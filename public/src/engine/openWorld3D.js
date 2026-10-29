@@ -25078,7 +25078,7 @@ export class OpenWorld3DEngine {
     if (!spriteData) return;
 
     const isMounted = Boolean(targetActor.mountGroup?.visible);
-    const startY = isMounted ? 3.48 : 2.84;
+    const startY = isMounted ? 3.84 : 3.20;
     spriteData.sprite.position.set(0, startY, 0);
     targetActor.root.add(spriteData.sprite);
 
@@ -25117,7 +25117,7 @@ export class OpenWorld3DEngine {
       }
 
       const isMounted = Boolean(b.actor?.mountGroup?.visible);
-      const targetY = isMounted ? 3.48 : 2.84;
+      const targetY = isMounted ? 3.84 : 3.20;
       b.sprite.position.y += (targetY - b.sprite.position.y) * Math.min(1.0, dt * 10.0);
 
       const remain = (b.expiresAt - now) / 800.0;
