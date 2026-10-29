@@ -24886,7 +24886,7 @@ export class OpenWorld3DEngine {
     return sprite;
   }
 
-  // --- ECHTES 3D-CHAT-SPRECHBLASEN-SYSTEM (Kompakter Metin2-Stil & Nameplate-Typografie) ---
+  // --- ECHTES 3D-CHAT-TEXT-SYSTEM (Rein freistehender Text ohne Hintergrund wie Metin2-Nameplates) ---
   createSpeechBubbleSprite(text = '', channel = 'normal', sender = '') {
     if (!text) return null;
     const cleanText = String(text).trim();
@@ -24894,11 +24894,11 @@ export class OpenWorld3DEngine {
 
     const measureCanvas = document.createElement('canvas');
     const mCtx = measureCanvas.getContext('2d');
-    const fontSize = 23;
+    const fontSize = 24;
     const fontStr = `bold ${fontSize}px Inter, "Segoe UI", Tahoma, sans-serif`;
     mCtx.font = fontStr;
 
-    const maxTextWidth = 300;
+    const maxTextWidth = 320;
     const rawWords = cleanText.split(/\s+/);
     const words = [];
     for (const w of rawWords) {
@@ -24948,41 +24948,26 @@ export class OpenWorld3DEngine {
       if (w > longestLineWidth) longestLineWidth = w;
     }
 
-    // Kompaktes Metin2-Design: Schlankes Padding, dezent transluzenter Grund, passende Proportionen
-    const padX = 10;
-    const padY = 5;
-    const lineHeight = 27;
+    // Schlankes Padding ohne Hintergrund-Box (nur Puffer gegen Kontur-Clipping)
+    const padX = 8;
+    const padY = 6;
+    const lineHeight = 28;
 
-    const bubbleW = Math.ceil(longestLineWidth + padX * 2);
-    const bubbleH = Math.ceil(padY * 2 + lines.length * lineHeight);
+    const textW = Math.ceil(longestLineWidth + padX * 2);
+    const textH = Math.ceil(padY * 2 + lines.length * lineHeight);
 
     const margin = 4;
-    const canvasW = Math.ceil((bubbleW + margin * 2) / 4) * 4;
-    const canvasH = Math.ceil((bubbleH + margin * 2) / 4) * 4;
+    const canvasW = Math.ceil((textW + margin * 2) / 4) * 4;
+    const canvasH = Math.ceil((textH + margin * 2) / 4) * 4;
 
     const canvas = document.createElement('canvas');
     canvas.width = canvasW;
     canvas.height = canvasH;
     const ctx = canvas.getContext('2d');
+    // Komplett transparenter Hintergrund - keine störende Box
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const bx = (canvasW - bubbleW) / 2;
-    const by = margin;
-
-    // Schlank abgerundeter, dezenter transluzenter Container (Metin2 Stil)
-    ctx.fillStyle = 'rgba(11, 18, 30, 0.75)';
-    if (ctx.roundRect) {
-      ctx.beginPath();
-      ctx.roundRect(bx, by, bubbleW, bubbleH, 4);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
-    } else {
-      ctx.fillRect(bx, by, bubbleW, bubbleH);
-    }
-
-    // Text mit tiefschwarzer Kontur und dezentem Schatten (exakt wie Spieler-Nameplate)
+    // Text mit tiefschwarzer Kontur und dezentem Schlagschatten (exakt wie Spieler-Nameplate)
     ctx.font = fontStr;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -24990,19 +24975,20 @@ export class OpenWorld3DEngine {
     ctx.lineJoin = 'round';
 
     let textColor = '#ffffff';
-    if (channel === 'global') textColor = '#ffd700';
-    else if (channel === 'trade') textColor = '#34d399';
-    else if (channel === 'guild') textColor = '#38bdf8';
+    if (channel === 'global') textColor = '#ffd700'; // Rufchat Goldgelb
+    else if (channel === 'trade') textColor = '#34d399'; // Handel Grün
+    else if (channel === 'guild') textColor = '#38bdf8'; // Gilde Cyan
 
-    const textStartY = by + padY + lineHeight / 2;
+    const textStartY = margin + padY + lineHeight / 2;
     for (let idx = 0; idx < lines.length; idx++) {
       const lineY = textStartY + idx * lineHeight;
+      // Starke Kontur + Schlagschatten für perfekte Lesbarkeit auf jedem Hintergrund
       ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-      ctx.shadowBlur = 3;
+      ctx.shadowBlur = 4;
       ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1.5;
+      ctx.shadowOffsetY = 2;
       ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 4.8;
+      ctx.lineWidth = 5.5;
       ctx.strokeText(lines[idx], canvasW / 2, lineY);
 
       ctx.shadowBlur = 0;
@@ -25031,7 +25017,7 @@ export class OpenWorld3DEngine {
 
     // Exakte optische Übereinstimmung mit der Nameplate (0.00525 Einheiten/Pixel):
     const worldPixelScale = 0.00525;
-    const baseW = Math.max(0.42, canvasW * worldPixelScale);
+    const baseW = Math.max(0.35, canvasW * worldPixelScale);
     const baseH = canvasH * worldPixelScale;
     sprite.scale.set(baseW, baseH, 1);
 
@@ -25092,7 +25078,7 @@ export class OpenWorld3DEngine {
     if (!spriteData) return;
 
     const isMounted = Boolean(targetActor.mountGroup?.visible);
-    const startY = isMounted ? 4.16 : 3.52;
+    const startY = isMounted ? 4.08 : 3.45;
     spriteData.sprite.position.set(0, startY, 0);
     targetActor.root.add(spriteData.sprite);
 
@@ -25131,7 +25117,7 @@ export class OpenWorld3DEngine {
       }
 
       const isMounted = Boolean(b.actor?.mountGroup?.visible);
-      const targetY = isMounted ? 4.16 : 3.52;
+      const targetY = isMounted ? 4.08 : 3.45;
       b.sprite.position.y += (targetY - b.sprite.position.y) * Math.min(1.0, dt * 10.0);
 
       const remain = (b.expiresAt - now) / 800.0;
