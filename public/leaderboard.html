@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>AERYNDOR: Legacy of the Monoliths – Ruhmeshalle &amp; Live-Rangliste</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/homepage.css?v=522" />
+  <style>
+    .lb-clickable-row {
+      cursor: pointer;
+      transition: background 0.18s ease, transform 0.15s ease;
+    }
+    .lb-clickable-row:hover {
+      background: rgba(216, 178, 92, 0.11) !important;
+    }
+    .lb-clickable-row:hover .char-name-link {
+      color: #fde047;
+      text-decoration: underline;
+    }
+    .char-name-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      color: var(--text-primary);
+      transition: color 0.18s ease;
+    }
+    .char-inspect-pill {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(216, 178, 92, 0.14);
+      border: 1px solid rgba(216, 178, 92, 0.35);
+      color: var(--gold-light);
+      letter-spacing: 0.04em;
+      opacity: 0.85;
+      transition: opacity 0.18s ease, background 0.18s ease;
+    }
+    .lb-clickable-row:hover .char-inspect-pill,
+    .legacy-pillar-card.is-clickable:hover .char-inspect-pill {
+      opacity: 1;
+      background: rgba(216, 178, 92, 0.28);
+    }
+    .legacy-pillar-card.is-clickable {
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .legacy-pillar-card.is-clickable:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55), 0 0 22px rgba(216, 178, 92, 0.22);
+    }
+
+    /* Charakter-Dossier Modal (Next-Gen Liquid Glass) */
+    .lb-char-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(3, 6, 14, 0.76);
+      backdrop-filter: blur(14px) saturate(150%);
+      -webkit-backdrop-filter: blur(14px) saturate(150%);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .lb-char-modal-backdrop.open {
+      display: flex;
+    }
+    .lb-char-modal {
+      width: 100%;
+      max-width: 1080px;
+      max-height: 91vh;
+      overflow-y: auto;
+      background: linear-gradient(165deg, rgba(11, 16, 30, 0.88) 0%, rgba(6, 10, 20, 0.92) 55%, rgba(12, 18, 34, 0.89) 100%);
+      backdrop-filter: blur(24px) saturate(175%);
+      -webkit-backdrop-filter: blur(24px) saturate(175%);
+      border: 1px solid rgba(216, 178, 92, 0.56);
+      border-radius: 26px;
+      box-shadow:
+        0 32px 80px rgba(0, 0, 0, 0.82),
+        0 0 42px rgba(216, 178, 92, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+      color: #f8fafc;
+      padding: 26px 28px;
+      position: relative;
+      animation: lbModalIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @keyframes lbModalIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .lb-cm-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid rgba(216, 178, 92, 0.38);
+      background: rgba(15, 23, 42, 0.65);
+      color: #f8fafc;
+      font-size: 1.05rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      z-index: 5;
+    }
+    .lb-cm-close:hover {
+      background: rgba(239, 68, 68, 0.28);
+      border-color: rgba(248, 113, 113, 0.72);
+      transform: scale(1.08) rotate(90deg);
+    }
+    .lb-cm-top {
+      display: grid;
+      grid-template-columns: 162px 1fr;
+      gap: 22px;
+      align-items: stretch;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(216, 178, 92, 0.22);
+      margin-bottom: 20px;
+    }
+    .lb-cm-portrait-box {
+      width: 162px;
+      height: 196px;
+      border-radius: 18px;
+      background: radial-gradient(circle at 50% 38%, rgba(216, 178, 92, 0.28) 0%, rgba(8, 12, 22, 0.88) 78%);
+      border: 1px solid rgba(216, 178, 92, 0.52);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .lb-cm-portrait-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.75));
+    }
+    .lb-cm-rank-tag {
+      position: absolute;
+      top: 9px;
+      left: 9px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      background: rgba(8, 12, 22, 0.88);
+      border: 1px solid rgba(250, 204, 21, 0.68);
+      color: #fde047;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      z-index: 2;
+    }
+    .lb-cm-hero-meta-pills {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .lb-cm-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+    .lb-cm-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .lb-cm-kpi-card {
+      padding: 10px 13px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(16, 24, 42, 0.62) 0%, rgba(9, 13, 24, 0.68) 100%);
+      border: 1px solid rgba(216, 178, 92, 0.24);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    .lb-cm-kpi-lbl {
+      font-size: 0.66rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+    .lb-cm-kpi-val {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .lb-cm-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .lb-cm-section {
+      background: linear-gradient(165deg, rgba(16, 23, 38, 0.56) 0%, rgba(9, 14, 26, 0.64) 100%);
+      border: 1px solid rgba(216, 178, 92, 0.24);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+      border-radius: 18px;
+      padding: 16px 18px;
+    }
+    .lb-cm-sec-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: var(--gold-light);
+      letter-spacing: 0.04em;
+      margin-bottom: 12px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .lb-cm-sec-badge {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(216, 178, 92, 0.14);
+      border: 1px solid rgba(216, 178, 92, 0.34);
+      color: #f5df9e;
+      white-space: nowrap;
+    }
+    .lb-cm-skill-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .lb-cm-skill-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .lb-cm-skill-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 11px;
+      border-radius: 12px;
+      background: rgba(8, 12, 22, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .lb-cm-skill-row:hover {
+      border-color: rgba(216, 178, 92, 0.42);
+      background: rgba(14, 20, 34, 0.74);
+    }
+    .lb-cm-skill-row img {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      border: 1px solid rgba(216, 178, 92, 0.48);
+      object-fit: cover;
+      flex-shrink: 0;
+      background: rgba(5, 8, 15, 0.9);
+    }
+    .lb-cm-skill-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .lb-cm-skill-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+    .lb-cm-skill-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #f8fafc;
+    }
+    .lb-cm-skill-sub {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lb-cm-bar {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    .lb-cm-bar > div {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+    .lb-cm-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .lb-cm-stat-box {
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: rgba(8, 12, 22, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.81rem;
+      white-space: nowrap;
+    }
+    .lb-cm-stat-box .stat-val-pill {
+      font-weight: 800;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+    .lb-cm-companion-card {
+      padding: 10px 13px;
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(12, 18, 34, 0.72), rgba(7, 11, 22, 0.58));
+      border: 1px solid rgba(216, 178, 92, 0.28);
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .lb-cm-companion-card .comp-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: radial-gradient(circle at 50% 40%, rgba(216, 178, 92, 0.25), rgba(8, 12, 22, 0.85));
+      border: 1px solid rgba(216, 178, 92, 0.42);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+    .lb-cm-companion-card .comp-icon img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+    }
+    .lb-cm-companion-card .comp-body {
+      min-width: 0;
+    }
+    .lb-cm-companion-card .comp-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+    .lb-cm-companion-card .comp-title {
+      font-size: 0.88rem;
+      font-weight: 800;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lb-cm-companion-card .comp-sub {
+      font-size: 0.72rem;
+      color: #cbd5e1;
+      margin-top: 2px;
+    }
+    .lb-cm-companion-card .comp-badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 800;
+      background: rgba(250, 204, 21, 0.12);
+      border: 1px solid rgba(250, 204, 21, 0.35);
+      white-space: nowrap;
+    }
+    .lb-cm-eq-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 11px;
+    }
+    .lb-cm-eq-item {
+      padding: 11px 13px;
+      border-radius: 15px;
+      background: linear-gradient(155deg, rgba(13, 19, 36, 0.72) 0%, rgba(7, 11, 22, 0.58) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr);
+      align-items: center;
+      gap: 13px;
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 6px 16px rgba(0, 0, 0, 0.24);
+    }
+    .lb-cm-eq-item:hover {
+      transform: translateY(-2px);
+      border-color: rgba(216, 178, 92, 0.52);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 24px rgba(0, 0, 0, 0.38);
+    }
+    .lb-cm-eq-icon-box {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border-radius: 13px;
+      background: radial-gradient(circle at 50% 42%, var(--eq-glow, rgba(216, 178, 92, 0.22)) 0%, rgba(6, 9, 18, 0.88) 78%);
+      border: 1.5px solid var(--eq-border, rgba(216, 178, 92, 0.42));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .lb-cm-eq-icon-box img {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.8));
+      transition: transform 0.22s ease;
+    }
+    .lb-cm-eq-item:hover .lb-cm-eq-icon-box img {
+      transform: scale(1.08);
+    }
+    .lb-cm-eq-plus {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #fde047, #d97706);
+      color: #090c14;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
+      line-height: 1.25;
+    }
+    .lb-cm-eq-body {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .lb-cm-eq-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .lb-cm-item-name {
+      font-size: 0.88rem;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lb-cm-slot-tag {
+      font-size: 0.66rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .lb-cm-bonus-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .lb-cm-bonus-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.69rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 7px;
+      background: rgba(216, 178, 92, 0.13);
+      border: 1px solid rgba(216, 178, 92, 0.32);
+      color: #f8fafc;
+    }
+    .lb-cm-bonus-empty {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #64748b;
+      font-style: italic;
+    }
+    .lb-cm-tab-bar {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: rgba(6, 9, 18, 0.65);
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .lb-cm-tab-btn {
+      border: none;
+      background: transparent;
+      color: #cbd5e1;
+      font-size: 0.74rem;
+      font-weight: 800;
+      padding: 5px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .lb-cm-tab-btn.active {
+      background: linear-gradient(135deg, #f5df9e 0%, #d8b25c 100%);
+      color: #090c14;
+      box-shadow: 0 3px 10px rgba(216, 178, 92, 0.35);
+    }
+    @media (max-width: 900px) {
+      .lb-cm-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .lb-cm-grid { grid-template-columns: 1fr; }
+      .lb-cm-skill-grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .lb-cm-top { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+      .lb-cm-hero-meta-pills { justify-content: center; }
+      .lb-cm-eq-list { grid-template-columns: 1fr; }
+      .lb-cm-stat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <canvas id="ember-canvas" aria-hidden="true"></canvas>
+
+  <header class="top-shell" id="top-shell">
+    <nav class="navbar" aria-label="Hauptnavigation">
+      <a href="/" class="nav-brand" title="Zurück zur Startseite">
+        <img src="/assets/client_ui/logo/1.png" alt="Aeryndor Wappen" class="nav-brand-crest" />
+        <div class="nav-brand-text">
+          <span class="nav-brand-title">AERYNDOR</span>
+          <span class="nav-brand-sub">Legacy of the Monoliths</span>
+        </div>
+      </a>
+
+      <div class="nav-links" id="nav-links">
+        <a href="/">Start</a>
+        <a href="/rangliste" class="active">🏆 Rangliste</a>
+        <a href="/download">⚡ Download</a>
+        <a href="/systeme">⚙️ Systeme</a>
+        <a href="/lore">📜 Lore</a>
+      </div>
+
+      <div class="nav-actions">
+        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="window.toggleColorTheme()" title="Zwischen Dark Mode &amp; Light Mode wechseln" aria-label="Farbschema umschalten">
+          <span id="theme-toggle-icon">☀️</span>
+        </button>
+                <a href="https://discord.gg/Q4gnqSAaSc" target="_blank" rel="noopener noreferrer" class="nav-btn-discord" title="Offizieller Aeryndor Discord-Server">
+          <svg class="discord-svg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+          <span>Discord</span>
+        </a>
+        <a href="/play" class="nav-btn-secondary" title="Sofort im Browser spielen (WebGL2 3D-Engine)">
+          <span class="nav-play-badge" aria-hidden="true">▶</span>
+          <span>Play Browser</span>
+          <span class="nav-play-dot" aria-hidden="true"></span>
+        </a>
+        <a href="/#userpanel" class="nav-btn-primary">
+          <span>Userpanel</span>
+        </a>
+        <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" onclick="window.toggleMobileDrawer()" aria-label="Menü öffnen" aria-expanded="false">
+          <span id="mobile-menu-icon">☰</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+      <div class="mobile-drawer-links">
+        <a href="/"><span>🏰</span> Startseite &amp; Userpanel</a>
+        <a href="/rangliste" class="active"><span>🏆</span> Ruhmeshalle (Rangliste)</a>
+        <a href="/download"><span>⚡</span> PC-Client Download</a>
+        <a href="/systeme"><span>⚙️</span> Spielsysteme &amp; Galerie</a>
+        <a href="/lore"><span>📜</span> Komplette Lore &amp; Klassen</a>
+      </div>
+    </div>
+
+    <div class="di-dock">
+      <div class="dynamic-island" id="dynamic-island" data-state="compact" role="region" aria-live="polite" tabindex="0">
+        <div class="di-compact" id="di-compact-trigger" title="Klicken zum Aufklappen">
+          <div class="di-leading">
+            <span class="di-orb" id="di-orb" data-tone="emerald"></span>
+          </div>
+          <div class="di-summary">
+            <span class="di-title" id="di-compact-title">Ruhmeshalle</span>
+            <span class="di-sep" aria-hidden="true">•</span>
+            <span class="di-sub" id="di-compact-sub">0 Online • -- ms</span>
+          </div>
+          <div class="di-trailing">
+            <span class="di-badge-pill" id="di-compact-badge">LIVE</span>
+          </div>
+        </div>
+        <div class="di-expanded" id="di-expanded-panel" aria-hidden="true">
+          <div class="di-exp-top">
+            <div class="di-exp-head">
+              <div class="di-exp-icon">🏆</div>
+              <div class="di-exp-titles">
+                <div class="di-exp-kicker">LIVE SERVER-DATENBANK</div>
+                <div class="di-exp-main" id="di-exp-title">Ruhmeshalle von Aeryndor</div>
+              </div>
+            </div>
+            <button type="button" class="di-close-btn" id="di-close-btn">✕</button>
+          </div>
+          <div class="di-exp-body">
+            Alle Helden aus Kaeryu und Seiryu werden live aus der Aeryndor-Datenbank synchronisiert.
+          </div>
+          <div class="di-exp-actions">
+            <button type="button" class="di-btn primary" onclick="window.loadLeaderboardStats(true)">🔄 Jetzt aktualisieren</button>
+            <a href="/" class="di-btn" style="text-decoration:none;text-align:center;">🏰 Zur Startseite</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="subpage-hero">
+    <div class="hero-backdrop" aria-hidden="true"></div>
+    <div class="hero-vignette" aria-hidden="true"></div>
+    <div class="subpage-hero-inner">
+      <div class="subpage-logos-bar">
+        <img src="/assets/client_ui/logo/2.png" alt="AERYNDOR: Legacy of the Monoliths" class="wordmark-lg" />
+      </div>
+      <h1 style="font-family:'Cinzel',serif;font-size:clamp(2rem,3.6vw,3rem);font-weight:900;line-height:1.12;">
+        RANGLISTE &amp; RUHMESHALLE
+      </h1>
+      <p class="hero-lead" style="max-width:820px;margin:0 auto;">
+        Die stärksten Klingenwächter, Schattenjäger, Runenmagier und Seelenweber aus Kaeryu und Seiryu – live sortiert nach Erfahrungsstufe, Rangpunkten und Goldschatz.
+      </p>
+    </div>
+  </section>
+
+  <section class="section-wrap reveal-on-scroll" style="padding-top:10px;">
+    <div class="hero-mini-stats" style="margin-bottom:28px;gap:14px;">
+      <div class="hero-mini-stat spotlight-card" style="padding:16px 12px;">
+        <div class="val" id="lb-stat-accounts" style="font-size:1.5rem;">--</div>
+        <div class="lbl" style="font-size:0.76rem;">Registrierte Accounts</div>
+      </div>
+      <div class="hero-mini-stat spotlight-card" style="padding:16px 12px;">
+        <div class="val" id="lb-stat-characters" style="font-size:1.5rem;">--</div>
+        <div class="lbl" style="font-size:0.76rem;">Erstellte Helden</div>
+      </div>
+      <div class="hero-mini-stat spotlight-card" style="padding:16px 12px;">
+        <div class="val" id="lb-stat-max-level" style="font-size:1.5rem;">--</div>
+        <div class="lbl" style="font-size:0.76rem;">Höchstes Level</div>
+      </div>
+      <div class="hero-mini-stat spotlight-card" style="padding:16px 12px;">
+        <div class="val" id="lb-stat-online" style="font-size:1.5rem;">--</div>
+        <div class="lbl" style="font-size:0.76rem;">Helden Online</div>
+      </div>
+      <div class="hero-mini-stat spotlight-card" style="padding:16px 12px;">
+        <div class="val" id="lb-stat-monoliths" style="font-size:1.5rem;">--</div>
+        <div class="lbl" style="font-size:0.76rem;">Aktive Rissmonolithen</div>
+      </div>
+    </div>
+
+    <div class="legacy-triad-grid" id="podium-grid" style="margin-bottom:28px;"></div>
+
+    <div class="lb-card spotlight-card">
+      <div class="lb-header">
+        <div>
+          <h3 style="font-family:'Cinzel',serif;font-size:1.35rem;color:var(--text-primary);">🏆 Top Helden-Chronik</h3>
+          <p style="font-size:0.84rem;color:var(--text-secondary);">Filtere nach Klasse oder suche gezielt nach einem Helden oder einer Stadt (Kaeryu / Seiryu)</p>
+        </div>
+        <button type="button" class="btn-refresh" onclick="window.loadLeaderboardStats(true)">
+          <span>🔄</span> <span>Rangliste aktualisieren</span>
+        </button>
+      </div>
+
+      <div class="lb-controls">
+        <div class="lb-filter-pills" id="lb-filter-pills">
+          <button type="button" class="lb-pill active" data-cls="all" onclick="window.filterLeaderboardClass('all')">Alle Klassen</button>
+          <button type="button" class="lb-pill" data-cls="Klingenwächter" onclick="window.filterLeaderboardClass('Klingenwächter')">⚔️ Klingenwächter</button>
+          <button type="button" class="lb-pill" data-cls="Schattenjäger" onclick="window.filterLeaderboardClass('Schattenjäger')">🗡️ Schattenjäger</button>
+          <button type="button" class="lb-pill" data-cls="Runenmagier" onclick="window.filterLeaderboardClass('Runenmagier')">🔮 Runenmagier</button>
+          <button type="button" class="lb-pill" data-cls="Seelenweber" onclick="window.filterLeaderboardClass('Seelenweber')">✨ Seelenweber</button>
+        </div>
+        <div class="lb-search-wrap">
+          <span class="lb-search-icon">🔍</span>
+          <input type="text" id="lb-search-input" class="lb-search-input" placeholder="Held oder Stadt suchen…" oninput="window.renderFilteredLeaderboard()" />
+        </div>
+      </div>
+
+      <div class="lb-table-wrap">
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>Held</th>
+              <th>Stadt</th>
+              <th>Klasse</th>
+              <th>Stufe</th>
+              <th>Rangpunkte</th>
+              <th>Goldschatz</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body">
+            <tr>
+              <td colspan="7" style="text-align:center;color:var(--text-secondary);padding:34px;">
+                Lade Helden-Chronik vom Server…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="/assets/client_ui/logo/2.png" alt="Aeryndor: Legacy of the Monoliths" class="wordmark" />
+        <span>© 2026 AERYNDOR: Legacy of the Monoliths – Das Vermächtnis der Monolithen.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Charakter-Info / Helden-Dossier Modal -->
+  <div class="lb-char-modal-backdrop" id="lb-char-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="lb-cm-hero-name">
+    <div class="lb-char-modal" id="lb-char-modal"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+      const CLASS_NAMES_DE = {
+        warrior: 'Klingenwächter', krieger: 'Klingenwächter',
+        assassin: 'Schattenjäger', assassine: 'Schattenjäger', ninja: 'Schattenjäger',
+        sura: 'Runenmagier', runenkrieger: 'Runenmagier', runenmagier: 'Runenmagier',
+        shaman: 'Seelenweber', schamane: 'Seelenweber', seelenweber: 'Seelenweber'
+      };
+      const CLASS_DOCTRINES = {
+        warrior: [
+          {
+            name: 'Körper-Kampf (Schwert-Aura & Kampfrausch)',
+            skills: [
+              { id: 'aura_sword', name: 'Aura des Schwerts', icon: '/assets/icons/skills/cropped/aura_sword.png' },
+              { id: 'whirlwind', name: 'Schwertwirbel', icon: '/assets/icons/skills/cropped/whirlwind.png' },
+              { id: 'three_way_cut', name: 'Dreiwege-Schnitt', icon: '/assets/icons/skills/cropped/three_way_cut.png' },
+              { id: 'dash_strike', name: 'Sausen', icon: '/assets/icons/skills/cropped/dash_strike.png' },
+              { id: 'berserk', name: 'Kampfrausch', icon: '/assets/icons/skills/cropped/berserk.png' },
+              { id: 'earthquake', name: 'Donnerschlag', icon: '/assets/icons/skills/cropped/earthquake.png', special: true },
+              { id: 'sword_finisher', name: 'Klingenschlag', icon: '/assets/icons/skills/cropped/sword_finisher.png', special: true }
+            ]
+          },
+          {
+            name: 'Mental-Kampf (Starker Körper & Durchschlag)',
+            skills: [
+              { id: 'aura_sword', name: 'Durchschlag', icon: '/assets/icons/skills/cropped/spirit_strike.png' },
+              { id: 'whirlwind', name: 'Heftiges Schlagen', icon: '/assets/icons/skills/cropped/bash.png' },
+              { id: 'three_way_cut', name: 'Stampfer', icon: '/assets/icons/skills/cropped/stump.png' },
+              { id: 'dash_strike', name: 'Starker Körper', icon: '/assets/icons/skills/cropped/strong_body.png' },
+              { id: 'berserk', name: 'Schwertschlag', icon: '/assets/icons/skills/cropped/sword_strike.png' },
+              { id: 'earthquake', name: 'Donnerschlag', icon: '/assets/icons/skills/cropped/earthquake.png', special: true },
+              { id: 'sword_finisher', name: 'Klingenschlag', icon: '/assets/icons/skills/cropped/sword_finisher.png', special: true }
+            ]
+          }
+        ],
+        assassin: [
+          {
+            name: 'Nahkampf-Assassine (Hinterhalt & Degenwirbel)',
+            skills: [
+              { id: 'shadow_step', name: 'Federschreiten', icon: '/assets/icons/skills/cropped/shadow_step.png' },
+              { id: 'ambush', name: 'Hinterhalt', icon: '/assets/icons/skills/cropped/ambush.png' },
+              { id: 'rolling_dagger', name: 'Degenwirbel', icon: '/assets/icons/skills/cropped/rolling_dagger.png' },
+              { id: 'poison_cloud', name: 'Giftwolke', icon: '/assets/icons/skills/cropped/poison_cloud.png' },
+              { id: 'stealth', name: 'Tarnung', icon: '/assets/icons/skills/cropped/stealth.png' },
+              { id: 'lightning_strike_ninja', name: 'Blitzangriff', icon: '/assets/icons/skills/cropped/lightning_strike_ninja.png', special: true },
+              { id: 'spark_slash', name: 'Funkenschlag', icon: '/assets/icons/skills/cropped/spark_slash.png', special: true }
+            ]
+          },
+          {
+            name: 'Fernkampf-Schütze (Feuerpfeil & Pfeilregen)',
+            skills: [
+              { id: 'shadow_step', name: 'Federschreiten', icon: '/assets/icons/skills/cropped/shadow_step.png' },
+              { id: 'ambush', name: 'Wiederholter Schuss', icon: '/assets/icons/skills/cropped/repetitive_shot.png' },
+              { id: 'rolling_dagger', name: 'Pfeilregen', icon: '/assets/icons/skills/cropped/arrow_shower.png' },
+              { id: 'poison_cloud', name: 'Feuerpfeil', icon: '/assets/icons/skills/cropped/fire_arrow.png' },
+              { id: 'stealth', name: 'Giftpfeil', icon: '/assets/icons/skills/cropped/poison_arrow.png' },
+              { id: 'lightning_strike_ninja', name: 'Blitzangriff', icon: '/assets/icons/skills/cropped/lightning_strike_ninja.png', special: true },
+              { id: 'spark_slash', name: 'Funkenschlag', icon: '/assets/icons/skills/cropped/spark_slash.png', special: true }
+            ]
+          }
+        ],
+        sura: [
+          {
+            name: 'Waffen-Sura (Verzauberte Klinge & TP-Absaugung)',
+            skills: [
+              { id: 'enchanted_blade', name: 'Verzauberte Klinge', icon: '/assets/icons/skills/cropped/enchanted_blade.png' },
+              { id: 'finger_strike', name: 'Fingerschlag', icon: '/assets/icons/skills/cropped/finger_strike.png' },
+              { id: 'dragon_swirl', name: 'Drachenwirbel', icon: '/assets/icons/skills/cropped/dragon_swirl.png' },
+              { id: 'dark_orb', name: 'Dunkler Stein', icon: '/assets/icons/skills/cropped/dark_orb.png' },
+              { id: 'enchanted_armor', name: 'Verzauberte Rüstung', icon: '/assets/icons/skills/cropped/enchanted_armor.png' },
+              { id: 'flame_strike', name: 'Flammenschlag', icon: '/assets/icons/skills/cropped/flame_strike.png', special: true },
+              { id: 'hell_lord', name: 'Höllenfürst', icon: '/assets/icons/skills/cropped/hell_lord.png', special: true }
+            ]
+          },
+          {
+            name: 'Magie-Sura (Zaubergeschwindigkeit & FKS)',
+            skills: [
+              { id: 'enchanted_blade', name: 'Dunkler Schlag', icon: '/assets/icons/skills/cropped/dark_strike.png' },
+              { id: 'finger_strike', name: 'Flammenschlag', icon: '/assets/icons/skills/cropped/flame_strike.png' },
+              { id: 'dragon_swirl', name: 'Geist der Flamme', icon: '/assets/icons/skills/cropped/flame_spirit.png' },
+              { id: 'dark_orb', name: 'Dunkler Schutz', icon: '/assets/icons/skills/cropped/dark_protection.png' },
+              { id: 'enchanted_armor', name: 'Dunkler Stein', icon: '/assets/icons/skills/cropped/dark_orb.png' },
+              { id: 'flame_strike', name: 'Flammenschlag', icon: '/assets/icons/skills/cropped/flame_strike.png', special: true },
+              { id: 'hell_lord', name: 'Höllenfürst', icon: '/assets/icons/skills/cropped/hell_lord.png', special: true }
+            ]
+          }
+        ],
+        shaman: [
+          {
+            name: 'Drachenmacht (Hilfe des Drachen & Segen)',
+            skills: [
+              { id: 'dragon_help', name: 'Hilfe des Drachen', icon: '/assets/icons/skills/cropped/dragon_help.png' },
+              { id: 'dragon_roar', name: 'Drachengebrüll', icon: '/assets/icons/skills/cropped/dragon_roar.png' },
+              { id: 'lightning_claw', name: 'Blitzkralle', icon: '/assets/icons/skills/cropped/lightning_claw.png' },
+              { id: 'natures_heal', name: 'Kurieren', icon: '/assets/icons/skills/cropped/natures_heal.png' },
+              { id: 'dragon_blessing', name: 'Segen', icon: '/assets/icons/skills/cropped/dragon_blessing.png' },
+              { id: 'thunderstorm', name: 'Gewittersturm', icon: '/assets/icons/skills/cropped/thunderstorm.png', special: true },
+              { id: 'meteor_shower', name: 'Meteorschauer', icon: '/assets/icons/skills/cropped/meteor_shower.png', special: true }
+            ]
+          },
+          {
+            name: 'Heilung & Blitz (Kurieren & Schnelligkeit)',
+            skills: [
+              { id: 'dragon_help', name: 'Blitzwurf', icon: '/assets/icons/skills/cropped/lightning_throw.png' },
+              { id: 'dragon_roar', name: 'Blitz heraufbeschwören', icon: '/assets/icons/skills/cropped/lightning_summon.png' },
+              { id: 'lightning_claw', name: 'Blitzkralle', icon: '/assets/icons/skills/cropped/lightning_claw.png' },
+              { id: 'natures_heal', name: 'Kurieren', icon: '/assets/icons/skills/cropped/natures_heal.png' },
+              { id: 'dragon_blessing', name: 'Schnelligkeit', icon: '/assets/icons/skills/cropped/swiftness.png' },
+              { id: 'thunderstorm', name: 'Gewittersturm', icon: '/assets/icons/skills/cropped/thunderstorm.png', special: true },
+              { id: 'meteor_shower', name: 'Meteorschauer', icon: '/assets/icons/skills/cropped/meteor_shower.png', special: true }
+            ]
+          }
+        ]
+      };
+      const PASSIVE_META = [
+        { id: 'monsterjaeger', name: 'Monsterjäger', bonus: '+1% Monster / St.', icon: '/assets/icons/skills/Passive/monsterjaeger.png' },
+        { id: 'metinbrecher', name: 'Monolithbrecher', bonus: '+1.5% Monolithen / St.', icon: '/assets/icons/skills/Passive/metinbrecher.png' },
+        { id: 'bossjaeger', name: 'Bossjäger', bonus: '+1% Bosse / St.', icon: '/assets/icons/skills/Passive/bossjaeger.png' },
+        { id: 'schmiedkunst', name: 'Schmiedekunst', bonus: '+0.5% Schmied / St.', icon: '/assets/icons/skills/Passive/schmiedkunst.png' },
+        { id: 'waffenmeister', name: 'Waffenmeister', bonus: '+8 AW / St.', icon: '/assets/icons/skills/Passive/waffenmeister.png' },
+        { id: 'ruestungsmeister', name: 'Rüstungsmeister', bonus: '+6 DEF / St.', icon: '/assets/icons/skills/Passive/ruestungsmeister.png' },
+        { id: 'kritischerinstinkt', name: 'Krit. Instinkt', bonus: '+0.75% Krit. / St.', icon: '/assets/icons/skills/Passive/kritischerinstinkt.png' },
+        { id: 'durchdringung', name: 'Durchdringung', bonus: '+0.75% Durchb. / St.', icon: '/assets/icons/skills/Passive/durchdringung.png' },
+        { id: 'kampftempo', name: 'Kampftempo', bonus: '+1% Angr.-Tempo / St.', icon: '/assets/icons/skills/Passive/kampftempo.png' },
+        { id: 'bewegungsexperte', name: 'Bewegungsexperte', bonus: '+1% Lauf-Tempo / St.', icon: '/assets/icons/skills/Passive/bewegungsexperte.png' },
+        { id: 'ausdauertraining', name: 'Ausdauertraining', bonus: '+5 Ausdauer / St.', icon: '/assets/icons/skills/Passive/ausdauertraining.png' },
+        { id: 'lebenskraft', name: 'Lebenskraft', bonus: '+150 Max. TP / St.', icon: '/assets/icons/skills/Passive/lebenskraft.png' },
+        { id: 'manakontrolle', name: 'Manakontrolle', bonus: '+80 Max. MP / St.', icon: '/assets/icons/skills/Passive/manakontrolle.png' },
+        { id: 'tpregen', name: 'TP-Regeneration', bonus: '+2.5% TP-Reg. / St.', icon: '/assets/icons/skills/Passive/tpregen.png' },
+        { id: 'mpregen', name: 'MP-Regeneration', bonus: '+2.5% MP-Reg. / St.', icon: '/assets/icons/skills/Passive/mpregen.png' },
+        { id: 'schnellerzauber', name: 'Schneller Zauber', bonus: '+1% Zaubertempo / St.', icon: '/assets/icons/skills/Passive/schnellerzauber.png' },
+        { id: 'pluenderer', name: 'Plünderer', bonus: '+1.5% Beute / St.', icon: '/assets/icons/skills/Passive/pluenderer.png' },
+        { id: 'metinsammler', name: 'Monolithsammler', bonus: '+1.5% Monolith-Loot', icon: '/assets/icons/skills/Passive/metinsammler.png' },
+        { id: 'bosserfahrung', name: 'Bosserfahrung', bonus: '+2% EXP / St.', icon: '/assets/icons/skills/Passive/bosserfahrung.png' },
+        { id: 'ressourcenkenntnis', name: 'Ressourcenkenntnis', bonus: '+1.5% Ertrag / St.', icon: '/assets/icons/skills/Passive/ressourcenkenntnis.png' }
+      ];
+      const PET_SKILLS_META = [
+        { id: 'auto_pickup', name: 'Auto-Pickup', bonus: 'Beute & Gold Auto-Loot', maxLv: 5, cat: 'aktiv', icon: '/assets/icons/skills/Pet/pet_skill_autopickup.png' },
+        { id: 'erneuerung', name: 'Erneuerung', bonus: 'Notfall-TP-Rettung', maxLv: 5, cat: 'aktiv', icon: '/assets/icons/skills/Pet/pet_skill_renewal.png' },
+        { id: 'heilung', name: 'Heilung', bonus: 'Kampf-TP-Heilung', maxLv: 5, cat: 'aktiv', icon: '/assets/icons/skills/Pet/pet_skill_healing.png' },
+        { id: 'erfahrungsrausch', name: 'Erfahrungsrausch', bonus: '+1.5% EXP / St.', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_exprush.png' },
+        { id: 'dungeonmeister', name: 'Dungeonmeister', bonus: '+1.25% Bosse / St.', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_dungeonmaster.png' },
+        { id: 'jaeger', name: 'Jäger', bonus: '+1.25% Monster & Risse', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_hunter.png' },
+        { id: 'schatzgraeber', name: 'Schatzgräber', bonus: '+1.5% Doppel-Gold', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_treasurehunter.png' },
+        { id: 'gluecksbringer', name: 'Glücksbringer', bonus: '+1.5% Doppel-Drop', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_luckycharm.png' },
+        { id: 'monsterschild', name: 'Monsterschild', bonus: '+0.75% Mob-Abwehr', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_monstershield.png' },
+        { id: 'erdverstaendnis', name: 'Erdverständnis', bonus: '+1% Kraft d. Erde', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_earthlore.png' },
+        { id: 'windverstaendnis', name: 'Windverständnis', bonus: '+1% Kraft d. Windes', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_windlore.png' },
+        { id: 'eisverstaendnis', name: 'Eisverständnis', bonus: '+1% Kraft d. Eises', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_icelore.png' },
+        { id: 'feuerverstaendnis', name: 'Feuerverständnis', bonus: '+1% Kraft d. Feuers', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_firelore.png' },
+        { id: 'dunkelheitverstaendnis', name: 'Dunkelheitverst.', bonus: '+1% Kraft d. Dunkelh.', maxLv: 20, cat: 'pvm', icon: '/assets/icons/skills/Pet/pet_skill_darknesslore.png' },
+        { id: 'herrschaft', name: 'Herrschaft', bonus: '+1% Halbmenschen', maxLv: 20, cat: 'pvp', icon: '/assets/icons/skills/Pet/pet_skill_sovereignty.png' },
+        { id: 'widerstand', name: 'Widerstand', bonus: '+0.75% PvP-Abwehr', maxLv: 20, cat: 'pvp', icon: '/assets/icons/skills/Pet/pet_skill_pvpresistance.png' },
+        { id: 'zerstoerung_fks', name: 'Zerstörung (FKS)', bonus: '+0.75% FKS-Schaden', maxLv: 20, cat: 'pvp', icon: '/assets/icons/skills/Pet/pet_skill_destructionfks.png' },
+        { id: 'beschuetzer_fks', name: 'Beschützer (FKS)', bonus: '+0.75% FKS-Abwehr', maxLv: 20, cat: 'pvp', icon: '/assets/icons/skills/Pet/pet_skill_protectorfks.png' },
+        { id: 'zerstoerung_dss', name: 'Zerstörung (DSS)', bonus: '+0.75% DSS-Schaden', maxLv: 20, cat: 'pvp', icon: '/assets/icons/skills/Pet/pet_skill_destructiondss.png' },
+        { id: 'beschuetzer_dss', name: 'Beschützer (DSS)', bonus: '+0.75% DSS-Abwehr', maxLv: 20, cat: 'pvp', icon: '/assets/icons/skills/Pet/pet_skill_protectordss.png' },
+        { id: 'resistenz', name: 'Resistenz', bonus: '+1.5% Status-Res.', maxLv: 20, cat: 'allgemein', icon: '/assets/icons/skills/Pet/pet_skill_resilience.png' },
+        { id: 'unberuehrbarkeit', name: 'Unberührbarkeit', bonus: '+0.75% Abblocken', maxLv: 20, cat: 'allgemein', icon: '/assets/icons/skills/Pet/pet_skill_invulnerability.png' },
+        { id: 'vampirismus', name: 'Vampirismus', bonus: '+0.5% TP-Absorb.', maxLv: 20, cat: 'allgemein', icon: '/assets/icons/skills/Pet/pet_skill_vampirism.png' },
+        { id: 'reichweite', name: 'Reichweite', bonus: '+0.15m Reichweite', maxLv: 20, cat: 'allgemein', icon: '/assets/icons/skills/Pet/pet_skill_archeryrange.png' }
+      ];
+      const SLOT_LABELS_DE = {
+        weapon: 'Waffe',
+        armor: 'Rüstung',
+        helmet: 'Helm',
+        shield: 'Schild',
+        gloves: 'Handschuhe',
+        bracelet: 'Armband',
+        necklace: 'Halskette',
+        earrings: 'Ohrringe',
+        shoes: 'Schuhe',
+        belt: 'Gürtel',
+        talisman: 'Talisman',
+        exp_ring: 'EXP-Ring',
+        thief_gloves: 'Diebeshandschuh',
+        luck_medal: 'Glücksmedaille',
+        wind_shoes: 'Windschuhe',
+        lolly: 'Magischer Lolly',
+        hmr: 'Halbmondring'
+      };
+      const SLOT_ORDER = {
+        weapon: 1,
+        armor: 2,
+        helmet: 3,
+        shield: 4,
+        gloves: 5,
+        bracelet: 6,
+        necklace: 7,
+        earrings: 8,
+        shoes: 9,
+        belt: 10,
+        talisman: 11,
+        exp_ring: 12,
+        lolly: 13,
+        hmr: 14,
+        thief_gloves: 15,
+        luck_medal: 16,
+        wind_shoes: 17
+      };
+      const RARITY_COLORS = {
+        common: '#cbd5e1',
+        rare: '#38bdf8',
+        epic: '#c084fc',
+        legendary: '#fbbf24',
+        mythic: '#f87171'
+      };
+      const RARITY_LABELS_DE = {
+        common: 'Gewöhnlich',
+        rare: 'Selten',
+        epic: 'Episch',
+        legendary: 'Legendär',
+        mythic: 'Mythisch'
+      };
+
+      function resolveEqItemIcon(it, clsKey) {
+        if (!it) return '/assets/icons/items/equipment/1/wood_sword.png';
+        const slot = String(it.slot || '').toLowerCase();
+        const ico = String(it.icon || '').toLowerCase();
+        const nm = String(it.name || '').toLowerCase();
+        const rar = String(it.rarity || 'common').toLowerCase();
+
+        if (slot === 'weapon' || slot === 'costume_weapon') {
+          if (ico === 'rsb' || ico === 'glaive_iron' || ico === 'sword_grudge' || nm.indexOf('glefe') !== -1 || nm.indexOf('brecher') !== -1 || nm.indexOf('groll') !== -1) {
+            return '/assets/icons/items/equipment/1/wood_axe.png';
+          }
+          if (ico === 'shadow_bow' || ico === 'bow_crow' || nm.indexOf('bogen') !== -1) {
+            return '/assets/icons/items/equipment/1/wood_bow.png';
+          }
+          if (ico === 'wood_staff' || nm.indexOf('stab') !== -1 || nm.indexOf('glocke') !== -1) {
+            return '/assets/icons/items/equipment/1/wood_staff.png';
+          }
+          if (ico === 'wood_wand' || clsKey === 'sura') {
+            return '/assets/icons/items/equipment/1/wood_wand.png';
+          }
+          return '/assets/icons/items/equipment/1/wood_sword.png';
+        }
+        if (slot === 'armor' || slot === 'costume' || slot === 'costume_armor') {
+          if (clsKey === 'assassin' || nm.indexOf('schatten') !== -1 || nm.indexOf('ninja') !== -1) return '/assets/icons/items/equipment/1/wood_armor_ninja.png';
+          if (clsKey === 'sura' || nm.indexOf('runen') !== -1 || nm.indexOf('sura') !== -1) return '/assets/icons/items/equipment/1/wood_armor_sura.png';
+          if (clsKey === 'shaman' || nm.indexOf('seelen') !== -1 || nm.indexOf('schaman') !== -1) return '/assets/icons/items/equipment/1/wood_armor_shaman.png';
+          return '/assets/icons/items/equipment/1/wood_armor_warrior.png';
+        }
+        if (slot === 'helmet' || slot === 'costume_hair') {
+          return (rar === 'epic' || rar === 'legendary' || rar === 'mythic')
+            ? '/assets/icons/items/equipment/1/wood_helm2.png'
+            : '/assets/icons/items/equipment/1/wood_helm.png';
+        }
+        if (slot === 'shield') return '/assets/icons/items/equipment/1/wood_shield.png';
+        if (slot === 'gloves' || slot === 'thief_gloves') return '/assets/icons/items/equipment/1/wood_gloves.png';
+        if (slot === 'bracelet') {
+          return (rar === 'epic' || rar === 'legendary' || rar === 'mythic' || nm.indexOf('himmel') !== -1)
+            ? '/assets/icons/items/equipment/1/wood_bracelet2.png'
+            : '/assets/icons/items/equipment/1/wood_bracelet.png';
+        }
+        if (slot === 'necklace') return '/assets/icons/items/equipment/1/wood_necklace.png';
+        if (slot === 'earrings') return '/assets/icons/items/equipment/1/wood_earrings.png';
+        if (slot === 'shoes' || slot === 'wind_shoes') {
+          return (rar !== 'common')
+            ? '/assets/icons/items/equipment/1/wood_greaves.png'
+            : '/assets/icons/items/equipment/1/wood_boots.png';
+        }
+        if (slot === 'belt') return '/assets/icons/items/equipment/1/wood_bracers.png';
+        if (slot === 'talisman') return '/assets/icons/items/uppitems/Ancestors_Amulet_of_the_Wilderness.png';
+        if (slot === 'exp_ring') return '/assets/icons/items/itemshop/ring_of_experience.png';
+        if (slot === 'lolly') return '/assets/icons/items/itemshop/lollipop.png';
+        if (slot === 'hmr') return '/assets/icons/items/itemshop/ring_moon.png';
+        if (slot === 'luck_medal') return '/assets/icons/items/itemshop/ring_emerald_luxury.png';
+        return '/assets/icons/items/equipment/1/wood_ring.png';
+      }
+
+      function formatBonusChip(b) {
+        if (!b || !b.name) return '';
+        const nm = String(b.name);
+        const low = nm.toLowerCase();
+        const isFlat = low === 'max. tp' || low === 'max. mp' || low === 'angriffswert' || low === 'verteidigung' || low.indexOf('(str)') !== -1 || low.indexOf('(dex)') !== -1 || low.indexOf('(int)') !== -1 || low.indexOf('(vit)') !== -1;
+        const unit = b.unit != null ? b.unit : (isFlat ? '' : '%');
+        const valTxt = b.value != null ? ' +' + b.value + unit : '';
+
+        let ico = '✨';
+        let bg = 'rgba(216, 178, 92, 0.13)';
+        let brd = 'rgba(216, 178, 92, 0.34)';
+        if (low.indexOf('stark gegen') !== -1 || low.indexOf('halbmenschen') !== -1 || low.indexOf('monster') !== -1 || low.indexOf('boss') !== -1 || low.indexOf('monolith') !== -1) {
+          ico = '⚔️';
+          bg = 'rgba(245, 158, 11, 0.14)';
+          brd = 'rgba(251, 191, 36, 0.38)';
+        } else if (low.indexOf('kritisch') !== -1 || low.indexOf('durchbohr') !== -1 || low.indexOf('angriffsgeschw') !== -1 || low.indexOf('zauber') !== -1 || low.indexOf('schaden') !== -1 || low.indexOf('angriffswert') !== -1) {
+          ico = '⚡';
+          bg = 'rgba(56, 189, 248, 0.14)';
+          brd = 'rgba(56, 189, 248, 0.38)';
+        } else if (low.indexOf('tp') !== -1 || low.indexOf('vitalität') !== -1) {
+          ico = '❤️';
+          bg = 'rgba(248, 113, 113, 0.14)';
+          brd = 'rgba(248, 113, 113, 0.38)';
+        } else if (low.indexOf('mp') !== -1 || low.indexOf('intelligenz') !== -1) {
+          ico = '💧';
+          bg = 'rgba(96, 165, 250, 0.14)';
+          brd = 'rgba(96, 165, 250, 0.38)';
+        } else if (low.indexOf('abblocken') !== -1 || low.indexOf('ausweichen') !== -1 || low.indexOf('widerstand') !== -1 || low.indexOf('verteidigung') !== -1) {
+          ico = '🛡️';
+          bg = 'rgba(168, 85, 247, 0.14)';
+          brd = 'rgba(192, 132, 252, 0.38)';
+        } else if (low.indexOf('exp') !== -1 || low.indexOf('yang') !== -1 || low.indexOf('drop') !== -1 || low.indexOf('beute') !== -1) {
+          ico = '🍀';
+          bg = 'rgba(16, 185, 129, 0.14)';
+          brd = 'rgba(52, 211, 153, 0.38)';
+        }
+
+        return '<span class="lb-cm-bonus-pill" style="background:' + bg + ';border-color:' + brd + ';"><span>' + ico + '</span><span>' + escapeHtml(nm + valTxt) + '</span></span>';
+      }
+
+      function getRepRankInfo(pts) {
+        const p = Number(pts || 0);
+        if (p >= 1000000) return { name: 'Unsterblich', color: '#e838c8', bonus: '+40% Monster, +20% HM' };
+        if (p >= 500000) return { name: 'Legendär', color: '#9333ea', bonus: '+20% Monster, +10% HM' };
+        if (p >= 200000) return { name: 'Göttlich', color: '#ff00ff', bonus: '+10% Monster' };
+        if (p >= 100000) return { name: 'Königlich', color: '#f59e0b', bonus: '+5% Monster' };
+        if (p >= 50000) return { name: 'Held', color: '#6ee7b7', bonus: '' };
+        if (p >= 20000) return { name: 'Ritterlich', color: '#38bdf8', bonus: '' };
+        if (p >= 10000) return { name: 'Edel', color: '#2563eb', bonus: '' };
+        if (p >= 5000) return { name: 'Gut', color: '#2b5c8f', bonus: '' };
+        if (p >= 1000) return { name: 'Freundlich', color: '#93c5fd', bonus: '' };
+        if (p >= 0) return { name: 'Neutral', color: '#cbd5e1', bonus: '' };
+        if (p >= -4999) return { name: 'Aggressiv', color: '#c85a17', bonus: '' };
+        if (p >= -9999) return { name: 'Arglistig', color: '#9a4400', bonus: '' };
+        if (p >= -19999) return { name: 'Bösartig', color: '#e5989b', bonus: '' };
+        if (p >= -49999) return { name: 'Grausam', color: '#d96b6b', bonus: '' };
+        if (p >= -99999) return { name: 'Rücksichtslos', color: '#ff0000', bonus: '' };
+        if (p >= -199999) return { name: 'Hinterhältig', color: '#cc0000', bonus: '' };
+        if (p >= -499999) return { name: 'Blutrünstig', color: '#800000', bonus: '+10% HM' };
+        return { name: 'Tödlich', color: '#5c1a1a', bonus: '+20% HM' };
+      }
+
+      function formatSkillStage(rawLv, isSpecial) {
+        if (isSpecial && (rawLv === undefined || rawLv === null || Number(rawLv) <= 0)) {
+          return { label: '🔒 Geheime Kunst (Lv. 30+)', color: '#94a3b8', pct: 0 };
+        }
+        const lv = Math.max(0, Number(rawLv || 0));
+        if (lv === 0) return { label: 'Stufe 0 / 20', color: '#94a3b8', pct: 0 };
+        if (lv < 20) {
+          return { label: 'Stufe ' + lv + ' / 20', color: '#ffe066', pct: Math.max(6, Math.round((lv / 20) * 100)) };
+        }
+        if (lv <= 29) {
+          const m = lv - 19;
+          return { label: 'M' + m + ' (Meister • ' + m + '/10)', color: '#38bdf8', pct: Math.round((m / 10) * 100) };
+        }
+        if (lv <= 39) {
+          const g = lv - 29;
+          return { label: 'G' + g + ' (Großmeister • ' + g + '/10)', color: '#fb923c', pct: Math.round((g / 10) * 100) };
+        }
+        if (lv < 49) {
+          const p = lv - 39;
+          return { label: 'P' + p + ' (Perfekter Meister • ' + p + '/10)', color: '#c084fc', pct: Math.round((p / 10) * 100) };
+        }
+        if (lv === 49) {
+          return { label: 'P10 (Perfekter Meister)', color: '#e879f9', pct: 100 };
+        }
+        return { label: '👑 L1 (MAXIMALSTUFE)', color: '#f59e0b', pct: 100 };
+      }
+
+      let currentLbClassFilter = 'all';
+      window._cachedLeaderboard = [];
+
+      function applyTheme(theme) {
+        const clean = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', clean);
+        const iconEl = document.getElementById('theme-toggle-icon');
+        if (iconEl) iconEl.textContent = clean === 'dark' ? '☀️' : '🌙';
+        try { localStorage.setItem('aeryndor_hp_theme', clean); } catch (_e) {}
+      }
+      window.toggleColorTheme = function () {
+        const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+      };
+      try {
+        const saved = localStorage.getItem('aeryndor_hp_theme');
+        if (saved === 'light' || saved === 'dark') applyTheme(saved);
+      } catch (_e) {}
+
+      window.toggleMobileDrawer = function () {
+        const d = document.getElementById('mobile-drawer');
+        if (d) d.classList.toggle('open');
+      };
+      const islandEl = document.getElementById('dynamic-island');
+      const trigger = document.getElementById('di-compact-trigger');
+      const closeBtn = document.getElementById('di-close-btn');
+      if (trigger && islandEl) {
+        trigger.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          islandEl.setAttribute('data-state', islandEl.getAttribute('data-state') === 'expanded' ? 'compact' : 'expanded');
+        });
+      }
+      if (closeBtn && islandEl) {
+        closeBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          islandEl.setAttribute('data-state', 'compact');
+        });
+      }
+
+      window.closeLeaderboardCharModal = function () {
+        const bd = document.getElementById('lb-char-modal-backdrop');
+        if (bd) bd.classList.remove('open');
+      };
+
+      document.getElementById('lb-char-modal-backdrop')?.addEventListener('click', function (ev) {
+        if (ev.target && ev.target.id === 'lb-char-modal-backdrop') {
+          window.closeLeaderboardCharModal();
+        }
+      });
+
+      window.filterLbCmPetSkills = function (cat, btnEl) {
+        if (btnEl && btnEl.parentElement) {
+          btnEl.parentElement.querySelectorAll('.lb-cm-tab-btn').forEach(function (b) {
+            b.classList.toggle('active', b === btnEl);
+          });
+        }
+        document.querySelectorAll('#lb-cm-pet-skills-grid .lb-cm-pet-skill-item').forEach(function (el) {
+          const itemCat = el.getAttribute('data-pet-cat') || 'all';
+          el.style.display = (cat === 'all' || itemCat === cat) ? 'flex' : 'none';
+        });
+      };
+
+      window.openLeaderboardCharModal = function (playerKey) {
+        const list = Array.isArray(window._cachedLeaderboard) ? window._cachedLeaderboard : [];
+        const row = list.find(function (r) {
+          return String(r.playerId || '') === String(playerKey) || String(r.name || '') === String(playerKey);
+        });
+        if (!row) return;
+
+        const bd = document.getElementById('lb-char-modal-backdrop');
+        const modal = document.getElementById('lb-char-modal');
+        if (!bd || !modal) return;
+
+        const rawCls = String(row.classId || 'warrior').toLowerCase();
+        const clsKey = rawCls === 'ninja' ? 'assassin' : (['warrior', 'assassin', 'sura', 'shaman'].includes(rawCls) ? rawCls : 'warrior');
+        const clsName = CLASS_NAMES_DE[clsKey] || escapeHtml(row.classId || 'Klingenwächter');
+        const genderStr = String(row.gender || 'm').toLowerCase();
+        const genderKey = (genderStr === 'f' || genderStr === 'female') ? 'f' : 'm';
+        const isKaeryu = String(row.empire || '').toLowerCase() === 'kaeryu' || String(row.cityName || '').toLowerCase() === 'kaeryu';
+        const cityLabel = isKaeryu ? 'Kaeryu' : 'Seiryu';
+        const cityIcon = isKaeryu ? '/assets/client_ui/wappen/Crest_Schattenreich.png' : '/assets/client_ui/wappen/Crest_Lichtreich.png';
+
+        const eqList = Array.isArray(row.equipment) ? row.equipment : [];
+        const aObj = eqList.find(function (it) { return it && it.slot === 'armor'; });
+        const tier = (aObj && Number(aObj.plus || 0) >= 4) || Number(row.level || 1) >= 15 ? 'armor' : 'base';
+        const portraitSrc = '/assets/homepage/' + clsKey + '_' + genderKey + '_' + tier + '.png';
+
+        const docList = CLASS_DOCTRINES[clsKey] || CLASS_DOCTRINES.warrior;
+        const docIdx = Number(row.doctrineIdx || 0) === 1 ? 1 : 0;
+        const activeDoc = docList[docIdx] || docList[0];
+
+        const rawSkills = (row.skills && typeof row.skills === 'object') ? row.skills : {};
+        const skillsHtml = activeDoc.skills.map(function (sk) {
+          const val = rawSkills[sk.id];
+          const st = formatSkillStage(val, Boolean(sk.special));
+          return (
+            '<div class="lb-cm-skill-row">' +
+              '<img src="' + sk.icon + '" alt="' + escapeHtml(sk.name) + '" onerror="this.src=\'/assets/icons/skills/cropped/common.png\'" />' +
+              '<div class="lb-cm-skill-info">' +
+                '<div class="lb-cm-skill-top">' +
+                  '<span>' + escapeHtml(sk.name) + (sk.special ? ' <span style="color:#fde047;font-size:0.7rem;">★</span>' : '') + '</span>' +
+                  '<span class="skill-stage-lbl" style="color:' + st.color + ';">' + escapeHtml(st.label) + '</span>' +
+                '</div>' +
+                '<div class="lb-cm-bar"><div style="width:' + st.pct + '%;background:' + st.color + ';color:' + st.color + ';"></div></div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+        const rawPassives = (row.passives && typeof row.passives === 'object') ? row.passives : {};
+        let maxedPassivesCount = 0;
+        const passivesHtml = PASSIVE_META.map(function (pm) {
+          const plv = Math.max(0, Math.min(20, Number(rawPassives[pm.id] || 0)));
+          if (plv >= 20) maxedPassivesCount++;
+          const pct = Math.round((plv / 20) * 100);
+          const col = plv >= 20 ? '#f59e0b' : plv > 0 ? '#38bdf8' : '#64748b';
+          return (
+            '<div class="lb-cm-skill-row is-compact" title="' + escapeHtml(pm.name + ' • ' + pm.bonus) + '">' +
+              '<img src="' + pm.icon + '" alt="' + escapeHtml(pm.name) + '" onerror="this.style.display=\'none\'" />' +
+              '<div class="lb-cm-skill-info">' +
+                '<div class="lb-cm-skill-top">' +
+                  '<span>' + escapeHtml(pm.name) + '</span>' +
+                  '<span class="skill-stage-lbl" style="color:' + col + ';">' + plv + ' / 20</span>' +
+                '</div>' +
+                '<div style="font-size:0.65rem;color:#94a3b8;margin-top:-2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(pm.bonus) + '</div>' +
+                '<div class="lb-cm-bar" style="height:4px;"><div style="width:' + pct + '%;background:' + col + ';color:' + col + ';"></div></div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+        const mInfo = row.mountInfo || { level: 1, dmgPoints: 0, hpPoints: 0 };
+        const horseLv = Number(mInfo.level || 1);
+        const horseTierTitle = horseLv >= 50 ? 'Militärgaul (Max. Stufe)' : horseLv >= 35 ? 'Kampfpferd' : 'Reitpferd';
+        const horseSub = horseLv >= 50 ? 'Alle 3 Reit-Kampfskills freigeschaltet' : 'Sattel-Training & Reitkunst aktiv';
+
+        const pInfo = row.petInfo || { name: 'Grüner Smaragddrache', level: 1, skills: {} };
+        const rawPetSkills = (pInfo.skills && typeof pInfo.skills === 'object') ? pInfo.skills : {};
+        let maxedPetSkillsCount = 0;
+        const petSkillsHtml = PET_SKILLS_META.map(function (ps) {
+          const maxLv = Number(ps.maxLv || 20);
+          const slv = Math.max(0, Math.min(maxLv, Number(rawPetSkills[ps.id] || 0)));
+          if (slv >= maxLv) maxedPetSkillsCount++;
+          const pct = Math.round((slv / maxLv) * 100);
+          const col = slv >= maxLv ? '#34d399' : slv > 0 ? '#38bdf8' : '#64748b';
+          const catBadge = ps.cat === 'aktiv' ? '⚡' : '';
+          return (
+            '<div class="lb-cm-skill-row is-compact lb-cm-pet-skill-item" data-pet-cat="' + ps.cat + '" title="' + escapeHtml(ps.name + ' • ' + ps.bonus) + '">' +
+              '<img src="' + ps.icon + '" alt="' + escapeHtml(ps.name) + '" onerror="this.style.display=\'none\'" />' +
+              '<div class="lb-cm-skill-info">' +
+                '<div class="lb-cm-skill-top">' +
+                  '<span>' + catBadge + escapeHtml(ps.name) + '</span>' +
+                  '<span class="skill-stage-lbl" style="color:' + col + ';">' + slv + ' / ' + maxLv + '</span>' +
+                '</div>' +
+                '<div style="font-size:0.65rem;color:#94a3b8;margin-top:-2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(ps.bonus) + '</div>' +
+                '<div class="lb-cm-bar" style="height:4px;"><div style="width:' + pct + '%;background:' + col + ';color:' + col + ';"></div></div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+        const sortedEqList = eqList.slice().sort(function (a, b) {
+          const oa = SLOT_ORDER[String(a && a.slot || '').toLowerCase()] || 99;
+          const ob = SLOT_ORDER[String(b && b.slot || '').toLowerCase()] || 99;
+          return oa - ob;
+        });
+
+        const eqHtml = sortedEqList.length > 0
+          ? sortedEqList.map(function (it) {
+              const slotLbl = SLOT_LABELS_DE[it.slot] || escapeHtml(it.slot || 'Slot');
+              const rarKey = String(it.rarity || 'common').toLowerCase();
+              const rCol = RARITY_COLORS[rarKey] || '#cbd5e1';
+              const rarLbl = RARITY_LABELS_DE[rarKey] || 'Ausrüstung';
+              const itemIconSrc = resolveEqItemIcon(it, clsKey);
+              const plusVal = Number(it.plus || 0);
+              const bonuses = Array.isArray(it.bonuses) ? it.bonuses : [];
+              const bonusPills = bonuses.length > 0
+                ? bonuses.map(formatBonusChip).filter(Boolean).join('')
+                : '<span class="lb-cm-bonus-empty">○ Keine Verzauberung aktiv</span>';
+              return (
+                '<div class="lb-cm-eq-item">' +
+                  '<div class="lb-cm-eq-icon-box" style="--eq-border:' + rCol + '88;--eq-glow:' + rCol + '38;">' +
+                    '<img src="' + itemIconSrc + '" alt="' + escapeHtml(it.name || 'Item') + '" onerror="this.src=\'/assets/icons/items/equipment/1/wood_sword.png\'" />' +
+                    (plusVal > 0 ? '<span class="lb-cm-eq-plus">+' + plusVal + '</span>' : '') +
+                  '</div>' +
+                  '<div class="lb-cm-eq-body">' +
+                    '<div class="lb-cm-eq-head">' +
+                      '<span class="lb-cm-item-name" style="color:' + rCol + ';text-shadow:0 0 10px ' + rCol + '33;">' + escapeHtml(it.name || 'Item') + (plusVal > 0 ? ' +' + plusVal : '') + '</span>' +
+                      '<span class="lb-cm-slot-tag" style="border-color:' + rCol + '44;color:' + rCol + ';">' + slotLbl + ' • ' + rarLbl + '</span>' +
+                    '</div>' +
+                    '<div class="lb-cm-bonus-pills">' + bonusPills + '</div>' +
+                  '</div>' +
+                '</div>'
+              );
+            }).join('')
+          : '<div style="grid-column:1/-1;color:#94a3b8;font-size:0.8rem;padding:8px;">Keine Ausrüstung angelegt.</div>';
+
+        const repInfo = getRepRankInfo(row.reputation);
+        const safeName = escapeHtml(row.name || 'Held');
+        const safeGuild = escapeHtml(row.guild || 'Keine Gilde');
+        const safeRep = Number(row.reputation || 0).toLocaleString('de-DE');
+        const safeGold = Number(row.yang || 0).toLocaleString('de-DE');
+        const safeShards = Number(row.shards || 0).toLocaleString('de-DE');
+        const safeHp = Number(row.maxHp || 950).toLocaleString('de-DE');
+        const safeMp = Number(row.maxMp || 260).toLocaleString('de-DE');
+
+        modal.innerHTML =
+          '<button type="button" class="lb-cm-close" onclick="window.closeLeaderboardCharModal()" title="Schließen">✕</button>' +
+          '<div class="lb-cm-top">' +
+            '<div class="lb-cm-portrait-box">' +
+              '<span class="lb-cm-rank-tag">Rang #' + Number(row.rank || 1) + '</span>' +
+              '<img src="' + portraitSrc + '" alt="' + safeName + '" />' +
+            '</div>' +
+            '<div style="min-width:0;">' +
+              '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px;">' +
+                '<h2 id="lb-cm-hero-name" style="font-family:\'Cinzel\',serif;font-size:1.75rem;font-weight:900;color:#fff;margin:0;letter-spacing:0.03em;">' + safeName + '</h2>' +
+                '<span class="lvl-pill" style="font-size:0.85rem;">Lv. ' + Number(row.level || 1) + '</span>' +
+                '<span style="padding:4px 11px;border-radius:999px;font-size:0.72rem;font-weight:800;background:' + (row.online ? 'rgba(16,185,129,0.18)' : 'rgba(148,163,184,0.14)') + ';color:' + (row.online ? '#34d399' : '#94a3b8') + ';border:1px solid ' + (row.online ? 'rgba(16,185,129,0.4)' : 'rgba(148,163,184,0.25)') + ';">' +
+                  (row.online ? '● LIVE ONLINE' : '○ Offline') +
+                '</span>' +
+              '</div>' +
+              '<div class="lb-cm-hero-meta-pills">' +
+                '<span class="lb-cm-meta-pill">⚔️ <b>' + clsName + '</b> • ' + escapeHtml(activeDoc.name) + '</span>' +
+                '<span class="lb-cm-meta-pill"><img src="' + cityIcon + '" alt="" style="width:15px;height:15px;object-fit:contain;" /> Stadt <b>' + cityLabel + '</b></span>' +
+                '<span class="lb-cm-meta-pill">🛡️ Gilde: <b>' + safeGuild + '</b></span>' +
+              '</div>' +
+              '<div class="lb-cm-kpi-grid">' +
+                '<div class="lb-cm-kpi-card">' +
+                  '<span class="kpi-label">Rang &amp; Rangpunkte</span>' +
+                  '<b class="kpi-val" style="color:' + repInfo.color + ';text-shadow:0 0 12px ' + repInfo.color + '44;display:inline-flex;align-items:center;gap:6px;"><img src="/assets/icons/items/ranking_points/zen_bean_rainbow.png" alt="" style="width:18px;height:18px;object-fit:contain;" />' + repInfo.name + '</b>' +
+                  '<span class="kpi-sub">⚔️ ' + safeRep + ' Rangpunkte' + (repInfo.bonus ? ' (' + repInfo.bonus + ')' : '') + '</span>' +
+                '</div>' +
+                '<div class="lb-cm-kpi-card">' +
+                  '<span class="kpi-label">Goldschatz</span>' +
+                  '<b class="kpi-val" style="color:var(--gold-light);display:inline-flex;align-items:center;gap:6px;"><img src="/assets/icons/currency/gold.png" alt="" style="width:18px;height:18px;object-fit:contain;" />' + safeGold + '</b>' +
+                  '<span class="kpi-sub">Yang Vermögen</span>' +
+                '</div>' +
+                '<div class="lb-cm-kpi-card">' +
+                  '<span class="kpi-label">Vital-Ressourcen</span>' +
+                  '<b class="kpi-val" style="color:#f87171;display:inline-flex;align-items:center;gap:6px;"><img src="/assets/icons/items/potion/roter_trank.png" alt="" style="width:18px;height:18px;object-fit:contain;" />' + safeHp + ' TP</b>' +
+                  '<span class="kpi-sub" style="color:#60a5fa;display:inline-flex;align-items:center;gap:4px;"><img src="/assets/icons/items/potion/blauer_trank.png" alt="" style="width:14px;height:14px;object-fit:contain;" />' + safeMp + ' Max. MP</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="lb-cm-grid">' +
+            '<div class="lb-cm-section">' +
+              '<div class="lb-cm-sec-title">' +
+                '<span>⚔️ Aktive Klassen-Fertigkeiten</span>' +
+                '<span class="lb-cm-sec-badge">1–20 • M • G • P • L1</span>' +
+              '</div>' +
+              '<div class="lb-cm-skill-list">' + skillsHtml + '</div>' +
+            '</div>' +
+
+            '<div class="lb-cm-section">' +
+              '<div class="lb-cm-sec-title">' +
+                '<span>📊 Charakter-Attribute &amp; Begleiter</span>' +
+                '<span class="lb-cm-sec-badge">Basis &amp; Reittier</span>' +
+              '</div>' +
+              '<div class="lb-cm-stat-grid">' +
+                '<div class="lb-cm-stat-box"><span>❤️ Vitalität (VIT)</span><b class="stat-val-pill">' + Number(row.vit || 16) + '</b></div>' +
+                '<div class="lb-cm-stat-box"><span>💧 Intelligenz (INT)</span><b class="stat-val-pill">' + Number(row.int || 10) + '</b></div>' +
+                '<div class="lb-cm-stat-box"><span>⚔️ Stärke (STR)</span><b class="stat-val-pill">' + Number(row.str || 16) + '</b></div>' +
+                '<div class="lb-cm-stat-box"><span>🏹 Beweglichkeit (DEX)</span><b class="stat-val-pill">' + Number(row.dex || 12) + '</b></div>' +
+              '</div>' +
+              '<div class="lb-cm-companion-card">' +
+                '<div class="comp-icon"><img src="/assets/icons/items/mount/mount_seal.png" alt="Reittier" /></div>' +
+                '<div class="comp-body">' +
+                  '<div class="comp-label">Reittier &amp; Sattel-Ausbau</div>' +
+                  '<div class="comp-title" style="color:#fde047;">' + escapeHtml(horseTierTitle) + '</div>' +
+                  '<div class="comp-sub">' + escapeHtml(horseSub) + ' • ⚔️ +' + Number(mInfo.dmgPoints || 0) + ' DMG • ❤️ +' + Number(mInfo.hpPoints || 0) + ' TP/DEF</div>' +
+                '</div>' +
+                '<div class="comp-badge" style="color:#fde047;">Lv. ' + horseLv + ' / 50</div>' +
+              '</div>' +
+              '<div class="lb-cm-companion-card">' +
+                '<div class="comp-icon" style="border-color:rgba(52,211,153,0.45);background:radial-gradient(circle at 50% 40%,rgba(16,185,129,0.25),rgba(8,12,22,0.85));"><img src="/assets/icons/items/pet/pet_seal.png" alt="Begleiter Pet" /></div>' +
+                '<div class="comp-body">' +
+                  '<div class="comp-label">Aktiver Begleiter (Pet)</div>' +
+                  '<div class="comp-title" style="color:#34d399;">' + escapeHtml(pInfo.name || 'Grüner Smaragddrache') + '</div>' +
+                  '<div class="comp-sub">' + maxedPetSkillsCount + ' / ' + PET_SKILLS_META.length + ' Pet-Skills auf Maximalstufe</div>' +
+                '</div>' +
+                '<div class="comp-badge" style="color:#34d399;border-color:rgba(52,211,153,0.35);background:rgba(16,185,129,0.12);">Lv. ' + Number(pInfo.level || 1) + ' / 120</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="lb-cm-section" style="margin-bottom:18px;">' +
+            '<div class="lb-cm-sec-title">' +
+              '<span>🛡️ Angelegte Ausrüstung &amp; Verzauberungen</span>' +
+              '<span class="lb-cm-sec-badge">' + eqList.length + ' Teile angelegt</span>' +
+            '</div>' +
+            '<div class="lb-cm-eq-list">' + eqHtml + '</div>' +
+          '</div>' +
+
+          '<div class="lb-cm-grid">' +
+            '<div class="lb-cm-section">' +
+              '<div class="lb-cm-sec-title">' +
+                '<span>📜 Passive Charakter-Fertigkeiten (Alle 20)</span>' +
+                '<span class="lb-cm-sec-badge">' + maxedPassivesCount + ' / 20 Max (Lv. 20)</span>' +
+              '</div>' +
+              '<div class="lb-cm-skill-grid-2">' + passivesHtml + '</div>' +
+            '</div>' +
+
+            '<div class="lb-cm-section">' +
+              '<div class="lb-cm-sec-title">' +
+                '<span>🐉 Begleiter Pet-Skills (' + escapeHtml(pInfo.name || 'Pet') + ')</span>' +
+                '<span class="lb-cm-sec-badge">' + maxedPetSkillsCount + ' / 24 Max (Lv. 20)</span>' +
+              '</div>' +
+              '<div class="lb-cm-tab-bar">' +
+                '<button type="button" class="lb-cm-tab-btn active" onclick="window.filterLbCmPetSkills(\'all\', this)">Alle (24)</button>' +
+                '<button type="button" class="lb-cm-tab-btn" onclick="window.filterLbCmPetSkills(\'aktiv\', this)">⚡ Aktiv (3)</button>' +
+                '<button type="button" class="lb-cm-tab-btn" onclick="window.filterLbCmPetSkills(\'pvm\', this)">👹 PvM (11)</button>' +
+                '<button type="button" class="lb-cm-tab-btn" onclick="window.filterLbCmPetSkills(\'pvp\', this)">⚔️ PvP (6)</button>' +
+                '<button type="button" class="lb-cm-tab-btn" onclick="window.filterLbCmPetSkills(\'allgemein\', this)">🛡️ Allgemein (4)</button>' +
+              '</div>' +
+              '<div id="lb-cm-pet-skills-grid" class="lb-cm-skill-grid-2">' + petSkillsHtml + '</div>' +
+            '</div>' +
+          '</div>';
+
+        bd.classList.add('open');
+      };
+
+      window.filterLeaderboardClass = function (clsName) {
+        currentLbClassFilter = clsName || 'all';
+        document.querySelectorAll('#lb-filter-pills .lb-pill').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-cls') === currentLbClassFilter);
+        });
+        window.renderFilteredLeaderboard();
+      };
+
+      function renderPodium(list) {
+        const pod = document.getElementById('podium-grid');
+        if (!pod) return;
+        const top3 = list.slice(0, 3);
+        if (top3.length === 0) { pod.innerHTML = ''; return; }
+        const medals = ['🥇 1. Platz • Champion', '🥈 2. Platz • Großmeister', '🥉 3. Platz • Herausforderer'];
+        const borderColors = ['rgba(250, 204, 21, 0.55)', 'rgba(203, 213, 225, 0.45)', 'rgba(251, 146, 60, 0.45)'];
+        pod.innerHTML = top3.map(function (row, idx) {
+          const clsKey = String(row.classId || 'warrior').toLowerCase();
+          const clsName = CLASS_NAMES_DE[clsKey] || escapeHtml(row.classId || 'Klingenwächter');
+          const safeName = escapeHtml(row.name || 'Unbekannt');
+          const safeKey = escapeHtml(row.playerId || row.name || '');
+          const isKaeryu = String(row.empire || '').toLowerCase() === 'kaeryu' || String(row.cityName || '').toLowerCase() === 'kaeryu';
+          const cityLabel = isKaeryu ? 'Kaeryu' : 'Seiryu';
+          const safeLevel = Number(row.level || 1);
+          const rawRep = Number(row.reputation != null ? row.reputation : (row.kills || 0));
+          const safeRep = rawRep.toLocaleString('de-DE');
+          const repInfo = getRepRankInfo(rawRep);
+          const safeGold = Number(row.yang != null ? row.yang : (row.gold || 0)).toLocaleString('de-DE');
+          return (
+            '<div class="legacy-pillar-card spotlight-card is-clickable podium-rank-' + (idx + 1) + '" data-char-key="' + safeKey + '" onclick="window.openLeaderboardCharModal(this.getAttribute(\'data-char-key\'))" title="Klicken für Charakter-Info &amp; Skill-Level von ' + safeName + '" style="border-color:' + borderColors[idx] + ';">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+                '<span style="font-size:0.76rem;font-weight:800;color:var(--gold-light);text-transform:uppercase;letter-spacing:0.08em;">' + medals[idx] + '</span>' +
+                '<span class="lvl-pill">Lv. ' + safeLevel + '</span>' +
+              '</div>' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;">' +
+                '<h4 style="font-size:1.35rem;color:#ffffff;margin:0;">' + safeName + '</h4>' +
+                '<span class="char-inspect-pill">🔍 Charakter-Info</span>' +
+              '</div>' +
+              '<p style="font-size:0.85rem;color:var(--text-secondary);">' + clsName + ' • Stadt ' + cityLabel + '</p>' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--glass-border-subtle);font-size:0.84rem;font-weight:700;">' +
+                '<span style="color:' + repInfo.color + ';text-shadow:0 0 8px ' + repInfo.color + '44;">⚔️ ' + safeRep + ' Rangpunkte <span style="font-size:0.74rem;opacity:0.92;">(' + repInfo.name + ')</span></span>' +
+                '<span style="color:var(--gold-light);">🪙 ' + safeGold + ' Yang</span>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      window.renderFilteredLeaderboard = function () {
+        const tbody = document.getElementById('leaderboard-body');
+        if (!tbody) return;
+        const list = Array.isArray(window._cachedLeaderboard) ? window._cachedLeaderboard : [];
+        const searchEl = document.getElementById('lb-search-input');
+        const q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+
+        const filtered = list.filter(function (row) {
+          const clsKey = String(row.classId || 'warrior').toLowerCase();
+          const clsName = CLASS_NAMES_DE[clsKey] || String(row.classId || 'Klingenwächter');
+          if (currentLbClassFilter !== 'all' && clsName !== currentLbClassFilter) return false;
+          if (q) {
+            const nameStr = String(row.name || '').toLowerCase();
+            const isKaeryu = String(row.empire || '').toLowerCase() === 'kaeryu' || String(row.cityName || '').toLowerCase() === 'kaeryu';
+            const cityStr = isKaeryu ? 'kaeryu' : 'seiryu';
+            return nameStr.includes(q) || cityStr.includes(q) || clsName.toLowerCase().includes(q);
+          }
+          return true;
+        });
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:28px;">Keine passenden Helden für diesen Filter gefunden.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = filtered.slice(0, 25).map(function (row) {
+          const r = Number(row.rank) || 1;
+          const rankClass = r === 1 ? 'r1' : r === 2 ? 'r2' : r === 3 ? 'r3' : '';
+          const clsKey = String(row.classId || 'warrior').toLowerCase();
+          const clsName = CLASS_NAMES_DE[clsKey] || escapeHtml(row.classId || 'Klingenwächter');
+          const safeName = escapeHtml(row.name || 'Unbekannt');
+          const safeKey = escapeHtml(row.playerId || row.name || '');
+          const isKaeryu = String(row.empire || '').toLowerCase() === 'kaeryu' || String(row.cityName || '').toLowerCase() === 'kaeryu';
+          const cityLabel = isKaeryu ? 'Kaeryu' : 'Seiryu';
+          const cityIcon = isKaeryu ? '/assets/client_ui/wappen/Crest_Schattenreich.png' : '/assets/client_ui/wappen/Crest_Lichtreich.png';
+          const safeLevel = Number(row.level || 1);
+          const rawRep = Number(row.reputation != null ? row.reputation : (row.kills || 0));
+          const safeRep = rawRep.toLocaleString('de-DE');
+          const repInfo = getRepRankInfo(rawRep);
+          const safeGold = Number(row.yang != null ? row.yang : (row.gold || 0)).toLocaleString('de-DE');
+          return (
+            '<tr class="lb-clickable-row" data-char-key="' + safeKey + '" onclick="window.openLeaderboardCharModal(this.getAttribute(\'data-char-key\'))" title="Klicken für Charakter-Info &amp; aktuelle Skill-Level von ' + safeName + '">' +
+              '<td><span class="rank-badge ' + rankClass + '">' + r + '</span></td>' +
+              '<td class="char-cell"><span class="char-name-link"><span>' + safeName + '</span><span class="char-inspect-pill">🔍 Info</span></span></td>' +
+              '<td><span class="class-pill" style="display:inline-flex;align-items:center;gap:6px;"><img src="' + cityIcon + '" alt="" style="width:18px;height:18px;object-fit:contain;" />' + cityLabel + '</span></td>' +
+              '<td><span class="class-pill">' + clsName + '</span></td>' +
+              '<td><span class="lvl-pill">Lv. ' + safeLevel + '</span></td>' +
+              '<td><span style="display:inline-flex;align-items:center;gap:6px;font-weight:800;color:' + repInfo.color + ';text-shadow:0 0 10px ' + repInfo.color + '44;">⚔️ ' + safeRep + ' Rangpunkte <span style="padding:2px 8px;border-radius:999px;font-size:0.7rem;background:' + repInfo.color + '20;border:1px solid ' + repInfo.color + '60;color:' + repInfo.color + ';">' + repInfo.name + '</span></span></td>' +
+              '<td class="gold-cell">🪙 ' + safeGold + ' Yang</td>' +
+            '</tr>'
+          );
+        }).join('');
+      };
+
+      window.loadLeaderboardStats = async function () {
+        const t0 = performance.now();
+        try {
+          const res = await fetch('/api/homepage-stats', { cache: 'no-store' });
+          if (!res.ok) return;
+          const data = await res.json();
+          const ping = Math.max(4, Math.round(performance.now() - t0));
+          const list = data.leaderboard || [];
+          const maxLv = list.reduce(function (m, r) { return Math.max(m, Number(r.level || 1)); }, 1);
+          const onlineCnt = Number(data.onlinePlayers != null ? data.onlinePlayers : (data.onlineCount || 0));
+
+          document.getElementById('lb-stat-accounts').textContent = Number(data.totalAccounts || 0).toLocaleString('de-DE');
+          document.getElementById('lb-stat-characters').textContent = Number(data.totalCharacters || 0).toLocaleString('de-DE');
+          document.getElementById('lb-stat-max-level').textContent = 'Lv. ' + maxLv;
+          document.getElementById('lb-stat-online').textContent = onlineCnt.toLocaleString('de-DE');
+          document.getElementById('lb-stat-monoliths').textContent = Number(data.activeMonoliths != null ? data.activeMonoliths : 18).toLocaleString('de-DE');
+
+          const subEl = document.getElementById('di-compact-sub');
+          if (subEl) subEl.textContent = onlineCnt + ' Online • ' + ping + ' ms';
+          const pingPill = document.getElementById('lb-ping-pill');
+          if (pingPill) pingPill.textContent = ping + ' ms LATENZ';
+
+          window._cachedLeaderboard = list;
+          renderPodium(list);
+          window.renderFilteredLeaderboard();
+        } catch (_e) {}
+      };
+
+      window.loadLeaderboardStats();
+      setInterval(window.loadLeaderboardStats, 25000);
+
+      window.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') {
+          window.closeLeaderboardCharModal();
+          return;
+        }
+        if (ev.key === 'F5' || ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R'))) {
+          ev.preventDefault();
+          window.location.reload();
+        }
+      });
+
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('is-visible'); obs.unobserve(e.target); }
+          });
+        }, { threshold: 0.08 });
+        document.querySelectorAll('.reveal-on-scroll').forEach(function (el) { obs.observe(el); });
+      } else {
+        document.querySelectorAll('.reveal-on-scroll').forEach(function (el) { el.classList.add('is-visible'); });
+      }
+    })();
+  </script>
+  <script src="/js/lang-switcher.js?v=532"></script>
+</body>
+</html>

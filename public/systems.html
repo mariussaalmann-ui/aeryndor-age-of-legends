@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>AERYNDOR: Legacy of the Monoliths – Spielsysteme, Features &amp; Bildergalerie</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/homepage.css?v=522" />
+</head>
+<body>
+
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <canvas id="ember-canvas" aria-hidden="true"></canvas>
+
+  <header class="top-shell" id="top-shell">
+    <nav class="navbar" aria-label="Hauptnavigation">
+      <a href="/" class="nav-brand" title="Zurück zur Startseite">
+        <img src="/assets/client_ui/logo/1.png" alt="Aeryndor Wappen" class="nav-brand-crest" />
+        <div class="nav-brand-text">
+          <span class="nav-brand-title">AERYNDOR</span>
+          <span class="nav-brand-sub">Legacy of the Monoliths</span>
+        </div>
+      </a>
+
+      <div class="nav-links" id="nav-links">
+        <a href="/">Start</a>
+        <a href="/rangliste">🏆 Rangliste</a>
+        <a href="/download">⚡ Download</a>
+        <a href="/systeme" class="active">⚙️ Systeme</a>
+        <a href="/lore">📜 Lore</a>
+      </div>
+
+      <div class="nav-actions">
+        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="window.toggleColorTheme()" title="Zwischen Dark Mode &amp; Light Mode wechseln" aria-label="Farbschema umschalten">
+          <span id="theme-toggle-icon">☀️</span>
+        </button>
+                <a href="https://discord.gg/Q4gnqSAaSc" target="_blank" rel="noopener noreferrer" class="nav-btn-discord" title="Offizieller Aeryndor Discord-Server">
+          <svg class="discord-svg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+          <span>Discord</span>
+        </a>
+        <a href="/play" class="nav-btn-secondary" title="Sofort im Browser spielen (WebGL2 3D-Engine)">
+          <span class="nav-play-badge" aria-hidden="true">▶</span>
+          <span>Play Browser</span>
+          <span class="nav-play-dot" aria-hidden="true"></span>
+        </a>
+        <a href="/#userpanel" class="nav-btn-primary">
+          <span>Userpanel</span>
+        </a>
+        <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" onclick="window.toggleMobileDrawer()" aria-label="Menü öffnen" aria-expanded="false">
+          <span id="mobile-menu-icon">☰</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+      <div class="mobile-drawer-links">
+        <a href="/"><span>🏰</span> Startseite &amp; Userpanel</a>
+        <a href="/rangliste"><span>🏆</span> Ruhmeshalle (Rangliste)</a>
+        <a href="/download"><span>⚡</span> PC-Client Download</a>
+        <a href="/systeme" class="active"><span>⚙️</span> Spielsysteme &amp; Galerie</a>
+        <a href="/lore"><span>📜</span> Komplette Lore &amp; Klassen</a>
+      </div>
+    </div>
+
+    <div class="di-dock">
+      <div class="dynamic-island" id="dynamic-island" data-state="compact" role="region" aria-live="polite" tabindex="0">
+        <div class="di-compact" id="di-compact-trigger" title="Klicken zum Aufklappen">
+          <div class="di-leading">
+            <span class="di-orb" id="di-orb" data-tone="emerald"></span>
+          </div>
+          <div class="di-summary">
+            <span class="di-title" id="di-compact-title">Aeryndor Systeme</span>
+            <span class="di-sep" aria-hidden="true">•</span>
+            <span class="di-sub" id="di-compact-sub">0 Online • -- ms</span>
+          </div>
+          <div class="di-trailing">
+            <span class="di-badge-pill" id="di-compact-badge">ONLINE</span>
+          </div>
+        </div>
+        <div class="di-expanded" id="di-expanded-panel" aria-hidden="true">
+          <div class="di-exp-top">
+            <div class="di-exp-head">
+              <div class="di-exp-icon">⚙️</div>
+              <div class="di-exp-titles">
+                <div class="di-exp-kicker">AERYNDOR ENGINE &amp; GAMEPLAY</div>
+                <div class="di-exp-main" id="di-exp-title">Spielsysteme &amp; Feature-Vorstellung</div>
+              </div>
+            </div>
+            <button type="button" class="di-close-btn" id="di-close-btn">✕</button>
+          </div>
+          <div class="di-exp-body">
+            Entdecke alle Kernmechaniken von Aeryndor: Rissmonolithen, Action-Kampf, Schmiede, Begleiter, HUD und das erweiterbare Bilder-Archiv.
+          </div>
+          <div class="di-exp-actions">
+            <a href="/lore" class="di-btn primary" style="text-decoration:none;text-align:center;">📜 Zur Lore-Chronik</a>
+            <a href="/" class="di-btn" style="text-decoration:none;text-align:center;">🏰 Zur Startseite</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="subpage-hero">
+    <div class="hero-backdrop" aria-hidden="true"></div>
+    <div class="hero-vignette" aria-hidden="true"></div>
+    <div class="subpage-hero-inner">
+      <div class="subpage-logos-bar">
+        <img src="/assets/client_ui/logo/2.png" alt="AERYNDOR: Legacy of the Monoliths" class="wordmark-lg" />
+      </div>
+      <h1 style="font-family:'Cinzel',serif;font-size:clamp(2rem,3.6vw,3rem);font-weight:900;line-height:1.12;">
+        SPIELSYSTEME &amp; FEATURES
+      </h1>
+      <p class="hero-lead" style="max-width:820px;margin:0 auto;">
+        Hier findest du alle zentralen Systeme von <strong>Aeryndor: Legacy of the Monoliths</strong> im Detail erklärt und mit Bildern illustriert. Jedes Bild lässt sich per Klick im Vollbild vergrößern.
+      </p>
+    </div>
+  </section>
+
+  <nav class="sticky-subnav" id="sys-category-bar" aria-label="System-Kategorien filtern">
+    <a href="#systeme-grid" class="active" onclick="return window.filterSystems('all', this)">✨ Alle Systeme (10)</a>
+    <a href="#systeme-grid" onclick="return window.filterSystems('combat', this)">⚔️ Kampf, Bosse &amp; Rissmonolithen</a>
+    <a href="#systeme-grid" onclick="return window.filterSystems('progression', this)">⚒️ Schmiede, Items &amp; Skills</a>
+    <a href="#systeme-grid" onclick="return window.filterSystems('world', this)">🤖 KI-Helden, Pets, Mounts &amp; Welt</a>
+    <a href="#systeme-grid" onclick="return window.filterSystems('ui', this)">🖥️ Interface &amp; Technik</a>
+  </nav>
+
+  <section class="section-wrap reveal-on-scroll" id="systeme-grid">
+    <div class="sys-showcase-grid">
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="combat">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/client_ui/logo/3.png', 'Rissmonolithen-System: 18 Rissmonolithen (Lv. 5–90), 3 Stufen &amp; level-passende Riss-Elitebosse')">
+          <img src="/assets/client_ui/logo/3.png" alt="Rissmonolithen-System" loading="lazy" />
+          <span class="sys-cat-badge">⚔️ Kern-System</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>1. Das Rissmonolithen-Netzwerk, 3 Stufen &amp; Level-Elitebosse</h3>
+          <p>
+            Überall in Aeryndor schlagen <strong>18 Rissmonolithen (Level 5 bis 90)</strong> ein. Jeder Monolith durchläuft drei Stufen: <strong>Stufe 1: Schlafend</strong> (dropt <em>Monolithensplitter</em>), <strong>Stufe 2: Instabil</strong> (erweckbar mit 1× <em>Monolithensplitter</em> – beschwört <strong>exakt zum Monolith-Level passende Riss-Elitebosse &amp; Monsterwellen</strong> wie <em>Roter Zornkeiler, Grizzlybär, Weißer Königstiger, Schwarzwind-Gu-Ryung oder Wilder General</em>) und <strong>Stufe 3: Erweckt</strong> (erweckbar mit 1× <em>Erwachter Risskern</em> – öffnet ein Portal für den <strong>Gebiets-Weltboss</strong> mit 5× Beute-Resonanz).
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">⚡ 18 Rissmonolithen (Lv. 5–90)</span>
+            <span class="sys-bullet-tag">👹 Level-passende Riss-Elitebosse</span>
+            <span class="sys-bullet-tag">👑 Weltboss-Portal auf Stufe 3</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="ui">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/systems/hud_interface_live.jpg', 'Das Aeryndor Ingame-Interface mit Charakterfenster, Inventar, Kompass-Minimap und Quest-Tracker')">
+          <img src="/assets/homepage/systems/hud_interface_live.jpg?v=485" alt="Aeryndor Interface &amp; HUD" loading="lazy" />
+          <span class="sys-cat-badge">🖥️ Interface &amp; HUD</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>2. Maßgeschneidertes Fantasy-HUD &amp; Echtzeit-Telemetrie</h3>
+          <p>
+            Das Ingame-Interface von Aeryndor kombiniert edle gold-metallische Ornamentik mit kristallklarer Übersicht. Die hochauflösende Minimap zeigt aktive Rissmonolithen, NPCs und Gruppenmitglieder in Echtzeit, während Statuskugeln, Buff-Timer und frei belegbare Skill-Slots dir im Gefecht volle Kontrolle geben.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🗺️ Live-Radar &amp; Minimap</span>
+            <span class="sys-bullet-tag">⚡ 144+ FPS Native Engine</span>
+            <span class="sys-bullet-tag">⌨️ Direkte Hotkey-Steuerung</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="progression">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/systems/skills_showcase.png', 'Fertigkeiten &amp; Meisterschaften der Klassen in Aeryndor')">
+          <img src="/assets/homepage/systems/skills_showcase.png" alt="Fertigkeiten &amp; Meisterschaften" loading="lazy" />
+          <span class="sys-cat-badge">⚒️ Charakter-Entwicklung</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>3. Fertigkeiten, Runenmagie &amp; Meisterschaften</h3>
+          <p>
+            Jede der vier Klassen – <strong>Klingenwächter, Schattenjäger, Runenkrieger/Runenmagier und Seelenweber</strong> – besitzt einzigartige aktive Kampffertigkeiten und mächtige Auren. Durch Fertigkeitsbücher und Seelensteine entwickelst du deine Fähigkeiten stufenweise weiter, wobei sich auch ihre visuellen Partikeleffekte verstärken.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🔥 Klassenspezifische Auren</span>
+            <span class="sys-bullet-tag">📖 Fertigkeitsbücher &amp; Runen</span>
+            <span class="sys-bullet-tag">✨ Dynamische Partikeleffekte</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="progression">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/systems/forge_items.png', 'Waffen, Rüstungen und Artefakte – Veredelung von +0 bis +9')">
+          <img src="/assets/homepage/systems/forge_items.png" alt="Schmiedekunst &amp; Ausrüstung" loading="lazy" />
+          <span class="sys-cat-badge">⚒️ Schmiede &amp; Beute</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>4. Schmiedekunst (+0 bis +9) &amp; Reine Seelensplitter</h3>
+          <p>
+            Bei den Meisterschmieden von Kaeryu, Seiryu und Bakra kannst du deine Waffen, Rüstungen und Schmuckstücke von <strong>+0 bis auf +9</strong> verbessern. Mit höheren Stufen steigen nicht nur Grundschaden und Verteidigung, sondern deine Ausrüstung erhält auch einen intensiven magischen Schimmer. Seltene <strong>Seelensplitter</strong> aus Rissmonolithen dienen als Schlüsselmaterial.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🔨 Upgrade-System +0 bis +9</span>
+            <span class="sys-bullet-tag">🔮 Reine Seelensplitter</span>
+            <span class="sys-bullet-tag">🌟 Visueller Rüstungs-Glanz</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="world">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/systems/pets_mounts.png', 'Treue Begleiter (Pets) und Reittier-System in Aeryndor')">
+          <img src="/assets/homepage/systems/pets_mounts.png" alt="Begleiter &amp; Reittiere" loading="lazy" />
+          <span class="sys-cat-badge">🐾 Pets &amp; Mounts</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>5. Reittier-Kampf (Mounts) &amp; 10 3D-Begleiter-Pets mit Kampfsynergie</h3>
+          <p>
+            Durchquere die weitläufigen Regionen Aeryndors auf dem Rücken mächtiger Kriegspferde und mystischer Reittiere – inklusive flüssigem <strong>berittenem Nahkampf</strong> direkt vom Sattel aus. Zusätzlich begleiten dich <strong>10 detailreiche 3D-Pets</strong> (von Boden-Begleitern wie <em>Kriegselefant, Flammenkobold &amp; Mini-Sensenmann</em> bis zu schwebenden Drachen &amp; Phönixen), deren Level, Statuspunkte und <strong>21 passive Pet-Skills</strong> deinen Helden direkt mit <strong>+Angriffswert, +Magie-AW und +% Monsterschaden</strong> verstärken.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🐎 Berittener Nahkampf (Lv. 1–50)</span>
+            <span class="sys-bullet-tag">🐾 10 3D-Pets (Lv. 1–120 &amp; 21 Skills)</span>
+            <span class="sys-bullet-tag">⚡ Direkte +AW &amp; +% DMG Synergie</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="combat">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/systems/boss_target_ui.png', '3 Gebietsbosse (15 Min. Respawn), Map-2-Dungeonboss Malakor (Lv. 35) &amp; Drop-Vorschau')">
+          <img src="/assets/homepage/systems/boss_target_ui.png" alt="Gebietsbosse, Dungeonboss &amp; Ziel-System" loading="lazy" />
+          <span class="sys-cat-badge">⚔️ Bosse &amp; Dungeons</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>6. 3 Gebietsbosse (15 Min.), Map-2-Dungeonboss &amp; Drop-Vorschau</h3>
+          <p>
+            Auf den drei großen Boss-Plätzen der offenen Welt patrouillieren <strong>3 feste Gebietsbosse mit 15 Minuten Respawn-Zeit</strong>: 2× <em>Lykos der Bestienfürst (Lv. 20)</em> im Westen &amp; Osten sowie der <em>Brutale Hauptmann (Lv. 35)</em> im Süden von Bakra. In den <strong>Äther-Katakomben</strong> erwartet dich zudem der verstärkte <strong>Map-2-Dungeonboss Schwarzwind-Kriegsherr Malakor (Lv. 35)</strong> samt Elite-Leibwächtern und Lv.-30-Artefaktbeute.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">⏱️ 3 Gebietsbosse (15m Respawn)</span>
+            <span class="sys-bullet-tag">🏰 Map-2-Dungeonboss Malakor (Lv. 35)</span>
+            <span class="sys-bullet-tag">📦 Live Drop- &amp; TP-Vorschau</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="combat">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/sura_f_armor.png', 'Maßgeschneiderte 3D-Charakter- &amp; Rüstungsmodelle für alle 4 Klassen (Männlich &amp; Weiblich)')">
+          <img src="/assets/homepage/sura_f_armor.png" alt="Charakter- &amp; Rüstungssystem" class="contain-img" loading="lazy" />
+          <span class="sys-cat-badge">⚔️ 4 Klassen • 8 Pfade</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>7. Treffer-Feedback, Trefferzonen &amp; 8 Heldenmodelle</h3>
+          <p>
+            Im Kampf zählt jedes Ausweichmanöver und jede Schlagkombination: AoE-Schwertwirbel erfassen ganze Monsterhorden gleichzeitig. Alle vier Klassen sind sowohl als <strong>männlicher Held</strong> als auch als <strong>weibliche Heldin</strong> mit maßgeschneiderten Rüstungssets spielbar.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">♂️♀️ Männlich &amp; Weiblich wählbar</span>
+            <span class="sys-bullet-tag">💥 Dynamischer AoE-Nahkampf</span>
+            <span class="sys-bullet-tag">🛡️ Sichtbare Rüstungs-Sets</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="world">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/world_map.jpg', 'Zusammenhängende Open World von Kaeryu und Seiryu über das Weol-Denkmal bis Bakra')">
+          <img src="/assets/homepage/world_map.jpg" alt="Offene Spielwelt Aeryndor" loading="lazy" />
+          <span class="sys-cat-badge">🌍 Open World &amp; Cloud</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>8. Zusammenhängende Open World &amp; Nahtloser Account</h3>
+          <p>
+            Reise von den grünen Wiesen rund um <strong>Kaeryu und Seiryu</strong> über das <strong>Weol-Denkmal</strong> und den <strong>See Sohan</strong> bis in die herbstlichen Wälder von <strong>Bakra</strong>. Dein Aeryndor-Account ist in Echtzeit mit dem Server synchronisiert – spiele wahlweise im nativen Windows PC-Client oder direkt im Browser.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🏰 3 Städte &amp; Heiligtümer</span>
+            <span class="sys-bullet-tag">🔄 PC-Client &amp; Browser-Sync</span>
+            <span class="sys-bullet-tag">🪙 Ingame-Itemshop</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="world">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/warrior_m_armor.png', 'Autonome KI-Helden (Bots): Intelligente Monsterjagd, Rissmonolith-Erweckung &amp; gemeinsame Weltboss-Raids')">
+          <img src="/assets/homepage/warrior_m_armor.png" alt="Intelligente KI-Helden &amp; Koop-Weltboss-Jagd" class="contain-img" loading="lazy" />
+          <span class="sys-cat-badge">🤖 Autonome KI-Helden</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>9. 12 Autonome KI-Helden (KI v5.0), Physische NPC-/Stadt-KI &amp; Koop-Raids</h3>
+          <p>
+            Aeryndor lebt rund um die Uhr durch <strong>12 autonome KI-Helden (6 in Seiryu, 6 in Kaeryu)</strong> auf Basis der neuen <strong>KI v5.0 Omni-Synergy</strong>: Sie gehen physisch zu Quest-NPCs zur Quest-Annahme &amp; Belohnungs-Abholung, besuchen Dorfschmied (+9), Seelenweberin &amp; Händlerin in den Städten, beschwören ihre 3D-Pets, erwecken Rissmonolithen auf Stufe 2 &amp; 3, jagen alle 3 festen 15-Minuten-Kartenbosse mit taktischem Schildblock/Ausweichen und antworten Spielern im Messenger &amp; Handel mit echten Live-Daten!
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🧬 12 KI-Helden (KI v5.0 Omni-Synergy)</span>
+            <span class="sys-bullet-tag">📜 Physische NPC-Quests &amp; Stadtrundgänge</span>
+            <span class="sys-bullet-tag">⚖️ 600-Kill Live-Auto-Balancing</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="sys-feature-card spotlight-card" data-sys-cat="progression">
+        <div class="sys-feature-media zoomable-media" onclick="window.openLightbox('/assets/homepage/assassin_f_armor.png', 'Tapferkeitsumhänge, Gruppen-EXP-Bonus (+15% bis +100%) &amp; originalgetreue 1x2 / 1x1 Ausrüstungs-Icons')">
+          <img src="/assets/homepage/assassin_f_armor.png" alt="Tapferkeitsumhänge, Gruppen-Synergie &amp; Inventar-System" class="contain-img" loading="lazy" />
+          <span class="sys-cat-badge">🛡️ Taktik &amp; Wirtschaft</span>
+          <span class="sys-zoom-hint">🔍 Bild vergrößern</span>
+        </div>
+        <div class="sys-feature-body">
+          <h3>10. Tapferkeitsumhänge, Gruppen-Synergie &amp; 1×2 Ausrüstungs-Slots</h3>
+          <p>
+            Ziehe mit <strong>Tapferkeitsumhängen</strong> alle Monster im Umkreis magisch an, um riesige Wellen auf einmal zu vernichten. In Gruppen bis zu 8 Spielern (oder gemeinsam mit KI-Helden) erhältst du <strong>+15% bis +100% Gruppen-EXP-Bonus</strong>. Das überarbeitete Charakter- &amp; Inventar-UI bietet zudem detailgetreue <strong>1×2 Langslots für Waffen &amp; Rüstungen</strong>, 1×1 Schmuckslots sowie freie <strong>Spieler-Marktstände (Bazar)</strong>.
+          </p>
+          <div class="sys-bullet-tags">
+            <span class="sys-bullet-tag">🧣 Tapferkeitsumhang-Pull</span>
+            <span class="sys-bullet-tag">👥 Bis +100% Gruppen-EXP</span>
+            <span class="sys-bullet-tag">🗡️ 1×2 &amp; 1×1 Ingame-Slot-Design</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <div class="lightbox-modal" id="lightbox-modal" onclick="window.closeLightbox(event)" role="dialog" aria-modal="true">
+    <div class="lightbox-box" onclick="event.stopPropagation()">
+      <button type="button" class="lightbox-close" onclick="window.closeLightbox()">✕</button>
+      <img id="lightbox-img" src="" alt="Vollbild-Vorschau" />
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="/assets/client_ui/logo/2.png" alt="Aeryndor: Legacy of the Monoliths" class="wordmark" />
+        <span>© 2026 AERYNDOR: Legacy of the Monoliths – Das Vermächtnis der Monolithen.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+
+      window.filterSystems = function (cat, linkEl) {
+        document.querySelectorAll('#sys-category-bar a').forEach(function (a) { a.classList.toggle('active', a === linkEl); });
+        document.querySelectorAll('.sys-feature-card').forEach(function (card) {
+          card.style.display = (cat === 'all' || card.getAttribute('data-sys-cat') === cat) ? '' : 'none';
+        });
+        return false;
+      };
+
+      function applyTheme(theme) {
+        const clean = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', clean);
+        const iconEl = document.getElementById('theme-toggle-icon');
+        if (iconEl) iconEl.textContent = clean === 'dark' ? '☀️' : '🌙';
+        try { localStorage.setItem('aeryndor_hp_theme', clean); } catch (_e) {}
+      }
+      window.toggleColorTheme = function () {
+        const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+      };
+      try {
+        const saved = localStorage.getItem('aeryndor_hp_theme');
+        if (saved === 'light' || saved === 'dark') applyTheme(saved);
+      } catch (_e) {}
+
+      window.toggleMobileDrawer = function () {
+        const d = document.getElementById('mobile-drawer');
+        if (d) d.classList.toggle('open');
+      };
+
+      const islandEl = document.getElementById('dynamic-island');
+      const trigger = document.getElementById('di-compact-trigger');
+      const closeBtn = document.getElementById('di-close-btn');
+      if (trigger && islandEl) {
+        trigger.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          islandEl.setAttribute('data-state', islandEl.getAttribute('data-state') === 'expanded' ? 'compact' : 'expanded');
+        });
+      }
+      if (closeBtn && islandEl) {
+        closeBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          islandEl.setAttribute('data-state', 'compact');
+        });
+      }
+
+      async function pollStatus() {
+        const t0 = performance.now();
+        try {
+          const res = await fetch('/api/homepage-stats', { cache: 'no-store' });
+          if (!res.ok) return;
+          const data = await res.json();
+          const ping = Math.max(4, Math.round(performance.now() - t0));
+          const online = Number(data.onlinePlayers != null ? data.onlinePlayers : (data.onlineCount || 0));
+          const subEl = document.getElementById('di-compact-sub');
+          if (subEl) subEl.textContent = online + ' Online • ' + ping + ' ms';
+        } catch (_e) {}
+      }
+      pollStatus();
+      setInterval(pollStatus, 25000);
+
+      window.openLightbox = function (src, cap) {
+        const m = document.getElementById('lightbox-modal');
+        const img = document.getElementById('lightbox-img');
+        const c = document.getElementById('lightbox-caption');
+        if (!m || !img) return;
+        img.src = src;
+        if (c) c.textContent = cap || '';
+        m.classList.add('open');
+      };
+      window.closeLightbox = function () {
+        const m = document.getElementById('lightbox-modal');
+        if (m) m.classList.remove('open');
+      };
+      window.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') window.closeLightbox();
+        if (ev.key === 'F5' || ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R'))) {
+          ev.preventDefault();
+          window.location.reload();
+        }
+      });
+
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('is-visible'); obs.unobserve(e.target); }
+          });
+        }, { threshold: 0.08 });
+        document.querySelectorAll('.reveal-on-scroll').forEach(function (el) { obs.observe(el); });
+      } else {
+        document.querySelectorAll('.reveal-on-scroll').forEach(function (el) { el.classList.add('is-visible'); });
+      }
+    })();
+  </script>
+  <script src="/js/lang-switcher.js?v=532"></script>
+</body>
+</html>

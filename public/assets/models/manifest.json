@@ -1,0 +1,877 @@
+{
+  "monsters": {
+    "pewi_stray_dog": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -18.71,
+        -70.85,
+        -0.42
+      ],
+      "bbox_max": [
+        18.71,
+        57.83,
+        95.07
+      ],
+      "height_cm": 95.49,
+      "textures": [
+        "pewi_stray_dog_col1.png",
+        "pewi_stray_dog_col2.png",
+        "pewi_stray_dog_col3.png",
+        "pewi_stray_dog_col4.png"
+      ]
+    },
+    "mr_pewi_boar": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -35.25,
+        -114.04,
+        -0.28
+      ],
+      "bbox_max": [
+        35.25,
+        149.59,
+        131.97
+      ],
+      "height_cm": 132.25,
+      "textures": [
+        "boar_col1.png",
+        "boar_col2.png",
+        "boar_col3.png",
+        "boar_col4.png"
+      ]
+    },
+    "pewi_bear": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -74.31,
+        -225.93,
+        -2.04
+      ],
+      "bbox_max": [
+        74.31,
+        112.89,
+        197.77
+      ],
+      "height_cm": 199.81,
+      "textures": [
+        "pewi_bear_col1.png",
+        "pewi_bear_col2.png",
+        "pewi_bear_col3.png",
+        "pewi_bear_col4.png",
+        "pewi_bear_col5.png"
+      ]
+    },
+    "pewi_tiger": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -30.89,
+        -128.21,
+        -2.28
+      ],
+      "bbox_max": [
+        30.89,
+        186.38,
+        126.08
+      ],
+      "height_cm": 128.37,
+      "textures": [
+        "pewi_tiger_col1.png",
+        "pewi_tiger_col2.png",
+        "pewi_tiger_col3.png"
+      ]
+    },
+    "bkembryo_pewi": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -63.9,
+        -64.51,
+        -0.15
+      ],
+      "bbox_max": [
+        33.49,
+        33.03,
+        185.38
+      ],
+      "height_cm": 185.53,
+      "textures": [
+        "pewi_bkembryo1.png",
+        "pewi_bkembryo2.png"
+      ]
+    },
+    "bkseira_pewi": {
+      "meshes": 3,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -62.31,
+        -31.7,
+        -0.27
+      ],
+      "bbox_max": [
+        64.36,
+        25.98,
+        175.99
+      ],
+      "height_cm": 176.26,
+      "textures": [
+        "bkseira_pewi1.png",
+        "bkseira_pewi2.png",
+        "bkseira_pewi3.png"
+      ]
+    },
+    "bktransf_pewi": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -38.24,
+        -84.78,
+        -0.3
+      ],
+      "bbox_max": [
+        31.16,
+        30.04,
+        172.16
+      ],
+      "height_cm": 172.46,
+      "textures": [
+        "bktransf_pewi1.png",
+        "bktransf_pewi2.png"
+      ]
+    },
+    "asenis_monster_m1_3": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -38.05,
+        -103.99,
+        -0.4
+      ],
+      "bbox_max": [
+        35.41,
+        87.06,
+        129.7
+      ],
+      "height_cm": 130.1,
+      "textures": [
+        "kozak.png"
+      ]
+    },
+    "pewi_m2_xieyue": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -48.22,
+        -231.03,
+        -0.11
+      ],
+      "bbox_max": [
+        48.22,
+        32.25,
+        194.26
+      ],
+      "height_cm": 194.37,
+      "textures": [
+        "xieyue_body_col1.png",
+        "xieyue_body_col2.png",
+        "xieyue_weapon_col1.png",
+        "xieyue_weapon_col2.png"
+      ]
+    },
+    "pewi_m2_dingtou": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -87.18,
+        -76.42,
+        -0.0
+      ],
+      "bbox_max": [
+        88.2,
+        20.34,
+        171.78
+      ],
+      "height_cm": 171.78,
+      "textures": [
+        "dingtou_col1.png",
+        "dingtou_col3.png",
+        "dingtou_weapon_col1.png",
+        "dingtou_weapon_col3.png"
+      ]
+    },
+    "pewi_m2_bowman": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -161.75,
+        -13.32,
+        -0.52
+      ],
+      "bbox_max": [
+        51.71,
+        32.0,
+        183.12
+      ],
+      "height_cm": 183.64,
+      "textures": [
+        "bowman_col1.png",
+        "bowman_col2.png",
+        "bowman_col3.png"
+      ]
+    },
+    "pewi_m2_kunlun": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -113.95,
+        -154.35,
+        0.63
+      ],
+      "bbox_max": [
+        108.77,
+        57.9,
+        229.29
+      ],
+      "height_cm": 228.66,
+      "textures": [
+        "kunlun_col1.png",
+        "kunlun_col4.png",
+        "kunlun_weapon_col1.png",
+        "kunlun_weapon_col4.png"
+      ]
+    },
+    "pewi_m2_ravager": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -73.95,
+        -21.99,
+        0.19
+      ],
+      "bbox_max": [
+        73.94,
+        46.04,
+        214.5
+      ],
+      "height_cm": 214.31,
+      "textures": [
+        "ravager1_col1.png",
+        "ravager1_col2.png",
+        "ravager1_col3.png"
+      ]
+    },
+    "pewi_m2_pangzi": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -99.72,
+        -46.88,
+        0.01
+      ],
+      "bbox_max": [
+        99.72,
+        124.4,
+        238.83
+      ],
+      "height_cm": 238.83,
+      "textures": [
+        "pangzi_col1.png",
+        "pangzi_col4.png",
+        "pangzi_weapon_col1.png",
+        "pangzi_weapon_col4.png"
+      ]
+    },
+    "pewi_m2_piratedeva": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -51.79,
+        -93.5,
+        0.53
+      ],
+      "bbox_max": [
+        54.54,
+        37.55,
+        173.84
+      ],
+      "height_cm": 173.3,
+      "textures": [
+        "piratedeva_col1.png",
+        "piratedeva_col2.png",
+        "piratedeva_col3.png"
+      ]
+    },
+    "pewi_m2_tuobei": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -146.06,
+        -63.03,
+        0.04
+      ],
+      "bbox_max": [
+        136.34,
+        70.32,
+        225.67
+      ],
+      "height_cm": 225.64,
+      "textures": [
+        "tuobei_col1.png",
+        "tuobei_col6.png",
+        "tuobei_weapon_col1.png",
+        "tuobei_weapon_col6.png"
+      ]
+    },
+    "pewi_m2_archbarb": {
+      "meshes": 3,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -54.54,
+        -68.66,
+        -1.11
+      ],
+      "bbox_max": [
+        79.83,
+        67.65,
+        185.73
+      ],
+      "height_cm": 186.84,
+      "textures": [
+        "archbarb1_col1.png",
+        "archbarb2_col1.png",
+        "archbarb_weapon_col1.png"
+      ]
+    },
+    "pewi_m2_tongding": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -99.9,
+        -79.38,
+        -0.19
+      ],
+      "bbox_max": [
+        93.8,
+        35.44,
+        213.53
+      ],
+      "height_cm": 213.72,
+      "textures": [
+        "tongding_col1.png",
+        "tongding_col3.png",
+        "tongding_weapon_col1.png",
+        "tongding_weapon_col3.png"
+      ]
+    },
+    "pewi_m2_jubi": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "walk",
+        "run",
+        "attack",
+        "dead"
+      ],
+      "bbox_min": [
+        -151.64,
+        -22.74,
+        0.18
+      ],
+      "bbox_max": [
+        115.5,
+        28.74,
+        239.17
+      ],
+      "height_cm": 238.99,
+      "textures": [
+        "jubi_col1.png",
+        "jubi_col2.png",
+        "jubi_col3.png"
+      ]
+    }
+  },
+  "npcs": {
+    "npc_pewi_kowal": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk"
+      ],
+      "bbox_min": [
+        -80.4,
+        -98.11,
+        0.1
+      ],
+      "bbox_max": [
+        66.19,
+        56.36,
+        205.38
+      ],
+      "height_cm": 205.28,
+      "textures": [
+        "kowal.png"
+      ]
+    },
+    "plechi_lady_npc12": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "bbox_min": [
+        -91.83,
+        -22.97,
+        -0.56
+      ],
+      "bbox_max": [
+        60.81,
+        32.3,
+        224.98
+      ],
+      "height_cm": 225.54,
+      "textures": [
+        "plechito_tex.png"
+      ]
+    },
+    "plechi_lord_shinsoo": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk"
+      ],
+      "bbox_min": [
+        -103.39,
+        -52.26,
+        -0.43
+      ],
+      "bbox_max": [
+        59.34,
+        116.03,
+        226.94
+      ],
+      "height_cm": 227.36,
+      "textures": [
+        "lord_shinsoo_tex.png"
+      ]
+    },
+    "plechi_lord_jinno": {
+      "meshes": 4,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk"
+      ],
+      "bbox_min": [
+        -74.26,
+        -81.76,
+        -0.84
+      ],
+      "bbox_max": [
+        107.52,
+        128.69,
+        252.4
+      ],
+      "height_cm": 253.24,
+      "textures": [
+        "lord_jinno_weapon.png",
+        "lord_jinno_body.png",
+        "lord_jinno_sash.png"
+      ]
+    },
+    "plechi_tribe_npc1": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk"
+      ],
+      "bbox_min": [
+        -71.33,
+        -105.17,
+        0.02
+      ],
+      "bbox_max": [
+        58.73,
+        66.45,
+        208.85
+      ],
+      "height_cm": 208.84,
+      "textures": [
+        "tribe_npc_body.png",
+        "tribe_npc_staff.png"
+      ]
+    },
+    "pewi_zielarz": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "bbox_min": [
+        -67.28,
+        -30.48,
+        -0.01
+      ],
+      "bbox_max": [
+        67.28,
+        30.82,
+        193.83
+      ],
+      "height_cm": 193.83,
+      "textures": [
+        "zielarz.png"
+      ]
+    },
+    "plechi_old_alchemist": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "bbox_min": [
+        -112.25,
+        -42.55,
+        0.38
+      ],
+      "bbox_max": [
+        72.47,
+        48.72,
+        190.29
+      ],
+      "height_cm": 189.91,
+      "textures": [
+        "alchemist_body.png",
+        "alchemist_deco.png"
+      ]
+    },
+    "pewi_info_manager": {
+      "meshes": 1,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "bbox_min": [
+        -58.69,
+        -27.44,
+        -1.74
+      ],
+      "bbox_max": [
+        58.75,
+        44.8,
+        184.32
+      ],
+      "height_cm": 186.06,
+      "textures": [
+        "info_manager.png"
+      ]
+    },
+    "pewi_human_aide": {
+      "meshes": 3,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "bbox_min": [
+        -62.13,
+        -16.84,
+        0.31
+      ],
+      "bbox_max": [
+        62.13,
+        66.23,
+        193.14
+      ],
+      "height_cm": 192.83,
+      "textures": [
+        "human_aide_body.png",
+        "human_aide_face.png",
+        "human_aide_hair.png"
+      ]
+    }
+  },
+  "monoliths": {},
+  "pets": {
+    "plechi_thuderspirit_pet": {
+      "meshes": 1,
+      "primitives": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -49.42,
+        -60.59,
+        -0.17
+      ],
+      "bbox_max": [
+        49.42,
+        55.39,
+        81.89
+      ],
+      "height_cm": 82.07,
+      "textures": [
+        "plechi_thunderspirit.png"
+      ]
+    },
+    "plechi_elephant_pet2": {
+      "meshes": 1,
+      "primitives": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -34.15,
+        -61.89,
+        -0.2
+      ],
+      "bbox_max": [
+        34.03,
+        40.3,
+        82.58
+      ],
+      "height_cm": 82.78,
+      "textures": [
+        "plechi_elephant.png"
+      ]
+    },
+    "plechi_emd_pet": {
+      "meshes": 1,
+      "primitives": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -24.67,
+        -29.72,
+        63.61
+      ],
+      "bbox_max": [
+        22.52,
+        77.37,
+        153.16
+      ],
+      "height_cm": 89.56,
+      "textures": [
+        "plechi_emd_pet.png"
+      ]
+    },
+    "plechi_fantasy_flypet2": {
+      "meshes": 1,
+      "primitives": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -32.18,
+        -22.04,
+        124.31
+      ],
+      "bbox_max": [
+        32.18,
+        47.91,
+        201.66
+      ],
+      "height_cm": 77.35,
+      "textures": [
+        "plechi_fantasy_flypet.png"
+      ]
+    },
+    "plechi_lich_pet": {
+      "meshes": 1,
+      "primitives": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -58.28,
+        -18.77,
+        -7.44
+      ],
+      "bbox_max": [
+        30.02,
+        29.97,
+        77.57
+      ],
+      "height_cm": 85.01,
+      "textures": [
+        "plechi_lich_pet.png"
+      ]
+    },
+    "plechi_smaragd_dragon": {
+      "meshes": 2,
+      "primitives": 2,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -63.64,
+        -37.66,
+        56.84
+      ],
+      "bbox_max": [
+        58.68,
+        57.46,
+        144.71
+      ],
+      "height_cm": 87.87,
+      "textures": [
+        "plechi_smaragd_dragon0.png",
+        "plechi_smaragd_dragon1.png"
+      ]
+    },
+    "plechi_flamegoblin_pet": {
+      "meshes": 1,
+      "primitives": 1,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "bbox_min": [
+        -41.12,
+        -20.82,
+        88.64
+      ],
+      "bbox_max": [
+        39.97,
+        42.83,
+        157.44
+      ],
+      "height_cm": 68.8,
+      "textures": [
+        "plechi_flamegoblin.png"
+      ]
+    }
+  }
+}

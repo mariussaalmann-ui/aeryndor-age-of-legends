@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>AERYNDOR: Legacy of the Monoliths – Offizielle MMORPG Homepage &amp; PC-Client</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/homepage.css?v=522" />
+</head>
+<body>
+
+  <!-- HINTERGRUND-ATMOSPHÄRE -->
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <canvas id="ember-canvas" aria-hidden="true"></canvas>
+
+  <!-- TOP NAVIGATION (OBEN LANG) + INTERAKTIVE iOS DYNAMIC ISLAND (UNTEN KURZ) -->
+  <header class="top-shell" id="top-shell">
+
+    <nav class="navbar" aria-label="Hauptnavigation">
+      <a href="#hero" class="nav-brand" data-nav-section="hero" title="AERYNDOR: Legacy of the Monoliths">
+        <img src="/assets/client_ui/logo/1.png" alt="Aeryndor Wappen" class="nav-brand-crest" />
+        <div class="nav-brand-text">
+          <span class="nav-brand-title">AERYNDOR</span>
+          <span class="nav-brand-sub">Legacy of the Monoliths</span>
+        </div>
+      </a>
+
+      <div class="nav-links" id="nav-links">
+        <a href="#hero" class="active" data-nav-section="hero">Start</a>
+        <a href="/rangliste">🏆 Rangliste</a>
+        <a href="/download">⚡ Download</a>
+        <a href="/systeme">⚙️ Systeme</a>
+        <a href="/lore">📜 Lore</a>
+      </div>
+
+      <div class="nav-actions">
+        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="window.toggleColorTheme()" title="Zwischen Dark Mode &amp; Light Mode wechseln" aria-label="Farbschema umschalten">
+          <span id="theme-toggle-icon">☀️</span>
+        </button>
+
+        <a href="https://discord.gg/Q4gnqSAaSc" target="_blank" rel="noopener noreferrer" class="nav-btn-discord" title="Offizieller Aeryndor Discord-Server">
+          <svg class="discord-svg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+          <span>Discord</span>
+        </a>
+
+        <a href="/play" class="nav-btn-secondary" title="Sofort im Browser spielen (WebGL2 3D-Engine)">
+          <span class="nav-play-badge" aria-hidden="true">▶</span>
+          <span>Play Browser</span>
+          <span class="nav-play-dot" aria-hidden="true"></span>
+        </a>
+
+        <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" onclick="window.toggleMobileDrawer()" aria-label="Menü öffnen" aria-expanded="false">
+          <span id="mobile-menu-icon">☰</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- MOBILES GLAS-MENÜ -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <div class="mobile-drawer-links">
+        <a href="#hero" class="active" data-nav-section="hero" onclick="window.closeMobileDrawer()"><span>🏰</span> Startseite &amp; Userpanel</a>
+        <a href="/rangliste"><span>🏆</span> Ruhmeshalle (Rangliste)</a>
+        <a href="/download"><span>⚡</span> PC-Client Download</a>
+        <a href="/systeme"><span>⚙️</span> Spielsysteme &amp; Galerie</a>
+        <a href="/lore"><span>📜</span> Komplette Lore &amp; Klassen</a>
+        <a href="https://discord.gg/Q4gnqSAaSc" target="_blank" rel="noopener noreferrer"><span>💬</span> Offizieller Discord-Server</a>
+      </div>
+      <div class="mobile-drawer-actions">
+        <a href="#userpanel" class="nav-btn-primary" style="justify-content:center;padding:12px;" onclick="window.closeMobileDrawer()">
+          <span>Zum Userpanel</span>
+        </a>
+        <a href="/play" class="nav-btn-secondary" style="display:flex;justify-content:center;padding:12px;">
+          <span class="nav-play-badge" aria-hidden="true">▶</span>
+          <span>Play Browser starten</span>
+          <span class="nav-play-dot" aria-hidden="true"></span>
+        </a>
+      </div>
+    </div>
+
+    <!-- DYNAMIC ISLAND – ZENTRALES INTERAKTIONSSYSTEM (UNTEN) -->
+    <div class="di-dock">
+      <div
+        class="dynamic-island"
+        id="dynamic-island"
+        data-state="compact"
+        role="region"
+        aria-live="polite"
+        aria-label="Aeryndor Dynamic Island Statuszentrale"
+        tabindex="0"
+      >
+        <div class="di-compact" id="di-compact-trigger" title="Klicken oder Enter drücken zum Aufklappen">
+          <div class="di-leading">
+            <span class="di-orb" id="di-orb" data-tone="emerald"></span>
+            <span class="di-mini-icon" id="di-mini-icon" style="display:none;">✨</span>
+            <div class="di-avatar" id="di-avatar" aria-hidden="true">A</div>
+          </div>
+
+          <div class="di-summary">
+            <span class="di-title" id="di-compact-title">Aeryndor</span>
+            <span class="di-sep" aria-hidden="true">•</span>
+            <span class="di-sub" id="di-compact-sub">0 Online • -- ms</span>
+          </div>
+
+          <div class="di-trailing">
+            <div class="di-wave" id="di-wave" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span class="di-badge-pill" id="di-compact-badge">ONLINE</span>
+          </div>
+        </div>
+
+        <div class="di-expanded" id="di-expanded-panel" aria-hidden="true">
+          <div class="di-exp-top">
+            <div class="di-exp-head">
+              <div class="di-exp-icon" id="di-exp-icon">🛡️</div>
+              <div class="di-exp-titles">
+                <div class="di-exp-kicker" id="di-exp-kicker">AERYNDOR LIVE TELEMETRIE</div>
+                <div class="di-exp-main" id="di-exp-title">Aeryndor ist Online</div>
+              </div>
+            </div>
+            <button type="button" class="di-close-btn" id="di-close-btn" aria-label="Dynamic Island einklappen" title="Schließen (Esc)">✕</button>
+          </div>
+
+          <div class="di-exp-body" id="di-exp-body">
+            Alle Welten-Knotenpunkte, das Auktionshaus und die Instanz-Server laufen stabil im Echtzeit-Synchronisationsmodus.
+          </div>
+
+          <div class="di-exp-metrics" id="di-exp-metrics">
+            <div class="di-metric-chip">
+              <span class="lbl">Status</span>
+              <span class="val emerald" id="di-metric-1">Online</span>
+            </div>
+            <div class="di-metric-chip">
+              <span class="lbl">Helden / Welt</span>
+              <span class="val gold" id="di-metric-2">--</span>
+            </div>
+            <div class="di-metric-chip">
+              <span class="lbl">Server-Latenz</span>
+              <span class="val ice" id="di-metric-3">-- ms</span>
+            </div>
+          </div>
+
+          <div class="di-progress-wrap" id="di-progress-wrap">
+            <div class="di-progress-meta">
+              <span id="di-progress-label">Lade Paket herunter…</span>
+              <span id="di-progress-pct">0%</span>
+            </div>
+            <div class="di-progress-track">
+              <div class="di-progress-fill" id="di-progress-fill"></div>
+            </div>
+          </div>
+
+          <div class="di-exp-actions" id="di-exp-actions">
+            <button type="button" class="di-btn" id="di-secondary-action" onclick="window.handleIslandSecondaryAction(event)">
+              <span id="di-secondary-action-lbl">Status prüfen</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- STARTSEITEN-HERO: SYMMETRISCH, CLEAN, OHNE REDUNDANZ -->
+  <section class="hero" id="hero" data-section-title="Startseite • Server-Infos &amp; Userpanel">
+    <div class="hero-backdrop" aria-hidden="true"></div>
+    <div class="hero-vignette" aria-hidden="true"></div>
+
+    <div class="hero-grid hero-clean-grid">
+      <!-- Linke Spalte: Offizielles Wordmark-Logo, Einleitung & strukturierte Server-Infos -->
+      <div class="hero-copy hero-clean-left">
+        <div class="hero-wordmark-wrap">
+          <img src="/assets/client_ui/logo/2.png" alt="AERYNDOR: Legacy of the Monoliths" class="hero-wordmark-logo" />
+        </div>
+
+        <h1 class="hero-clean-title">
+          DEINE LEGENDE BEGINNT
+        </h1>
+
+        <p class="hero-lead">
+          In der Welt von Aeryndor erwachen <strong>18 Rissmonolithen (Lv. 5–90)</strong> in 3 Stufen (<em>Schlafend • Instabil • Erweckt</em>). Wähle deine Stadt zwischen <strong>Kaeryu</strong> und <strong>Seiryu</strong>, kämpfe gemeinsam mit Spielern sowie <strong>12 autonomen KI-Helden (KI v5.0 • 6 Seiryu &amp; 6 Kaeryu)</strong> samt ihren <strong>3D-Begleiter-Pets</strong>, bezwinge die <strong>3 Gebietsbosse (15 Min. Respawn)</strong> und stelle dich dem <strong>Map-2-Dungeonboss Malakor (Lv. 35)</strong>!
+        </p>
+
+        <div class="sys-bullet-tags hero-feature-grid">
+          <a href="/systeme" class="sys-bullet-tag" style="text-decoration:none;">🔮 18 Rissmonolithen (3 Stufen &amp; Level-Elitebosse)</a>
+          <a href="/systeme" class="sys-bullet-tag" style="text-decoration:none;">🧬 12 KI-Helden (KI v5.0) &amp; 🐾 3D-Pet-Kampfsynergie</a>
+          <a href="/systeme" class="sys-bullet-tag" style="text-decoration:none;">👑 3 Gebietsbosse (15m) &amp; Map-2-Dungeonboss</a>
+          <a href="#patchnotes-v4" class="sys-bullet-tag" style="text-decoration:none;">🛠️ Neu: Patchnotes v5.0 &amp; 34 Discord-Ränge</a>
+        </div>
+      </div>
+
+      <!-- Rechte Spalte: Reines, aufgeräumtes Userpanel ohne verschachtelte Innenboxen -->
+      <aside class="hero-hub-card clean-userpanel-card spotlight-card" id="userpanel" aria-label="Userpanel Login und Registrierung">
+        <div class="hero-hub-top">
+          <div class="hero-hub-brand">
+            <img src="/assets/client_ui/logo/1.png" alt="Aeryndor Emblem" />
+            <div class="hero-hub-brand-txt">
+              <div class="t1">AERYNDOR USERPANEL</div>
+              <div class="t2">Account-Verwaltung, Helden &amp; Drachenmünzen</div>
+            </div>
+          </div>
+          <div class="hsc-realm-badge">
+            <span class="dot"></span>
+            <span id="hsc-realm-status">ONLINE</span>
+          </div>
+        </div>
+
+        <div class="hero-auth-tabs" id="auth-mobile-switcher" role="tablist" aria-label="Anmelden oder Registrieren wählen">
+          <button type="button" class="hero-auth-tab-btn active" id="tab-btn-login" onclick="window.switchAuthTab('login')" role="tab" aria-selected="true">
+            Einloggen
+          </button>
+          <button type="button" class="hero-auth-tab-btn" id="tab-btn-register" onclick="window.switchAuthTab('register')" role="tab" aria-selected="false">
+            Registrieren (+250 Coins)
+          </button>
+        </div>
+
+        <div id="up-auth-view" class="hero-auth-stage" data-active-tab="login">
+
+          <!-- TAB 1: LOGIN -->
+          <div class="clean-auth-pane" id="auth-card-login">
+            <p class="clean-auth-hint">Melde dich mit deinem Account an, um deine Charaktere und Drachenmünzen zu verwalten.</p>
+
+            <form id="login-form" novalidate onsubmit="return window.submitUserpanelLogin(event)">
+              <div class="ios-field" id="field-login-user">
+                <div class="ios-input-wrap">
+                  <span class="ios-field-icon" aria-hidden="true">👤</span>
+                  <input
+                    type="text"
+                    id="login-username"
+                    class="ios-input"
+                    placeholder=" "
+                    required
+                    minlength="3"
+                    maxlength="24"
+                    autocomplete="username"
+                    oninput="window.clearFieldError('field-login-user')"
+                  />
+                  <label for="login-username" class="ios-floating-label">Account-Name</label>
+                </div>
+                <div class="ios-field-error" id="err-login-user" role="alert">
+                  <span>⚠️</span> <span class="err-txt">Bitte gib einen gültigen Account-Namen ein (mind. 3 Zeichen).</span>
+                </div>
+              </div>
+
+              <div class="ios-field" id="field-login-pass">
+                <div class="ios-input-wrap">
+                  <span class="ios-field-icon" aria-hidden="true">🔒</span>
+                  <input
+                    type="password"
+                    id="login-password"
+                    class="ios-input has-toggle"
+                    placeholder=" "
+                    required
+                    minlength="4"
+                    maxlength="64"
+                    autocomplete="current-password"
+                    oninput="window.clearFieldError('field-login-pass')"
+                  />
+                  <label for="login-password" class="ios-floating-label">Passwort</label>
+                  <button
+                    type="button"
+                    class="ios-pw-toggle"
+                    onclick="window.togglePasswordVisibility('login-password', this)"
+                    aria-label="Passwort anzeigen oder verbergen"
+                    title="Passwort ein-/ausblenden"
+                  >👁️</button>
+                </div>
+                <div class="ios-field-error" id="err-login-pass" role="alert">
+                  <span>⚠️</span> <span class="err-txt">Bitte gib dein Passwort ein (mind. 4 Zeichen).</span>
+                </div>
+              </div>
+
+              <button type="submit" class="ios-submit-btn gold" id="btn-login-submit">
+                <span class="spinner" aria-hidden="true"></span>
+                <span class="btn-label">Im Userpanel anmelden</span>
+              </button>
+
+              <div class="form-banner" id="login-msg" role="status" aria-live="polite"></div>
+            </form>
+          </div>
+
+          <!-- TAB 2: REGISTRIERUNG MIT +250 COINS BONUS -->
+          <div class="clean-auth-pane" id="auth-card-register">
+            <div class="bonus-coins-banner" style="margin-bottom:14px;padding:10px 14px;">
+              <span class="coin-ico">🪙</span>
+              <div class="bonus-txt">
+                <strong>+250 DRACHENMÜNZEN STARTBONUS</strong>
+                <span>Gültig für den PC-Client &amp; die Browser-Beta</span>
+              </div>
+            </div>
+
+            <form id="register-form" novalidate onsubmit="return window.submitRegistration(event)">
+              <div class="ios-field" id="field-reg-user">
+                <div class="ios-input-wrap">
+                  <span class="ios-field-icon" aria-hidden="true">✨</span>
+                  <input
+                    type="text"
+                    id="reg-username"
+                    class="ios-input ice-focus"
+                    placeholder=" "
+                    required
+                    minlength="3"
+                    maxlength="24"
+                    autocomplete="username"
+                    oninput="window.validateRegisterUsernameLive()"
+                  />
+                  <label for="reg-username" class="ios-floating-label">Wunsch-Accountname (3–24 Zeichen)</label>
+                </div>
+                <div class="ios-field-error" id="err-reg-user" role="alert">
+                  <span>⚠️</span> <span class="err-txt">3–24 Zeichen (nur Buchstaben, Zahlen, _ oder - erlaubt).</span>
+                </div>
+              </div>
+
+              <div class="ios-field" id="field-reg-pass">
+                <div class="ios-input-wrap">
+                  <span class="ios-field-icon" aria-hidden="true">🛡️</span>
+                  <input
+                    type="password"
+                    id="reg-password"
+                    class="ios-input ice-focus has-toggle"
+                    placeholder=" "
+                    required
+                    minlength="4"
+                    maxlength="64"
+                    autocomplete="new-password"
+                    oninput="window.clearFieldError('field-reg-pass')"
+                  />
+                  <label for="reg-password" class="ios-floating-label">Passwort (mind. 4 Zeichen)</label>
+                  <button
+                    type="button"
+                    class="ios-pw-toggle"
+                    onclick="window.togglePasswordVisibility('reg-password', this)"
+                    aria-label="Passwort anzeigen oder verbergen"
+                    title="Passwort ein-/ausblenden"
+                  >👁️</button>
+                </div>
+                <div class="ios-field-error" id="err-reg-pass" role="alert">
+                  <span>⚠️</span> <span class="err-txt">Passwort muss mindestens 4 Zeichen lang sein.</span>
+                </div>
+              </div>
+
+              <div class="ios-field" id="field-reg-pass2">
+                <div class="ios-input-wrap">
+                  <span class="ios-field-icon" aria-hidden="true">🔁</span>
+                  <input
+                    type="password"
+                    id="reg-password2"
+                    class="ios-input ice-focus has-toggle"
+                    placeholder=" "
+                    required
+                    minlength="4"
+                    maxlength="64"
+                    autocomplete="new-password"
+                    oninput="window.clearFieldError('field-reg-pass2')"
+                  />
+                  <label for="reg-password2" class="ios-floating-label">Passwort bestätigen</label>
+                  <button
+                    type="button"
+                    class="ios-pw-toggle"
+                    onclick="window.togglePasswordVisibility('reg-password2', this)"
+                    aria-label="Passwort anzeigen oder verbergen"
+                    title="Passwort ein-/ausblenden"
+                  >👁️</button>
+                </div>
+                <div class="ios-field-error" id="err-reg-pass2" role="alert">
+                  <span>⚠️</span> <span class="err-txt">Die beiden Passwörter stimmen nicht überein.</span>
+                </div>
+              </div>
+
+              <button type="submit" class="ios-submit-btn ice" id="btn-reg-submit">
+                <span class="spinner" aria-hidden="true"></span>
+                <span class="btn-label">Kostenlos registrieren (+250 Coins)</span>
+              </button>
+
+              <div class="form-banner" id="reg-msg" role="status" aria-live="polite"></div>
+            </form>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- EINGELOGGTES USERPANEL DASHBOARD (OHNE HOMEPAGE-ITEMSHOP) -->
+    <div style="max-width:1280px;width:100%;margin:0 auto;position:relative;z-index:3;">
+      <div id="up-dashboard-view" class="up-dashboard" style="margin-top:28px;">
+        <div class="up-topbar spotlight-card">
+          <div class="up-user-info">
+            <div class="up-avatar" id="up-avatar-letter">A</div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div class="up-user-name" id="up-username-display">Held</div>
+                <span class="up-acc-status-pill">● AKTIV</span>
+              </div>
+              <div class="up-user-meta" id="up-meta-display">Account verifiziert • Itemshop nur Ingame verfügbar</div>
+            </div>
+          </div>
+
+          <div class="up-wallet">
+            <div class="coin-pill" title="Dein aktuelles Drachenmünzen-Guthaben">
+              <span class="coin-icon">🪙</span>
+              <div>
+                <div class="coin-val" id="up-coins-val">0</div>
+                <div class="coin-lbl">Drachenmünzen</div>
+              </div>
+            </div>
+            <button type="button" class="btn-up-action primary" id="btn-buy-coins-toggle" onclick="window.toggleBuyCoinsPanel()">🪙 Coins kaufen</button>
+            <button type="button" class="btn-up-action" onclick="window.refreshUserpanelProfile()">🔄 Aktualisieren</button>
+            <button type="button" class="btn-up-action" onclick="window.logoutUserpanel()">🚪 Ausloggen</button>
+          </div>
+        </div>
+
+        <!-- AUSKLAPPBARES COINS-KAUFEN-MODUL (WIRD ÜBER DEN BUTTON "COINS KAUFEN" GEÖFFNET) -->
+        <div id="up-buy-coins-panel" class="shop-panel" style="display:none;margin-bottom:18px;border:1px solid rgba(216,178,92,0.45);background:linear-gradient(180deg,rgba(15,20,34,0.95),rgba(9,12,20,0.95));">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">
+            <h4 style="margin:0;">🪙 Drachenmünzen kaufen (Sofort-Gutschrift)</h4>
+            <button type="button" class="btn-up-action" onclick="window.toggleBuyCoinsPanel(false)" style="padding:4px 10px;font-size:0.78rem;">✕ Schließen</button>
+          </div>
+          <p class="sub" style="margin-bottom:14px;">
+            Wähle ein Drachenmünzen-Paket für deinen Account. <strong>Der Itemshop selbst ist ausschließlich direkt im Spiel (Ingame) verfügbar.</strong>
+          </p>
+          <div class="topup-grid">
+            <div class="topup-card" onclick="window.topupCoins('pack_500')">
+              <div class="t-coins">🪙 550</div>
+              <div class="t-bonus">500 + 50 Bonus-Coins</div>
+              <div class="t-price">4,99 € (Sofort-Test)</div>
+            </div>
+            <div class="topup-card" onclick="window.topupCoins('pack_1500')">
+              <div class="t-coins">🪙 1.750</div>
+              <div class="t-bonus">1.500 + 250 Bonus-Coins</div>
+              <div class="t-price">9,99 € (Sofort-Test)</div>
+            </div>
+            <div class="topup-card" onclick="window.topupCoins('pack_3500')">
+              <div class="t-coins">🪙 4.250</div>
+              <div class="t-bonus">3.500 + 750 Bonus-Coins</div>
+              <div class="t-price">19,99 € (Sofort-Test)</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="shop-feedback-msg" class="form-banner" role="status" aria-live="polite"></div>
+
+        <div>
+          <div class="up-section-bar">
+            <h3 style="font-family:'Cinzel',serif;font-size:1.35rem;color:var(--text-primary);margin:0;">
+              ⚔️ Deine Helden auf Aeryndor
+            </h3>
+            <span class="up-section-sub-pill">Echtzeit-Synchronisation • Stadt-Teleport bereit</span>
+          </div>
+          <div id="up-chars-container" class="up-chars-grid"></div>
+        </div>
+      </div>
+
+      <!-- AKTUELLE PATCHNOTES & LIVE-UPDATES (UPDATE v5.0) -->
+      <div id="patchnotes-v4" class="spotlight-card" style="margin-top:34px;padding:24px 26px;border-radius:22px;background:linear-gradient(180deg,rgba(15,23,42,0.82),rgba(9,13,24,0.92));border:1px solid rgba(216,178,92,0.32);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+          <div>
+            <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#38bdf8;">🛠️ Offizielles Live-Update • Patch v5.0</div>
+            <h2 style="font-family:'Cinzel',serif;font-size:clamp(1.25rem,2.2vw,1.65rem);margin:4px 0 0;color:var(--text-primary);">
+              Patchnotes v5.0: KI-Evolution v5.0 (12 Bots), Physische NPC-/Stadt-KI, 3D-Pets &amp; Live-Balancing
+            </h2>
+          </div>
+          <span class="hsc-realm-badge" style="padding:6px 12px;">
+            <span class="dot"></span>
+            <span>UPDATE v5.0 AKTIV</span>
+          </span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:14px;">
+          <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.65);border:1px solid rgba(16,185,129,0.28);">
+            <div style="font-weight:800;font-size:0.92rem;color:#6ee7b7;margin-bottom:6px;">🧬 1. KI-System v5.0 &amp; Physische NPC-Quests/Stadt-KI</div>
+            <p style="font-size:0.82rem;line-height:1.5;color:var(--text-secondary);margin:0;">
+              Beide Reiche werden von <strong>12 autonomen KI-Helden (6 Seiryu &amp; 6 Kaeryu)</strong> mit <strong>KI v5.0 Omni-Synergy</strong> bevölkert: Sie gehen physisch zu Quest-NPCs (Quest-Annahme &amp; Belohnungs-Abholung), besuchen Schmied (+9), Seelenweberin &amp; Händlerin in den Städten, weichen Boss-Angriffen taktisch aus und antworten im Messenger mit echten Live-Daten!
+            </p>
+          </div>
+
+          <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.65);border:1px solid rgba(168,85,247,0.28);">
+            <div style="font-weight:800;font-size:0.92rem;color:#c4b5fd;margin-bottom:6px;">🐾 2. 3D-Pet-Overhaul &amp; Direkte Kampfsynergie</div>
+            <p style="font-size:0.82rem;line-height:1.5;color:var(--text-secondary);margin:0;">
+              Alle <strong>10 3D-Begleiter-Pets</strong> wurden optisch &amp; physikalisch überarbeitet (vollständige opake Texturen ohne fehlende Körperteile, echte Boden-Laufanimation für Boden-Pets). Pet-Level, Pet-Statuspunkte und alle 21 passiven Pet-Skills fließen direkt als <strong>+AW, +Magie-AW &amp; +% Monster-Schaden</strong> in den Kampf ein!
+            </p>
+          </div>
+
+          <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.65);border:1px solid rgba(56,189,248,0.28);">
+            <div style="font-weight:800;font-size:0.92rem;color:#38bdf8;margin-bottom:6px;">⚖️ 3. Map-1/2-Progression &amp; 600-Kill Auto-Balancing</div>
+            <p style="font-size:0.82rem;line-height:1.5;color:var(--text-secondary);margin:0;">
+              Die <strong>Weiße-Eid-Fraktion auf Map 1</strong> sowie die <strong>Schwarzwind- &amp; Wilden-Stämme auf Map 2 Süd (Bakra)</strong> bieten eine nahtlose Level-Kurve für Lv. 18–35. Zudem analysiert der Server alle <strong>600 Bot-Kills</strong> automatisch die Klassen-Balance und setzt Optimierungen im KI-Autopilot-Modus live um.
+            </p>
+          </div>
+
+          <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.65);border:1px solid rgba(251,191,36,0.28);">
+            <div style="font-weight:800;font-size:0.92rem;color:#fde047;margin-bottom:6px;">🎖️ 4. Neues 34-stufiges Discord-Rangsystem</div>
+            <p style="font-size:0.82rem;line-height:1.5;color:var(--text-secondary);margin:0;">
+              Auf unserem offiziellen Discord erwarten dich jetzt <strong>34 strukturierte Ränge</strong>: Team- &amp; Verwaltungsränge, Community-Ehrenränge (<em>Pionier, Rissbezwinger, Bossjäger, Handelsfürst</em>), die 4 Klassenränge sowie klassenunabhängige Spielerränge von <strong>Wanderer</strong> bis <strong>Legende von Aeryndor</strong>!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="/assets/client_ui/logo/2.png" alt="Aeryndor: Legacy of the Monoliths" class="wordmark" />
+        <span>© 2026 AERYNDOR: Legacy of the Monoliths – Das Vermächtnis der Monolithen.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- INTERAKTIVE HOMEPAGE-, DYNAMIC-ISLAND-, AUTH- & SECURITY-LOGIK -->
+  <script>
+    (function () {
+      'use strict';
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      const CLASS_NAMES_DE = {
+        warrior: 'Klingenwächter',
+        krieger: 'Klingenwächter',
+        assassin: 'Schattenjäger',
+        assassine: 'Schattenjäger',
+        ninja: 'Schattenjäger',
+        sura: 'Runenmagier',
+        runenkrieger: 'Runenmagier',
+        runenmagier: 'Runenmagier',
+        shaman: 'Seelenweber',
+        schamane: 'Seelenweber',
+        seelenweber: 'Seelenweber'
+      };
+
+      const DOCTRINE_META = {
+        warrior: [
+          { name: 'Körper-Kampf (Aura)', icon: '/assets/icons/skills/cropped/aura_sword.png' },
+          { name: 'Mental-Kampf (Starker Körper)', icon: '/assets/icons/skills/cropped/strong_body.png' }
+        ],
+        assassin: [
+          { name: 'Nahkampf (Hinterhalt)', icon: '/assets/icons/skills/cropped/ambush.png' },
+          { name: 'Fernkampf (Feuerpfeil)', icon: '/assets/icons/skills/cropped/fire_arrow.png' }
+        ],
+        sura: [
+          { name: 'Waffen-Magie (Klinge)', icon: '/assets/icons/skills/cropped/enchanted_blade.png' },
+          { name: 'Schwarze Magie (Schutz)', icon: '/assets/icons/skills/cropped/dark_protection.png' }
+        ],
+        shaman: [
+          { name: 'Drachenmacht (Segen)', icon: '/assets/icons/skills/cropped/dragon_help.png' },
+          { name: 'Heilung & Blitz (Kurieren)', icon: '/assets/icons/skills/cropped/natures_heal.png' }
+        ]
+      };
+
+      const MAP_NAMES_DE = {
+        morgenwacht: 'Morgenwacht',
+        map_morgenwacht: 'Morgenwacht',
+        orc_valley: 'Orktal von Durn',
+        orktal: 'Orktal von Durn',
+        bloodleaf_forest: 'Blutblatt-Wald',
+        blutblatt: 'Blutblatt-Wald',
+        borderlands: 'Verlassene Grenzlande',
+        grenzlande: 'Verlassene Grenzlande',
+        iron_citadel: 'Eisenfürst-Zitadelle',
+        frost_peak: 'Frostkoloss-Gipfel',
+        origin_rift: 'Ursprungsspalt'
+      };
+
+      let currentAccount = null;
+      let currentHpToken = '';
+      let lastServerStats = null;
+      let lastPingMs = 18;
+
+      function applyTheme(theme) {
+        const cleanTheme = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', cleanTheme);
+        const iconEl = document.getElementById('theme-toggle-icon');
+        if (iconEl) iconEl.textContent = cleanTheme === 'dark' ? '☀️' : '🌙';
+        try { localStorage.setItem('aeryndor_hp_theme', cleanTheme); } catch (_e) {}
+      }
+      window.toggleColorTheme = function () {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+      };
+      try {
+        const savedTheme = localStorage.getItem('aeryndor_hp_theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') applyTheme(savedTheme);
+      } catch (_e) {}
+
+      const islandEl = document.getElementById('dynamic-island');
+      const compactTrigger = document.getElementById('di-compact-trigger');
+      const closeBtn = document.getElementById('di-close-btn');
+      const orbEl = document.getElementById('di-orb');
+      const miniIconEl = document.getElementById('di-mini-icon');
+      const avatarEl = document.getElementById('di-avatar');
+      const compactTitleEl = document.getElementById('di-compact-title');
+      const compactSubEl = document.getElementById('di-compact-sub');
+      const compactBadgeEl = document.getElementById('di-compact-badge');
+      const waveEl = document.getElementById('di-wave');
+
+      const expIconEl = document.getElementById('di-exp-icon');
+      const expKickerEl = document.getElementById('di-exp-kicker');
+      const expTitleEl = document.getElementById('di-exp-title');
+      const expBodyEl = document.getElementById('di-exp-body');
+      const expMetricsEl = document.getElementById('di-exp-metrics');
+      const metric1El = document.getElementById('di-metric-1');
+      const metric2El = document.getElementById('di-metric-2');
+      const metric3El = document.getElementById('di-metric-3');
+      const progressWrapEl = document.getElementById('di-progress-wrap');
+      const primaryActionLbl = document.getElementById('di-primary-action-lbl');
+      const secondaryActionLbl = document.getElementById('di-secondary-action-lbl');
+
+      let islandAutoTimer = null;
+      let islandHovering = false;
+      let isDownloadActive = false;
+
+      function setIslandState(newState, autoCollapseMs) {
+        if (!islandEl) return;
+        islandEl.setAttribute('data-state', newState);
+        const expPanel = document.getElementById('di-expanded-panel');
+        if (expPanel) expPanel.setAttribute('aria-hidden', newState === 'expanded' ? 'false' : 'true');
+        if (islandAutoTimer) { clearTimeout(islandAutoTimer); islandAutoTimer = null; }
+        if (autoCollapseMs && autoCollapseMs > 0) {
+          islandAutoTimer = setTimeout(function () {
+            if (!islandHovering && !isDownloadActive) restoreDefaultCompactIsland();
+          }, autoCollapseMs);
+        }
+      }
+
+      function restoreDefaultCompactIsland() {
+        if (!islandEl) return;
+        islandEl.setAttribute('data-state', 'compact');
+        const expPanel = document.getElementById('di-expanded-panel');
+        if (expPanel) expPanel.setAttribute('aria-hidden', 'true');
+
+        const onlineCnt = lastServerStats ? (lastServerStats.onlineCount || 0) : 0;
+        const totalChars = lastServerStats ? Number(lastServerStats.totalCharacters || 0) : 0;
+        const totalAccs = lastServerStats ? Number(lastServerStats.totalAccounts || 0) : 0;
+
+        orbEl.style.display = 'inline-block';
+        orbEl.setAttribute('data-tone', 'emerald');
+        miniIconEl.style.display = 'none';
+        avatarEl.classList.remove('visible');
+        waveEl.classList.remove('active');
+
+        compactTitleEl.textContent = 'Aeryndor';
+        compactSubEl.textContent = onlineCnt + ' Online • ' + (lastPingMs || '--') + ' ms';
+        compactBadgeEl.textContent = 'ONLINE';
+
+        if (!isDownloadActive) {
+          expIconEl.textContent = '🛡️';
+          expKickerEl.textContent = 'AERYNDOR LIVE TELEMETRIE';
+          expTitleEl.textContent = 'Aeryndor ist Online (' + (lastPingMs || '--') + ' ms)';
+          expBodyEl.textContent =
+            'Alle Welten-Knotenpunkte, das Auktionshaus und die Instanz-Server laufen stabil im Echtzeit-Synchronisationsmodus (' +
+            totalAccs + ' Accounts • ' + totalChars + ' Helden).';
+          progressWrapEl.classList.remove('visible');
+          expMetricsEl.style.display = 'grid';
+          metric1El.textContent = 'Online';
+          metric2El.textContent = onlineCnt + ' Online / ' + totalChars + ' Helden';
+          metric3El.textContent = (lastPingMs || '--') + ' ms';
+          if (primaryActionLbl) primaryActionLbl.textContent = 'Zum Userpanel';
+          if (secondaryActionLbl) secondaryActionLbl.textContent = 'Status prüfen';
+        }
+      }
+
+      window.notifyDynamicIsland = function (cfg) {
+        if (!islandEl || !cfg) return;
+        orbEl.setAttribute('data-tone', cfg.tone || 'emerald');
+
+        if (cfg.avatarLetter) {
+          orbEl.style.display = 'none';
+          miniIconEl.style.display = 'none';
+          avatarEl.classList.add('visible');
+          avatarEl.textContent = String(cfg.avatarLetter).charAt(0).toUpperCase();
+        } else if (cfg.miniIcon) {
+          orbEl.style.display = 'none';
+          avatarEl.classList.remove('visible');
+          miniIconEl.style.display = 'inline-block';
+          miniIconEl.textContent = cfg.miniIcon;
+        } else {
+          miniIconEl.style.display = 'none';
+          avatarEl.classList.remove('visible');
+          orbEl.style.display = 'inline-block';
+        }
+
+        if (cfg.compactTitle) compactTitleEl.textContent = cfg.compactTitle;
+        if (cfg.compactSub) compactSubEl.textContent = cfg.compactSub;
+        if (cfg.compactBadge) compactBadgeEl.textContent = cfg.compactBadge;
+        waveEl.classList.toggle('active', !!cfg.waveActive);
+
+        if (cfg.expIcon) expIconEl.textContent = cfg.expIcon;
+        if (cfg.expKicker) expKickerEl.textContent = cfg.expKicker;
+        if (cfg.expTitle) expTitleEl.textContent = cfg.expTitle;
+        if (cfg.expBody) expBodyEl.textContent = cfg.expBody;
+
+        if (cfg.metrics && cfg.metrics.length === 3) {
+          metric1El.textContent = cfg.metrics[0];
+          metric2El.textContent = cfg.metrics[1];
+          metric3El.textContent = cfg.metrics[2];
+        }
+        if (cfg.primaryLabel && primaryActionLbl) primaryActionLbl.textContent = cfg.primaryLabel;
+        if (cfg.secondaryLabel && secondaryActionLbl) secondaryActionLbl.textContent = cfg.secondaryLabel;
+        setIslandState(cfg.expand ? 'expanded' : 'compact', cfg.duration || (cfg.expand ? 5200 : 3200));
+      };
+
+      if (compactTrigger) {
+        compactTrigger.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          if (islandEl.getAttribute('data-state') === 'expanded') restoreDefaultCompactIsland();
+          else setIslandState('expanded', 7000);
+        });
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          restoreDefaultCompactIsland();
+        });
+      }
+      document.addEventListener('click', function (ev) {
+        if (islandEl && islandEl.getAttribute('data-state') === 'expanded' && !islandEl.contains(ev.target)) {
+          restoreDefaultCompactIsland();
+        }
+      });
+
+      window.addEventListener('keydown', function (ev) {
+        if (ev.key === 'F5' || ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R'))) {
+          ev.preventDefault();
+          window.location.reload();
+        }
+      });
+
+      window.handleIslandPrimaryAction = function (ev) {
+        if (ev) ev.stopPropagation();
+        restoreDefaultCompactIsland();
+        const upSec = document.getElementById('userpanel');
+        if (upSec) upSec.scrollIntoView({ behavior: 'smooth' });
+      };
+      window.handleIslandSecondaryAction = function (ev) {
+        if (ev) ev.stopPropagation();
+        window.loadHomepageStats(true);
+      };
+
+      window.toggleMobileDrawer = function () {
+        const drawer = document.getElementById('mobile-drawer');
+        if (drawer) drawer.classList.toggle('open');
+      };
+      window.closeMobileDrawer = function () {
+        const drawer = document.getElementById('mobile-drawer');
+        if (drawer) drawer.classList.remove('open');
+      };
+
+      window.togglePasswordVisibility = function (inputId, btnEl) {
+        const inp = document.getElementById(inputId);
+        if (!inp) return;
+        const isPass = inp.type === 'password';
+        inp.type = isPass ? 'text' : 'password';
+        if (btnEl) btnEl.textContent = isPass ? '🙈' : '👁️';
+        inp.focus();
+      };
+
+      window.setFieldError = function (fieldWrapId, message) {
+        const wrap = document.getElementById(fieldWrapId);
+        if (!wrap) return;
+        wrap.classList.remove('is-valid');
+        wrap.classList.add('has-error');
+        const errTxt = wrap.querySelector('.err-txt');
+        if (errTxt && message) errTxt.textContent = message;
+      };
+      window.clearFieldError = function (fieldWrapId) {
+        const wrap = document.getElementById(fieldWrapId);
+        if (wrap) wrap.classList.remove('has-error');
+      };
+      window.validateRegisterUsernameLive = function () {
+        const inp = document.getElementById('reg-username');
+        const wrap = document.getElementById('field-reg-user');
+        if (!inp || !wrap) return;
+        const val = inp.value.trim();
+        if (!val) { wrap.classList.remove('has-error', 'is-valid'); return; }
+        if (!/^[A-Za-z0-9_\-ÄÖÜäöüß]{3,24}$/.test(val)) {
+          window.setFieldError('field-reg-user', 'Nur Buchstaben, Zahlen, _ oder - (3–24 Zeichen).');
+        } else {
+          wrap.classList.remove('has-error');
+          wrap.classList.add('is-valid');
+        }
+      };
+
+      window.switchAuthTab = function (tab) {
+        const grid = document.getElementById('up-auth-view');
+        const btnLogin = document.getElementById('tab-btn-login');
+        const btnReg = document.getElementById('tab-btn-register');
+        if (grid) grid.setAttribute('data-active-tab', tab === 'register' ? 'register' : 'login');
+        if (btnLogin) {
+          btnLogin.classList.toggle('active', tab !== 'register');
+          btnLogin.setAttribute('aria-selected', tab !== 'register' ? 'true' : 'false');
+        }
+        if (btnReg) {
+          btnReg.classList.toggle('active', tab === 'register');
+          btnReg.setAttribute('aria-selected', tab === 'register' ? 'true' : 'false');
+        }
+      };
+
+      window.loadHomepageStats = async function (notifyIslandOnSuccess) {
+        const t0 = performance.now();
+        try {
+          const res = await fetch('/api/homepage-stats', { cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          lastPingMs = Math.max(4, Math.round(performance.now() - t0));
+          const list = data.leaderboard || [];
+          const maxLv = list.reduce(function (m, r) { return Math.max(m, Number(r.level || 1)); }, 1);
+          const onlineCnt = Number(data.onlinePlayers != null ? data.onlinePlayers : (data.onlineCount || 0));
+          data.onlineCount = onlineCnt;
+          lastServerStats = data;
+
+          function animateStatVal(elId, targetNum, prefix) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const prev = parseInt(el.getAttribute('data-val') || '0', 10);
+            const end = Number(targetNum || 0);
+            el.setAttribute('data-val', String(end));
+            if (prev === end && el.textContent !== '--') {
+              el.textContent = (prefix || '') + end.toLocaleString('de-DE');
+              return;
+            }
+            const dur = 550;
+            const startTs = performance.now();
+            function tick(now) {
+              const p = Math.min(1, (now - startTs) / dur);
+              const eased = 1 - Math.pow(1 - p, 3);
+              const cur = Math.round(prev + (end - prev) * eased);
+              el.textContent = (prefix || '') + cur.toLocaleString('de-DE');
+              if (p < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+          }
+          animateStatVal('stat-accounts', data.totalAccounts || 0, '');
+          animateStatVal('stat-characters', data.totalCharacters || 0, '');
+          const maxLvEl = document.getElementById('stat-max-level');
+          if (maxLvEl) maxLvEl.textContent = 'Lv. ' + maxLv;
+          animateStatVal('stat-online', onlineCnt, '');
+          animateStatVal('stat-monoliths', data.activeMonoliths != null ? data.activeMonoliths : 18, '');
+
+          const pingEl = document.getElementById('hsc-ping-val');
+          if (pingEl) pingEl.textContent = lastPingMs + ' ms';
+
+          restoreDefaultCompactIsland();
+          if (notifyIslandOnSuccess) {
+            window.notifyDynamicIsland({
+              type: 'server',
+              tone: 'emerald',
+              compactTitle: 'Aeryndor',
+              compactSub: onlineCnt + ' Online • ' + lastPingMs + ' ms',
+              compactBadge: 'ONLINE',
+              expIcon: '🛡️',
+              expKicker: 'AERYNDOR TELEMETRIE AKTUALISIERT',
+              expTitle: 'Aeryndor läuft mit ' + lastPingMs + ' ms Latenz',
+              expBody: 'Es sind aktuell ' + Number(data.totalAccounts || 0) + ' Accounts und ' + Number(data.totalCharacters || 0) + ' Helden in der Datenbank registriert.',
+              metrics: ['Online', onlineCnt + ' Online / ' + (data.totalCharacters || 0) + ' Helden', lastPingMs + ' ms'],
+              expand: true,
+              duration: 4000
+            });
+          }
+        } catch (_err) {}
+      };
+
+      function renderUserpanelDashboard(account) {
+        currentAccount = account;
+        if (account && account.hpToken) currentHpToken = account.hpToken;
+
+        const heroGrid = document.querySelector('.hero-clean-grid');
+        const userpanelAside = document.getElementById('userpanel');
+        const authView = document.getElementById('up-auth-view');
+        const mobileSwitcher = document.getElementById('auth-mobile-switcher');
+        const dashView = document.getElementById('up-dashboard-view');
+        const buyCoinsPanel = document.getElementById('up-buy-coins-panel');
+
+        if (!account) {
+          if (heroGrid) heroGrid.style.gridTemplateColumns = '';
+          if (userpanelAside) userpanelAside.style.display = '';
+          if (authView) authView.style.display = '';
+          if (mobileSwitcher) mobileSwitcher.style.display = '';
+          if (dashView) dashView.classList.remove('active');
+          if (buyCoinsPanel) buyCoinsPanel.style.display = 'none';
+          restoreDefaultCompactIsland();
+          return;
+        }
+
+        if (heroGrid) heroGrid.style.gridTemplateColumns = '1fr';
+        if (userpanelAside) userpanelAside.style.display = 'none';
+        if (authView) authView.style.display = 'none';
+        if (mobileSwitcher) mobileSwitcher.style.display = 'none';
+        if (dashView) dashView.classList.add('active');
+
+        const uname = String(account.username || 'Held');
+        const coinsFormatted = Number(account.coins || 0).toLocaleString('de-DE');
+        document.getElementById('up-username-display').textContent = uname;
+        document.getElementById('up-avatar-letter').textContent = uname.charAt(0).toUpperCase();
+        document.getElementById('up-coins-val').textContent = coinsFormatted;
+
+        const chars = account.characters || [];
+        const charCountLabel = chars.length === 1 ? '1 Charakter' : (chars.length + ' Charaktere');
+        document.getElementById('up-meta-display').textContent =
+          charCountLabel + ' auf Aeryndor • Itemshop nur Ingame verfügbar';
+
+        const container = document.getElementById('up-chars-container');
+        if (chars.length === 0) {
+          container.innerHTML =
+            '<div style="grid-column:1/-1;padding:34px;text-align:center;background:rgba(0,0,0,0.28);border-radius:18px;border:1px dashed rgba(216,178,92,0.3);">' +
+              '<h4 style="font-family:\'Cinzel\',serif;font-size:1.2rem;color:var(--gold-light);margin-bottom:8px;">Noch keine Helden auf diesem Account</h4>' +
+              '<p style="color:var(--text-secondary);margin-bottom:0;">Starte jetzt den PC-Client oder die Browser-Beta oben in der Navigation, um deinen ersten Charakter zu erschaffen!</p>' +
+            '</div>';
+          return;
+        }
+
+        container.innerHTML = chars.map(function (c, idx) {
+          const rawCls = String(c.classId || 'warrior').toLowerCase();
+          const clsKey = rawCls === 'ninja' ? 'assassin' : (['warrior', 'assassin', 'sura', 'shaman'].includes(rawCls) ? rawCls : 'warrior');
+          const genderStr = String(c.gender || 'm').toLowerCase();
+          const genderKey = (genderStr === 'f' || genderStr === 'female') ? 'f' : 'm';
+          const isKaeryu = String(c.empire || '').toLowerCase() === 'kaeryu' || String(c.cityName || '').toLowerCase() === 'kaeryu';
+          const cityLabel = isKaeryu ? 'Kaeryu' : 'Seiryu';
+          const cityIcon = isKaeryu ? '/assets/client_ui/wappen/Crest_Schattenreich.png' : '/assets/client_ui/wappen/Crest_Lichtreich.png';
+          const eqList = Array.isArray(c.equipment) ? c.equipment : [];
+          const aObj = eqList.find(function (it) { return it && it.slot === 'armor'; });
+          const tier = (aObj && Number(aObj.plus || 0) >= 4) || Number(c.level || 1) >= 15 ? 'armor' : 'base';
+          const imgSrc = '/assets/homepage/' + clsKey + '_' + genderKey + '_' + tier + '.png';
+          const clsLabel = CLASS_NAMES_DE[clsKey] || clsKey;
+          const safeCharName = escapeHtml(c.name || 'Held');
+          const safePid = escapeHtml(c.playerId || c.name || '');
+
+          const docArr = DOCTRINE_META[clsKey] || DOCTRINE_META.warrior;
+          const docIdx = String(c.doctrine || c.doctrineIdx || '0') === '1' ? 1 : 0;
+          const docObj = docArr[docIdx] || docArr[0];
+
+          const rawMap = String(c.mapId || 'morgenwacht').toLowerCase();
+          const mapLabel = MAP_NAMES_DE[rawMap] || 'Morgenwacht';
+
+          const goldVal = Number(c.yang != null ? c.yang : (c.gold || 0)).toLocaleString('de-DE');
+          const rawRepVal = Number(c.reputation != null ? c.reputation : (c.kills || 0));
+          const repVal = rawRepVal.toLocaleString('de-DE');
+          const repColor = rawRepVal >= 1000000 ? '#e838c8' : rawRepVal >= 500000 ? '#9333ea' : rawRepVal >= 200000 ? '#ff00ff' : rawRepVal >= 100000 ? '#f59e0b' : rawRepVal >= 50000 ? '#6ee7b7' : rawRepVal >= 20000 ? '#38bdf8' : rawRepVal >= 10000 ? '#2563eb' : rawRepVal >= 5000 ? '#2b5c8f' : rawRepVal >= 1000 ? '#93c5fd' : rawRepVal >= 0 ? '#cbd5e1' : rawRepVal >= -4999 ? '#c85a17' : rawRepVal >= -9999 ? '#9a4400' : rawRepVal >= -19999 ? '#e5989b' : rawRepVal >= -49999 ? '#d96b6b' : rawRepVal >= -99999 ? '#ff0000' : rawRepVal >= -199999 ? '#cc0000' : rawRepVal >= -499999 ? '#800000' : '#5c1a1a';
+          const repRankName = rawRepVal >= 250000 ? 'Unsterblich' : rawRepVal >= 100000 ? 'Legendär' : rawRepVal >= 60000 ? 'Göttlich' : rawRepVal >= 35000 ? 'Königlich' : rawRepVal >= 20000 ? 'Held' : rawRepVal >= 12000 ? 'Ritterlich' : rawRepVal >= 8000 ? 'Edel' : rawRepVal >= 4000 ? 'Gut' : rawRepVal >= 1000 ? 'Freundlich' : rawRepVal >= 0 ? 'Neutral' : 'Ruchlos';
+          const safeMaxHp = Number(c.maxHp || 950).toLocaleString('de-DE');
+          const safeMaxMp = Number(c.maxMp || 260).toLocaleString('de-DE');
+
+          return (
+            '<div class="up-char-card spotlight-card">' +
+              '<div class="up-char-render">' +
+                '<span class="up-char-slot-tag' + (c.online ? ' is-online' : '') + '">' + (c.online ? '● LIVE' : ('Held #' + (idx + 1))) + '</span>' +
+                '<img src="' + imgSrc + '" alt="' + safeCharName + '" loading="lazy" />' +
+                '<span class="up-char-city-tag"><img src="' + cityIcon + '" alt="" /> ' + cityLabel + '</span>' +
+              '</div>' +
+              '<div class="up-char-details">' +
+                '<div>' +
+                  '<div class="up-char-head">' +
+                    '<div class="up-char-name">' + safeCharName + '</div>' +
+                    '<span class="up-char-lvl">Lv. ' + Number(c.level || 1) + '</span>' +
+                  '</div>' +
+                  '<div class="up-char-meta-row">' +
+                    '<span class="up-meta-pill">⚔️ ' + escapeHtml(clsLabel) + '</span>' +
+                    '<span class="up-meta-pill">' + (genderKey === 'f' ? '♀ Weiblich' : '♂ Männlich') + '</span>' +
+                    '<span class="up-meta-pill" style="color:' + repColor + ';border-color:' + repColor + '44;">🏅 ' + repRankName + '</span>' +
+                  '</div>' +
+                  '<div class="up-char-stats">' +
+                    '<div class="up-stat-chip"><span class="k">Lehre / Spezialisierung</span><span class="v" style="display:inline-flex;align-items:center;gap:6px;"><img src="' + docObj.icon + '" alt="" style="width:18px;height:18px;border-radius:4px;object-fit:cover;border:1px solid rgba(216,178,92,0.45);" /><span>' + escapeHtml(docObj.name) + '</span></span></div>' +
+                    '<div class="up-stat-chip"><span class="k">Rang &amp; Rangpunkte</span><span class="v" style="display:inline-flex;align-items:center;gap:6px;"><img src="/assets/icons/items/ranking_points/zen_bean_rainbow.png" alt="" style="width:16px;height:16px;object-fit:contain;" /><span style="color:' + repColor + ';font-weight:800;">' + repRankName + ' (' + repVal + ')</span></span></div>' +
+                    '<div class="up-stat-chip"><span class="k">Yang-Schatz</span><span class="v" style="color:var(--gold-light);display:inline-flex;align-items:center;gap:6px;"><img src="/assets/icons/currency/gold.png" alt="" style="width:16px;height:16px;object-fit:contain;" />' + goldVal + ' Yang</span></div>' +
+                    '<div class="up-stat-chip"><span class="k">Vital-Ressourcen</span><span class="v" style="display:inline-flex;align-items:center;gap:5px;"><img src="/assets/icons/items/potion/roter_trank.png" alt="" style="width:15px;height:15px;object-fit:contain;" /><span style="color:#f87171;">' + safeMaxHp + ' TP</span> <span style="opacity:0.4;">•</span> <img src="/assets/icons/items/potion/blauer_trank.png" alt="" style="width:15px;height:15px;object-fit:contain;" /><span style="color:#60a5fa;">' + safeMaxMp + ' MP</span></span></div>' +
+                  '</div>' +
+                  '<div class="up-attr-row-4">' +
+                    '<div class="up-attr-box"><span class="ak">❤️ VIT</span><b class="av">' + Number(c.vit || 10) + '</b></div>' +
+                    '<div class="up-attr-box"><span class="ak">💧 INT</span><b class="av">' + Number(c.int || 10) + '</b></div>' +
+                    '<div class="up-attr-box"><span class="ak">⚔️ STR</span><b class="av">' + Number(c.str || 10) + '</b></div>' +
+                    '<div class="up-attr-box"><span class="ak">🏹 DEX</span><b class="av">' + Number(c.dex || 10) + '</b></div>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="up-char-actions">' +
+                  '<span class="up-char-vital-tag">📍 Gebiet: <b>' + escapeHtml(mapLabel) + '</b></span>' +
+                  '<button type="button" class="btn-char-mini" data-unstuck-pid="' + safePid + '" data-unstuck-name="' + safeCharName + '" onclick="window.unstuckCharacter(this.getAttribute(\'data-unstuck-pid\'), this.getAttribute(\'data-unstuck-name\'))">✨ Nach ' + cityLabel + ' teleportieren</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      window.submitUserpanelLogin = async function (ev) {
+        if (ev) ev.preventDefault();
+        const uEl = document.getElementById('login-username');
+        const pEl = document.getElementById('login-password');
+        const btn = document.getElementById('btn-login-submit');
+        const msg = document.getElementById('login-msg');
+        const u = uEl ? uEl.value.trim() : '';
+        const p = pEl ? pEl.value : '';
+        if (u.length < 3) { window.setFieldError('field-login-user', 'Mindestens 3 Zeichen.'); return false; }
+        if (p.length < 4) { window.setFieldError('field-login-pass', 'Mindestens 4 Zeichen.'); return false; }
+
+        if (btn) { btn.classList.add('is-loading'); btn.disabled = true; }
+        msg.className = 'form-banner'; msg.textContent = 'Prüfe Zugangsdaten…'; msg.style.display = 'block';
+        try {
+          const res = await fetch('/api/homepage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subAction: 'login', username: u, password: p })
+          });
+          const data = await res.json();
+          if (!data.ok || !data.profile) {
+            msg.className = 'form-banner err';
+            msg.textContent = '❌ ' + (data.message || data.error || 'Anmeldung fehlgeschlagen.');
+          } else {
+            msg.style.display = 'none';
+            const acc = data.profile;
+            if (data.hpToken) { currentHpToken = data.hpToken; acc.hpToken = data.hpToken; }
+            try { localStorage.setItem('aeryndor_hp_session', JSON.stringify({ username: acc.username, hpToken: currentHpToken })); } catch (_e) {}
+            renderUserpanelDashboard(acc);
+          }
+        } catch (_err) {
+          msg.className = 'form-banner err'; msg.textContent = '❌ Verbindungsfehler.';
+        } finally {
+          if (btn) { btn.classList.remove('is-loading'); btn.disabled = false; }
+        }
+        return false;
+      };
+
+      window.submitRegistration = async function (ev) {
+        if (ev) ev.preventDefault();
+        const u = document.getElementById('reg-username').value.trim();
+        const p1 = document.getElementById('reg-password').value;
+        const p2 = document.getElementById('reg-password2').value;
+        const btn = document.getElementById('btn-reg-submit');
+        const msg = document.getElementById('reg-msg');
+        if (!/^[A-Za-z0-9_\-ÄÖÜäöüß]{3,24}$/.test(u)) { window.setFieldError('field-reg-user', '3–24 Zeichen erlaubt.'); return false; }
+        if (p1.length < 4) { window.setFieldError('field-reg-pass', 'Mindestens 4 Zeichen.'); return false; }
+        if (p1 !== p2) { window.setFieldError('field-reg-pass2', 'Passwörter stimmen nicht überein.'); return false; }
+
+        if (btn) { btn.classList.add('is-loading'); btn.disabled = true; }
+        msg.className = 'form-banner'; msg.textContent = 'Erstelle Account…'; msg.style.display = 'block';
+        try {
+          const res = await fetch('/api/homepage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subAction: 'register', username: u, password: p1 })
+          });
+          const data = await res.json();
+          if (!data.ok || !data.profile) {
+            msg.className = 'form-banner err';
+            msg.textContent = '❌ ' + (data.message || data.error || 'Registrierung fehlgeschlagen.');
+          } else {
+            const acc = data.profile;
+            if (data.hpToken) { currentHpToken = data.hpToken; acc.hpToken = data.hpToken; }
+            try { localStorage.setItem('aeryndor_hp_session', JSON.stringify({ username: acc.username, hpToken: currentHpToken })); } catch (_e) {}
+            renderUserpanelDashboard(acc);
+            window.loadHomepageStats(false);
+          }
+        } catch (_err) {
+          msg.className = 'form-banner err'; msg.textContent = '❌ Verbindungsfehler.';
+        } finally {
+          if (btn) { btn.classList.remove('is-loading'); btn.disabled = false; }
+        }
+        return false;
+      };
+
+      window.refreshUserpanelProfile = async function () {
+        if (!currentAccount || !currentAccount.username) return;
+        try {
+          const res = await fetch('/api/homepage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subAction: 'profile', username: currentAccount.username, hpToken: currentHpToken })
+          });
+          const data = await res.json();
+          if (data.ok && data.profile) {
+            if (data.hpToken) currentHpToken = data.hpToken;
+            renderUserpanelDashboard(data.profile);
+          } else if (res.status === 401 || data.reason === 'unauthorized') {
+            window.logoutUserpanel();
+          }
+        } catch (_e) {}
+      };
+
+      window.logoutUserpanel = function () {
+        currentAccount = null;
+        currentHpToken = '';
+        try { localStorage.removeItem('aeryndor_hp_session'); } catch (_e) {}
+        renderUserpanelDashboard(null);
+      };
+
+      window.toggleBuyCoinsPanel = function (forceState) {
+        const panel = document.getElementById('up-buy-coins-panel');
+        if (!panel) return;
+        const isOpen = panel.style.display !== 'none';
+        const nextOpen = typeof forceState === 'boolean' ? forceState : !isOpen;
+        panel.style.display = nextOpen ? 'block' : 'none';
+        if (nextOpen) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      };
+
+      window.topupCoins = async function (packageId) {
+        if (!currentAccount) return;
+        const msg = document.getElementById('shop-feedback-msg');
+        try {
+          const res = await fetch('/api/homepage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subAction: 'topup', username: currentAccount.username, hpToken: currentHpToken, packageId: packageId })
+          });
+          const data = await res.json();
+          if (data.ok && data.profile) {
+            if (msg) { msg.className = 'form-banner ok'; msg.textContent = '✅ ' + data.message; msg.style.display = 'block'; }
+            renderUserpanelDashboard(data.profile);
+          } else {
+            if (msg) { msg.className = 'form-banner err'; msg.textContent = '❌ ' + (data.message || data.error); msg.style.display = 'block'; }
+          }
+        } catch (_e) {}
+      };
+
+      window.unstuckCharacter = async function (playerId) {
+        if (!currentAccount || !playerId) return;
+        const msg = document.getElementById('shop-feedback-msg');
+        try {
+          const res = await fetch('/api/homepage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subAction: 'unstuck', username: currentAccount.username, hpToken: currentHpToken, playerId: playerId })
+          });
+          const data = await res.json();
+          msg.className = data.ok ? 'form-banner ok' : 'form-banner err';
+          msg.textContent = (data.ok ? '✅ ' : '❌ ') + (data.message || data.error);
+        } catch (_e) {}
+      };
+
+      try {
+        const rawSess = localStorage.getItem('aeryndor_hp_session');
+        if (rawSess) {
+          const parsed = JSON.parse(rawSess);
+          if (parsed && parsed.username && parsed.hpToken) {
+            currentAccount = { username: parsed.username };
+            currentHpToken = parsed.hpToken;
+            window.refreshUserpanelProfile();
+          }
+        }
+      } catch (_e) {}
+
+      window.loadHomepageStats(false);
+      setInterval(function () { window.loadHomepageStats(false); }, 25000);
+
+      document.querySelectorAll('.spotlight-card').forEach(function (card) {
+        card.addEventListener('mousemove', function (ev) {
+          const rect = card.getBoundingClientRect();
+          card.style.setProperty('--mouse-x', (ev.clientX - rect.left) + 'px');
+          card.style.setProperty('--mouse-y', (ev.clientY - rect.top) + 'px');
+        });
+      });
+
+      const canvas = document.getElementById('ember-canvas');
+      if (canvas && canvas.getContext && !canvas.getAttribute('data-ember-running')) {
+        canvas.setAttribute('data-ember-running', '1');
+        const ctx = canvas.getContext('2d');
+        let w = (canvas.width = window.innerWidth);
+        let h = (canvas.height = window.innerHeight);
+        window.addEventListener('resize', function () {
+          w = canvas.width = window.innerWidth;
+          h = canvas.height = window.innerHeight;
+        }, { passive: true });
+        const embers = Array.from({ length: 52 }, function () {
+          return {
+            x: Math.random() * w,
+            y: Math.random() * h,
+            r: Math.random() * 2.1 + 0.8,
+            vx: (Math.random() - 0.5) * 0.28,
+            vy: -Math.random() * 0.52 - 0.16,
+            a: Math.random() * 0.55 + 0.25,
+            phase: Math.random() * Math.PI * 2,
+            pulseSpeed: 0.002 + Math.random() * 0.0025,
+            swayAmp: 0.18 + Math.random() * 0.28
+          };
+        });
+        (function drawEmbers(now) {
+          const t = now || performance.now();
+          ctx.clearRect(0, 0, w, h);
+          for (let i = 0; i < embers.length; i++) {
+            const p = embers[i];
+            p.x += p.vx + Math.sin(t * 0.0012 + p.phase) * p.swayAmp;
+            p.y += p.vy;
+            if (p.y < -12) { p.y = h + 12; p.x = Math.random() * w; }
+            if (p.x < -12) p.x = w + 12;
+            if (p.x > w + 12) p.x = -12;
+            const pulse = 0.65 + 0.35 * Math.sin(t * p.pulseSpeed + p.phase);
+            const alpha = Math.min(0.95, p.a * pulse);
+            const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3.4);
+            grad.addColorStop(0, 'rgba(255, 248, 220, ' + alpha + ')');
+            grad.addColorStop(0.38, 'rgba(245, 208, 115, ' + (alpha * 0.65) + ')');
+            grad.addColorStop(1, 'rgba(216, 162, 58, 0)');
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * 3.4, 0, Math.PI * 2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+          }
+          requestAnimationFrame(drawEmbers);
+        })();
+      }
+    })();
+  </script>
+  <script src="/js/lang-switcher.js?v=532"></script>
+</body>
+</html>

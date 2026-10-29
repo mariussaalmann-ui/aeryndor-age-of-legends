@@ -1,0 +1,45 @@
+Infinity War - Content/UI/HUD - Herkunft der Icons (Environment-HUD, FPS/Ping)
+==============================================================================
+Geladen zur Laufzeit ueber AInfinityWarHUD::GetOrigUITex("HUD/<name>.png") (einmalig, gecacht).
+
+ORIGINAL (konvertiert TGA -> PNG, Alpha erhalten, Originalgroesse):
+  clock.png                <- D:\Server\Infinity War\Infinity War NEW\data\source\d_\ymir work\ui\kingdoms_war\clock.tga   (23x23, Gold-Linienkunst)
+                              (identisch auch in D:\Server\Infinity War\Client- Infinity war\pack\yw_etc\ymir work\ui\kingdoms_war\clock.tga)
+
+Durchsuchte Quellen ohne passenden Treffer (Wetter / Jahreszeit / Thermometer / Wind / Feuchte / FPS / Ping):
+  C:\InfinityWar\InfinityWarClient\Content\UI (alle 799 Dateien)
+  D:\ymir work\ui  (inkl. infinity\, game\, public\, skill\, minigame\, calendar\)
+  D:\Server\Infinity War\data\source\d_\ymir work\ui
+  D:\Server\Infinity War\**\icon, locale\*\ui, ymir work\environment, ymir work\special
+  Gefundene, aber verworfene Kandidaten (Stil passt nicht zur Gold-Linienkunst / falsche Bedeutung):
+    data\source\icon\action\weather1.tga / weather2.tga / weather3.tga (32x32 gerahmte Action-Icons Sonne/Regenbogen/Mond)
+    data\source\d_\ymir work\ui\game\12zi\element\wind.sub / ice.sub / fire.sub (12zi.dds, Element-Edelsteine)
+    D:\ymir work\ui\minigame\snowflake_stick\snow_ball_img.sub (Schneeball-Event)
+    data\source\d_\ymir work\ui\game\advanced_game_options\sky*.dds (85x51 Himmels-Vorschaubilder, keine Icons)
+    D:\ymir work\ui\game\dungeon_info\clock.png, public\spawndungeon_icon\clock.sub (andere Uhren, weiss/klein)
+
+NEW (prozedural mit PIL erzeugt, weil kein passendes Original existiert):
+  Stil: goldene/bronzene Linienkunst auf transparentem Grund, Farbverlauf (236,206,122) -> (168,128,52),
+        dunkle 1px-Kontur (22,14,8, 78% Alpha); Palette abgeleitet aus kingdoms_war\clock.tga (172,140,60)
+        und advanced_game_options\category_icons\*.png (148,122,94). 32x32 RGBA, 8x Supersampling.
+  Generator: C:\Users\Anwender\.gemini\antigravity\brain\4613aeb8-78b3-4804-a5a4-afa6e3e6accd\scratch\gen_hud_icons.py
+  NEW season_spring.png        Fruehling (Bluete)
+  NEW season_summer.png        Sommer (Sonne mit Kern)
+  NEW season_autumn.png        Herbst (Ahornblatt)
+  NEW season_winter.png        Winter (Schneekristall)
+  NEW weather_sunny.png        Klar / Sonnig (Tag)
+  NEW weather_clear_night.png  Klar (Nacht: Mondsichel + Stern)
+  NEW weather_partly_cloudy.png Leicht bewoelkt
+  NEW weather_cloudy.png       Bewoelkt
+  NEW weather_overcast.png     Stark bewoelkt / bedeckt
+  NEW weather_rain.png         Leichter Regen / Regen
+  NEW weather_heavy_rain.png   Starker Regen / Sturm
+  NEW weather_storm.png        Gewitter
+  NEW weather_fog.png          Nebel
+  NEW weather_snow.png         Schneefall
+  NEW weather_blizzard.png     Schneesturm
+  NEW temp.png                 Thermometer
+  NEW wind.png                 Wind
+  NEW humidity.png             Luftfeuchtigkeit (Tropfen)
+  NEW fps.png                  FPS / Leistung (Tacho)
+  NEW ping.png                 Ping / Verbindung (Signalbalken)

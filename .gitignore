@@ -1,0 +1,41 @@
+# Python / Bytecode / Logs
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Lokale & Live-Datenbanken sowie geheime Konfigurationen (Account-Daten, Tokens, Sessions, WAL-Dateien)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/discord_config.json
+data/client_profile/
+data/ui_backup_*/
+.env
+*.pem
+*.key
+# Lokale Admin-Tools mit Server-Zugangsdaten (NIEMALS committen)
+tools/aeryndor_mcp_server.py
+tools/deploy_to_contabo.py
+
+# Laufzeit-Daten des Servers/der Bots (ändern sich ständig -> würden jedes git pull blockieren)
+data/bot_*.json
+data/monster_knowledge_base.json
+data/ai_test_center_control.json
+
+# Große Binär-Pakete (> 100 MB GitHub-Limit) & Backups
+backups/
+backups_deploy/
+pack/
+patch/
+runtimes/
+*.pak
+*.pdb
+
+# Temporäre Dateien & OS-Metadaten
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak

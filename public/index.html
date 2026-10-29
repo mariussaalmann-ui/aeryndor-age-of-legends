@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Aeryndor: Legacy of the Monoliths – 3D Open-World MMORPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="./favicon.ico" />
+  <link rel="icon" type="image/png" sizes="1024x1024" href="./assets/client_ui/logo/2.png" />
+  <link rel="apple-touch-icon" href="./assets/client_ui/logo/2.png" />
+  <link rel="stylesheet" href="./css/main.css?v=20261028_v570" />
+  <!-- iOS-inspirierte UI-Schicht (Dynamic Island, Dynamic Sidebar, Chat-Ruhemodus, Optionen, Login, Weltkarte) -->
+  <link rel="stylesheet" href="./css/ios-ui.css?v=20261028_v585" />
+  <script>
+    // Aeryndor Client Anti-Tamper: Sperrt Entwicklertools und Rechtsklick im Standalone-Client
+    (function() {
+      const isClient = window.location.search.includes('client=');
+      if (isClient) {
+        window.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
+        window.addEventListener('keydown', function(e) {
+          if (
+            e.keyCode === 123 || // F12
+            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
+            (e.ctrlKey && e.keyCode === 85) // Ctrl+U
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }, true);
+      }
+    })();
+  </script>
+</head>
+<body class="nw-dark-ui">
+  <script>
+    (function() {
+      try {
+        var pref = localStorage.getItem('aeryndor_ui_theme');
+        if (!pref) {
+          var hud = JSON.parse(localStorage.getItem('aeryndor_hud_vis_v422') || 'null');
+          if (hud && hud.uiTheme) pref = hud.uiTheme;
+        }
+        if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'dark';
+        var eff = pref;
+        if (pref === 'auto') {
+          var h = new Date().getHours() + new Date().getMinutes() / 60;
+          eff = (h >= 6.5 && h < 19.5) ? 'light' : 'dark';
+        }
+        document.body.classList.toggle('ui-theme-light', eff === 'light');
+        document.body.classList.toggle('ui-theme-dark', eff === 'dark');
+        document.body.setAttribute('data-ui-theme', eff);
+        document.body.setAttribute('data-ui-theme-pref', pref);
+      } catch (_e) {}
+    })();
+  </script>
+  <!-- ==================================================================== -->
+  <!-- 0. PORTAL VIEW: LOGIN, REGISTRIERUNG, CHAR-SELECT & CHAR-ERSTELLUNG  -->
+  <!-- ==================================================================== -->
+  <div id="portal-view" class="portal-view"></div>
+
+  <!-- ==================================================================== -->
+  <!-- 1. FULLSCREEN 3D OPEN-WORLD WEBGL VIEWPORT (Herzstück des Spiels)    -->
+  <!-- ==================================================================== -->
+  <div id="world-canvas-container" class="world-viewport"></div>
+
+  <!-- ==================================================================== -->
+  <!-- 2. OBEN LINKS – KOMPAKTER SPIELERSTATUS + AKTIVE BUFFS               -->
+  <!-- ==================================================================== -->
+  <section id="hud-user-panel" class="hud-user-panel">
+    <div class="nw-player-status-card">
+      <!-- Spielerporträt mit ornamentem Goldring, 3 Rauten-Zierspitzen & Level-Abzeichen rechts unten -->
+      <div class="nw-portrait-wrap" id="btn-open-char-portrait" title="Charakter &amp; Ausrüstung öffnen [C]">
+        <span class="nw-portrait-diamond top" aria-hidden="true"><span>◆</span></span>
+        <span class="nw-portrait-diamond left" aria-hidden="true"><span>◆</span></span>
+        <span class="nw-portrait-diamond bottom" aria-hidden="true"><span>◆</span></span>
+        <div class="nw-portrait-ring">
+          <img id="hud-portrait-img" src="./assets/client_ui/charackter/klingenwaechter_m.png" alt="Held" />
+        </div>
+        <div class="nw-portrait-lvl-badge" id="hud-player-level" title="Charakter-Level">1</div>
+      </div>
+
+      <!-- Rechte Spalte: Charaktername-Banner + HP (Rot), MP (Blau), Ausdauer (Gold) mit linken Icon-Medaillons & rechten Rauten-Spitzen -->
+      <div class="nw-status-bars-col">
+        <div class="nw-player-name-row">
+          <span id="hud-player-name" class="nw-player-name">Klingenwächter</span>
+          <span class="nw-name-end-diamond" aria-hidden="true"><span>◆</span></span>
+        </div>
+
+        <!-- Rote HP-Leiste -->
+        <div class="nw-bar-row-wrap">
+          <span class="nw-bar-left-medallion hp-med" aria-hidden="true">♥</span>
+          <div class="nw-bar-track nw-hp-track" title="Lebenspunkte (HP)">
+            <div id="hud-hp-fill" class="nw-bar-fill nw-hp-fill" style="width: 100%;"></div>
+            <span id="hud-hp-text" class="nw-bar-label">950 / 950</span>
+            <span class="nw-bar-end-diamond" aria-hidden="true"><span>◆</span></span>
+          </div>
+        </div>
+
+        <!-- Blaue MP-Leiste -->
+        <div class="nw-bar-row-wrap">
+          <span class="nw-bar-left-medallion mp-med" aria-hidden="true">💧</span>
+          <div class="nw-bar-track nw-mp-track" title="Manapunkte (MP)">
+            <div id="hud-mp-fill" class="nw-bar-fill nw-mp-fill" style="width: 100%;"></div>
+            <span id="hud-mp-text" class="nw-bar-label">260 / 260</span>
+            <span class="nw-bar-end-diamond" aria-hidden="true"><span>◆</span></span>
+          </div>
+        </div>
+
+        <!-- Goldene Ressourcen- / Ausdauer-Leiste -->
+        <div class="nw-bar-row-wrap">
+          <span class="nw-bar-left-medallion res-med" aria-hidden="true">✦</span>
+          <div class="nw-bar-track nw-res-track" title="Ausdauer &amp; Kampfressource">
+            <div id="hud-res-fill" class="nw-bar-fill nw-res-fill" style="width: 100%;"></div>
+            <span id="hud-res-text" class="nw-bar-label">100 / 100</span>
+            <span class="nw-bar-end-diamond" aria-hidden="true"><span>◆</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aktive Buffs & Debuffs direkt unterhalb der Spieleranzeige -->
+    <div id="hud-buff-strip" class="hud-buff-strip"></div>
+
+    <!-- Ornamente Gruppenanzeige direkt unterhalb der Buff-Leiste (kein Überlappen!) -->
+    <aside id="hud-party-panel" class="hud-party-panel nw-ornate-party-box hidden"></aside>
+  </section>
+
+  <!-- ==================================================================== -->
+  <!-- 3. OBEN MITTE – DYNAMIC ISLAND: KOMPASS <-> ZIEL- & KAMPF-INSel       -->
+  <!-- ==================================================================== -->
+  <!-- Zustand A: Kein Ziel ausgewählt -> Dynamic Island Kompass-Kapsel (inkl. integrierter Weltboss-Anzeige links & rechts) -->
+  <section id="hud-compass" class="hud-compass di-island-compass">
+    <div class="nw-compass-strip-wrap">
+      <span id="hud-compass-heading" class="di-compass-side-pill left" title="Aktuelle Blickrichtung">0° N</span>
+      <button type="button" id="hud-compass-wb-left" class="di-compass-wb-pill left hidden" title="Klicken: Monster-Info Dynamic Island für den aktiven Weltboss öffnen"></button>
+      <div class="nw-compass-viewport">
+        <div class="nw-compass-center-caret">▼</div>
+        <div id="hud-compass-tape" class="nw-compass-tape"></div>
+      </div>
+      <button type="button" id="hud-compass-wb-right" class="di-compass-wb-pill right hidden" title="Klicken: Weltboss auf der Weltkarte [M] anzeigen &amp; Wegpunkt setzen"></button>
+      <button type="button" id="hud-compass-status-pill" class="di-compass-side-pill right" title="Klicken: Auto-Jagd [O] öffnen / umschalten"><span class="di-status-dot"></span><span id="hud-compass-status-txt">CH 1</span></button>
+    </div>
+    <div class="nw-compass-meta">
+      <span id="hud-compass-region" class="nw-compass-region">MORGENWACHT</span>
+      <span id="hud-compass-waypoint" class="nw-compass-waypoint hidden" title="Klicken: Automatisch zum Questziel / Wegpunkt navigieren"></span>
+    </div>
+  </section>
+
+  <!-- Zustand B (Monster/Rissmonolith) & Zustand C (Spieler) -> Dynamic Island Ziel-Kapsel -->
+  <section id="hud-target-frame" class="hud-target-frame di-island-target hidden">
+    <div class="nw-target-shell">
+      <!-- Zielporträt links im goldenen Ring + Level-Badge -->
+      <div class="nw-target-portrait-wrap">
+        <div class="nw-target-portrait-ring">
+          <img id="target-portrait-img" src="./assets/client_ui/Dynamic island/race_animals.png" alt="Ziel" />
+        </div>
+        <span id="target-lvl-badge" class="di-target-lvl-badge">1</span>
+      </div>
+
+      <!-- Hauptspalte: Name/Level + Live-Distanz oben, HP-Balken + Damage-Trail mittig, Boni/Aktionen unten -->
+      <div class="target-bar-layout">
+        <div class="target-bar-top-row">
+          <div class="target-left-name">
+            <span id="target-name-label" class="target-name-label">Lv. 5 | Grauwolf</span>
+            <span id="target-di-subbadge" class="di-target-subbadge">📏 0m</span>
+          </div>
+
+          <div class="target-right-btns">
+            <button type="button" id="btn-target-focus" class="target-q-btn di-focus-btn" title="Ziel sofort angreifen / fokussieren">⚔️</button>
+            <button type="button" id="btn-target-dropinfo" class="target-q-btn" title="Mögliche Drops in der Dynamic Island ein-/ausklappen">?</button>
+            <button type="button" id="btn-close-target" class="target-close-btn" title="Ziel abwählen [ESC]">✕</button>
+          </div>
+        </div>
+
+        <div class="target-center-hp">
+          <div class="target-gauge-track">
+            <div id="target-hp-trail" class="target-gauge-trail" style="width: 100%;"></div>
+            <div id="target-hp-fill" class="target-gauge-fill" style="width: 100%;"></div>
+            <span id="target-hp-text" class="target-hp-text">490 / 490 (100%)</span>
+          </div>
+        </div>
+
+        <div id="target-info-pills" class="target-medallions"></div>
+      </div>
+    </div>
+
+    <!-- Integrierte Dynamic-Island Drop-Schublade "Mögliche Drops: <Ziel>" im königlichen Aeryndor-UI -->
+    <div id="target-drop-popup" class="target-drop-window di-drop-drawer nw-royal-frame hidden"></div>
+  </section>
+
+  <!-- ==================================================================== -->
+  <!-- 4. OBEN MITTE EINLADUNGS-BANNER                                      -->
+  <!-- ==================================================================== -->
+  <div id="hud-social-invites" class="hud-social-invites hidden"></div>
+
+  <!-- ==================================================================== -->
+  <!-- 5. OBEN RECHTS – RUNDE MINIKARTE, WETTER/KANAL-PLAKETTE & QUESTS     -->
+  <!-- ==================================================================== -->
+  <aside id="hud-minimap" class="hud-minimap">
+    <div class="nw-minimap-top-row">
+      <!-- Runde Minikarte im 1:1 Referenz-Design (Gold-Doppelring, N/O/S-Rauten, 4 Diagonal-Zierspitzen, +/-/M links, X oben rechts, Event-Kalender unten rechts) -->
+      <div class="iw-minimap-shell" id="hud-minimap-shell">
+        <div class="nw-minimap-north-badge" title="Norden"><span>N</span></div>
+
+        <canvas id="minimap-canvas" width="168" height="168" title="Auf Radar klicken zum Bewegen"></canvas>
+        <div class="nw-minimap-gold-ring"></div>
+      </div>
+    </div>
+
+    <!-- Ornamente AERYNDOR / CH 1 & Wetter-Plakette direkt unter der Minikarte (1:1 wie Referenzbild) -->
+    <div class="iw-climate-box nw-ornate-climate-plaque" id="hud-climate-box" title="Wetter-, Tageszeit- &amp; Jahreszeiten-System öffnen (Klicken zum Anpassen)">
+      <span class="nw-corner-ornament tl" aria-hidden="true"></span>
+      <span class="nw-corner-ornament tr" aria-hidden="true"></span>
+      <span class="nw-corner-ornament bl" aria-hidden="true"></span>
+      <span class="nw-corner-ornament br" aria-hidden="true"></span>
+
+      <!-- Obere Hälfte: AERYNDOR & ─── ◇ CH 1 ◇ ─── mit seitlichen Rauten-Ohren -->
+      <div class="nw-climate-header-plaque">
+        <span class="nw-plaque-ear left" aria-hidden="true"><span>◆</span></span>
+        <div class="nw-plaque-center">
+          <div class="nw-plaque-title" id="minimap-zone-title">AERYNDOR</div>
+          <div class="nw-plaque-sub" id="hud-climate-channel-wrap" title="Klicken, um den Channel (CH 1–4) zu wechseln">
+            <span class="nw-plaque-line left"></span>
+            <span class="nw-plaque-dia">◇</span>
+            <span id="hud-climate-channel-lbl">CH 1</span>
+            <span class="nw-plaque-dia">◇</span>
+            <span class="nw-plaque-line right"></span>
+          </div>
+        </div>
+        <span class="nw-plaque-ear right" aria-hidden="true"><span>◆</span></span>
+      </div>
+
+      <div class="nw-climate-gold-divider" aria-hidden="true"></div>
+
+      <!-- Untere Hälfte: Wetter-Icon links + "Sommer • Leicht bewölkt • 28°C" oben & Wind-Icon + "Wind 14 km/h" darunter -->
+      <div class="nw-climate-weather-body">
+        <div class="nw-climate-weather-row1">
+          <img id="hud-climate-season-ico" src="./assets/client_ui/HUD/season_autumn.png" class="climate-ico hidden" style="display:none;" alt="" />
+          <img id="hud-climate-weather-ico" src="./assets/client_ui/HUD/weather_sunny.png" class="climate-ico nw-weather-sun-ico" alt="" />
+          <span id="hud-climate-top">Sommer  •  Leicht bewölkt  •  28°C</span>
+        </div>
+
+        <div class="nw-climate-weather-row2">
+          <svg class="nw-climate-wind-svg" id="hud-climate-row2-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+          </svg>
+          <span id="hud-climate-wind-val">Wind 14 km/h</span>
+          <span id="hud-climate-temp-val" class="hidden" style="display:none;">28°C</span>
+        </div>
+
+        <!-- Optionale Koordinaten-, Live-FPS- & Ping-Zeile (in Optionen ein-/ausschaltbar) -->
+        <div class="iw-climate-row nw-zone-coords-row" id="hud-climate-coords-row">
+          <span id="hud-climate-coords-group" class="nw-coords-inline-group">
+            <span id="minimap-region-sub">Morgenwacht</span>
+            <span>•</span>
+            <span id="minimap-coords-line">2500, 3080</span>
+          </span>
+          <span id="hud-perf-badges-group" class="nw-perf-badges-group">
+            <span id="hud-fps-badge" class="nw-fps-inline" title="Live-Bildrate (FPS) – Klicken für Grafik-Optionen">
+              <span id="hud-fps-dot" class="nw-fps-dot"></span>
+              <span id="hud-fps-text">60 FPS</span>
+            </span>
+            <span id="hud-ping-badge" class="nw-ping-inline" title="Live-Ping &amp; Server-Latenz (ms) – Klicken für Interface-Optionen">
+              <span id="hud-ping-dot" class="nw-ping-dot"></span>
+              <span id="hud-ping-text">18 ms</span>
+            </span>
+          </span>
+        </div>
+
+        <!-- Versteckte Kompatibilitäts-Felder -->
+        <span id="hud-climate-sub" class="hidden" style="display:none;">Wind 14 km/h · CH 1</span>
+        <span id="btn-cycle-time" class="hidden" style="display:none;"></span>
+        <span id="minimap-time-line" class="hidden" style="display:none;">17:42</span>
+        <span id="hud-weather-short" class="hidden" style="display:none;">Sonnig</span>
+      </div>
+    </div>
+
+    <!-- Kompakte ornamente Aktives-Event-Box direkt unterhalb der Wetter-Box (1:1 wie Beispielbild 3) -->
+    <div class="nw-active-event-pill nw-ornate-event-box" id="hud-active-event-pill">
+      <span class="nw-corner-ornament tl" aria-hidden="true"></span>
+      <span class="nw-corner-ornament tr" aria-hidden="true"></span>
+      <span class="nw-corner-ornament bl" aria-hidden="true"></span>
+      <span class="nw-corner-ornament br" aria-hidden="true"></span>
+      <div class="nw-ev-pill-ico-wrap">
+        <img id="hud-ev-pill-ico" src="./assets/icons/items/chest/mondlicht_truhe.png" alt="" />
+        <span class="nw-ev-pill-dot"></span>
+      </div>
+      <div class="nw-ev-pill-body">
+        <div class="nw-ev-pill-top-line">
+          <span class="nw-ev-pill-title" id="hud-ev-pill-title">Mondlicht-Schatztruhen</span>
+          <span class="nw-ev-pill-timer" id="hud-ev-pill-timer">40:20</span>
+        </div>
+        <div class="nw-ev-pill-sub" id="hud-ev-pill-sub">+18% Truhen-Drop bei Monstern</div>
+      </div>
+    </div>
+
+    <!--Versteckter Kompatibilitäts-Badge für Auto-Farm-->
+    <div class="iw-fps-pill hidden" id="hud-autofarm-pill" style="display:none;">
+      <span class="af-dot" id="hud-af-dot"></span>
+      <span id="hud-af-status-text"></span>
+    </div>
+
+    <!-- 6. RECHTS UNTERHALB DER MINIKARTE – AKTIVE QUESTS (ORNAMENTER RAHMEN WIE BEISPIELBILD 2) -->
+    <section id="hud-quest-tracker" class="hud-quest-tracker"></section>
+  </aside>
+
+  <!-- ==================================================================== -->
+  <!-- 7. UNTEN LINKS – KOMPAKTER TRANSPARENTER CHAT & MESSENGER            -->
+  <!-- ==================================================================== -->
+  <section id="hud-chat-box" class="hud-chat-box">
+    <div class="chat-tabs-bar" id="chat-tabs-bar">
+      <button type="button" class="chat-tab-pill active" data-chat-filter="all">Allgemein</button>
+      <button type="button" class="chat-tab-pill ch-normal" data-chat-filter="normal">Gruppe</button>
+      <button type="button" class="chat-tab-pill ch-guild" data-chat-filter="guild">Gilde</button>
+      <button type="button" class="chat-tab-pill ch-global" data-chat-filter="global">System</button>
+      <button type="button" class="chat-tab-pill ch-trade" data-chat-filter="trade">Handel</button>
+      <button type="button" class="chat-tab-pill ch-drops" data-chat-filter="drops" title="Beute-Protokoll">Beute</button>
+      <button type="button" class="chat-tab-icon-btn" id="btn-chat-open-friends" data-open-win="friends" title="Messenger &amp; Freundesliste öffnen">+</button>
+      <button type="button" id="btn-chat-minimize" class="chat-tab-min-btn" title="Chat ein-/ausklappen [Enter]">⚙</button>
+    </div>
+
+    <div id="chat-messages" class="chat-messages"></div>
+
+    <div id="chat-min-bar" class="chat-min-bar" title="Drücke [Enter] oder klicke hier, um den Chat zu öffnen">
+      <span>💬 [Enter] Chat öffnen</span>
+    </div>
+
+    <div id="chat-smiley-popup" class="chat-smiley-popup hidden"></div>
+
+    <form id="chat-form" class="chat-input-row" autocomplete="off">
+      <button type="button" id="btn-chat-channel" class="chat-channel-badge ch-normal" title="Klicken zum Kanalwechsel">
+        Allgemein
+      </button>
+      <input id="chat-input" type="text" placeholder="Nachricht eingeben ..." maxlength="180" />
+      <button type="button" id="btn-chat-smiley" class="chat-smiley-btn" title="Smileys &amp; Emotes">😊</button>
+      <button type="submit" class="chat-send-btn" title="Nachricht senden [Enter]">➤</button>
+    </form>
+  </section>
+
+  <!-- ==================================================================== -->
+  <!-- 7B. LINKS MITTIG – DYNAMIC SIDEBAR (ausfahrbarer Schnellzugriff [L]) -->
+  <!--     Teleport, Weltkarte, Sanktuarium, Offlineshop, Händlerin, Schmied, -->
+  <!--     Runenweberin, Auto-Jagd, Begleiter, Quests, Events & Messenger     -->
+  <!--     Inhalt wird von src/ui/iosUi.js (initDynamicSidebar) aufgebaut.    -->
+  <!-- ==================================================================== -->
+  <nav id="hud-dyn-sidebar" class="dyn-sidebar" aria-label="Schnellzugriff"></nav>
+
+  <!-- ==================================================================== -->
+  <!-- 8. MOBILE VIRTUAL JOYSTICK & TOUCH COMBAT CONTROLS                   -->
+  <!-- ==================================================================== -->
+  <div id="mobile-controls" class="mobile-controls">
+    <div id="joystick-zone" class="joystick-zone">
+      <div id="joystick-knob" class="joystick-knob"></div>
+    </div>
+    <div class="mobile-action-cluster">
+      <button id="btn-mobile-attack" class="mob-atk-btn">⚔️<small>Angriff</small></button>
+      <button id="btn-mobile-loot" class="mob-sub-btn pos-loot">💎<small>Beute</small></button>
+      <button id="btn-mobile-pot" class="mob-sub-btn pos-pot">🧪<small>Trank</small></button>
+      <button id="btn-mobile-autofarm" class="mob-sub-btn pos-af">🤖<small>Auto</small></button>
+      <button id="btn-mobile-mount" class="mob-sub-btn pos-mount">🐎<small>Reiten</small></button>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- 9. UNTEN MITTE – NEUN-SLOT-AKTIONSLEISTE (1–9) + SCHMALE EXP-LEISTE   -->
+  <!-- ==================================================================== -->
+  <footer id="hud-bottom-bar" class="nw-bottom-bar">
+    <!-- Genau 9 Slots: 1 2 3 4 5 6 7 8 9 -->
+    <div class="nw-hotbar-frame">
+      <div class="nw-hotbar-wing nw-wing-left"></div>
+      <div id="hotbar-skill-slots" class="nw-hotbar-slots-grid"></div>
+      <div class="nw-hotbar-wing nw-wing-right"></div>
+    </div>
+
+    <!-- Sehr schmale goldene EXP-Leiste mit zentralem Level-Diamant -->
+    <div class="nw-exp-bar-row" title="Erfahrungspunkte (EXP)">
+      <div class="nw-exp-track">
+        <div id="hud-exp-fill" class="nw-exp-fill" style="width: 0%;"></div>
+      </div>
+      <div class="nw-exp-diamond">
+        <span id="hud-bottom-level">1</span>
+      </div>
+      <span id="hud-exp-text" class="nw-exp-hover-txt">0.00%</span>
+    </div>
+  </footer>
+
+  <!-- ==================================================================== -->
+  <!-- 10. UNTEN RECHTS – VIER KOMPAKTE SCHNELLZUGRIFFE (I, C, F, ESC)      -->
+  <!-- ==================================================================== -->
+  <nav id="hud-quick-menu" class="nw-quick-access">
+    <button type="button" class="nw-quick-btn" data-open-win="inventory" title="Inventar öffnen [I]">
+      <span class="nw-quick-circle">
+        <svg viewBox="0 0 24 24" class="nw-quick-svg"><path fill="currentColor" d="M7 4V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3zm2-1v1h6V3H9zm-5 5v12h16V8H4zm5 2h6v2H9v-2z"/></svg>
+      </span>
+      <span class="nw-quick-key">I</span>
+      <span class="nw-quick-lbl">Inventar</span>
+    </button>
+
+    <button type="button" class="nw-quick-btn" data-open-win="character" title="Charakter &amp; Status öffnen [C]">
+      <span class="nw-quick-circle">
+        <svg viewBox="0 0 24 24" class="nw-quick-svg"><path fill="currentColor" d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 4.5l4 1.5v3.2c0 2.95-1.7 5.71-4 6.68-2.3-.97-4-3.73-4-6.68V8l4-1.5z"/></svg>
+      </span>
+      <span class="nw-quick-key">C</span>
+      <span class="nw-quick-lbl">Charakter</span>
+    </button>
+
+    <button type="button" class="nw-quick-btn" data-open-win="skills" title="Fertigkeiten &amp; Passive Boni öffnen [F]">
+      <span class="nw-quick-circle">
+        <svg viewBox="0 0 24 24" class="nw-quick-svg"><path fill="currentColor" d="M12 2l2.6 6.6L21 11l-6.4 2.4L12 20l-2.6-6.6L3 11l6.4-2.4L12 2z"/></svg>
+      </span>
+      <span class="nw-quick-key">F</span>
+      <span class="nw-quick-lbl">Fertigkeiten</span>
+    </button>
+
+    <button type="button" class="nw-quick-btn" data-open-win="quests" title="Aufträge &amp; Quests öffnen [J]">
+      <span class="nw-quick-circle">
+        <svg viewBox="0 0 24 24" class="nw-quick-svg"><path fill="currentColor" d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 12v1.8h8V12H8zm0 4v1.8h5.5V16H8z"/></svg>
+      </span>
+      <span class="nw-quick-key">J</span>
+      <span class="nw-quick-lbl">Aufträge</span>
+    </button>
+
+    <button type="button" class="nw-quick-btn" data-open-win="gamemenu" title="Spielmenü &amp; Optionen öffnen [ESC]">
+      <span class="nw-quick-circle">
+        <svg viewBox="0 0 24 24" class="nw-quick-svg"><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/></svg>
+      </span>
+      <span class="nw-quick-key">ESC</span>
+      <span class="nw-quick-lbl">Menü</span>
+    </button>
+  </nav>
+
+  <!-- ==================================================================== -->
+  <!-- 11. FREI VERSCHIEBBARE DARK-FANTASY FENSTER                          -->
+  <!-- ==================================================================== -->
+  <div id="windows-layer" class="windows-layer">
+    <!-- CHARAKTER-, AUSRÜSTUNGS-, FERTIGKEITEN- & QUEST-FENSTER [C / F / J] -->
+    <section id="win-character" class="ornate-window win-character nw-royal-frame hidden" style="left: 90px; top: 72px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-character">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title" id="win-character-title">CHARAKTER</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="character" title="Schließen">✕</button>
+      </header>
+      <div id="win-character-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- INVENTAR- & AUSRÜSTUNGS-FENSTER [I] -->
+    <section id="win-inventory" class="ornate-window win-inventory nw-royal-frame hidden" style="right: 300px; top: 72px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <!-- Angedockte linke Funktions-Sidebar (Kostüme, Begleiter, Händler, Schmied, Runen, Markt, Auto-Jagd, Weltkarte) -->
+      <div class="inv-docked-sidebar">
+        <button type="button" class="inv-side-btn" id="btn-side-costumes" title="Kostüm- &amp; Skin-Ansicht umschalten">
+          <img src="./assets/client_ui/Dynamic island/drop_info/icon_crown.png" alt="" />
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="pet" title="Begleiter, Reittiere &amp; Skins [P]">
+          <img src="./assets/icons/items/pet/pet_seal.png" alt="" />
+          <span class="inv-side-key">P</span>
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="generalstore" title="Gemischtwarenhändlerin – Tränke &amp; Shop [V]">
+          <img src="./assets/icons/items/potion/roter_trank.png" alt="" />
+          <span class="inv-side-key">V</span>
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="blacksmith" title="Dorfschmied (+0 bis +9) [U]">
+          <img src="./assets/icons/skills/Passive/schmiedkunst.png" alt="" />
+          <span class="inv-side-key">U</span>
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="runeweaver" title="Runenweberin (Boni &amp; Äthersiegel) [N]">
+          <img src="./assets/icons/items/skill/soulstone.png" alt="" />
+          <span class="inv-side-key">N</span>
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="market" title="Offlineshops &amp; Spielermarkt [B]">
+          <img src="./assets/icons/currency/gold.png" alt="" />
+          <span class="inv-side-key">B</span>
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="autofarm" title="Intelligente Auto-Jagd &amp; Drop-Filter [O]">
+          <img src="./assets/client_ui/Dynamic island/stat_speed.png" alt="" />
+          <span class="inv-side-key">O</span>
+        </button>
+        <button type="button" class="inv-side-btn" data-open-win="worldmap" title="Weltkarte &amp; Teleport [M]">
+          <img src="./assets/icons/items/skill/skill_book.png" alt="" />
+          <span class="inv-side-key">M</span>
+        </button>
+      </div>
+
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-inventory">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title" id="win-inventory-title">INVENTAR</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="inventory" title="Schließen">✕</button>
+      </header>
+      <div id="win-inventory-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- SCHMIED / VERBESSERN-FENSTER (+0 bis +9) [U] -->
+    <section id="win-blacksmith" class="ornate-window win-blacksmith nw-royal-frame hidden" style="left: 340px; top: 74px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-blacksmith">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">⚒️ SCHMIED – VERBESSERUNG</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="blacksmith" title="Schließen">✕</button>
+      </header>
+      <div id="win-blacksmith-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- SEELENVERBESSERUNGS- & RUNENWEBERIN-FENSTER [N] -->
+    <section id="win-runeweaver" class="ornate-window win-runeweaver nw-royal-frame hidden" style="left: 694px; top: 74px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-runeweaver">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">🔮 SEELENVERBESSERUNG</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="runeweaver" title="Schließen">✕</button>
+      </header>
+      <div id="win-runeweaver-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- MESSENGER, FREUNDESLISTE & KONVERSATIONEN -->
+    <section id="win-friends" class="ornate-window win-friends nw-royal-frame hidden" style="left: 220px; top: 64px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-friends">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">💬 MESSENGER &amp; FREUNDESLISTE</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="friends" title="Schließen">✕</button>
+      </header>
+      <div id="win-friends-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- AUTO-HUNT, RADAR, AUTO-SELL & DROP-FILTER FENSTER [O] -->
+    <section id="win-autofarm" class="ornate-window win-autofarm nw-royal-frame hidden" style="left: 280px; top: 48px; width: 550px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-autofarm">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">⚔️ AUTO-JAGD &amp; RADAR [O]</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <div class="nw-win-header-actions">
+          <button id="btn-autofarm-minimize" class="win-min-btn nw-chamfer-min" title="Auto-Hunt-Fenster kompakt einklappen / ausklappen">—</button>
+          <button class="win-close-btn nw-chamfer-close" data-close-win="autofarm" title="Schließen">✕</button>
+        </div>
+      </header>
+      <div id="win-autofarm-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- BEGLEITER-, MOUNT- & SKIN-SAMMLUNGS-FENSTER [P] -->
+    <section id="win-pet" class="ornate-window win-pet nw-royal-frame hidden" style="left: 240px; top: 48px; width: 720px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-pet">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">🐉 BEGLEITER, REITTIERE &amp; SKINS [P]</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="pet" title="Schließen">✕</button>
+      </header>
+      <div id="win-pet-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- OFFLINESHOP & MARKTPLATZ-FENSTER [B] -->
+    <section id="win-market" class="ornate-window win-market nw-royal-frame hidden" style="left: 360px; top: 90px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-market">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">⚖️ OFFLINESHOPS &amp; MARKTSUCHE [B]</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="market" title="Schließen">✕</button>
+      </header>
+      <div id="win-market-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- GEMISCHTWARENHÄNDLERIN – SHOP & AUTO-SELL [V] -->
+    <section id="win-generalstore" class="ornate-window win-generalstore nw-royal-frame hidden" style="left: 325px; top: 70px; width: 510px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-generalstore">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">🧪 GEMISCHTWARENHÄNDLERIN [V]</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="generalstore" title="Schließen">✕</button>
+      </header>
+      <div id="win-generalstore-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- WELTKARTE [M] -->
+    <section id="win-worldmap" class="ornate-window win-worldmap nw-royal-frame hidden" style="left: 170px; top: 54px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-worldmap">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">🗺️ AERYNDOR – WELTKARTE [M]</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="worldmap" title="Schließen">✕</button>
+      </header>
+      <div id="win-worldmap-body" class="ornate-win-body" style="padding:6px 8px 8px;overflow:hidden;"></div>
+    </section>
+
+    <!-- ESC-SPIELMENÜ [ESC] -->
+    <section id="win-gamemenu" class="ornate-window win-gamemenu nw-royal-frame hidden" style="left: 550px; top: 145px; width: 300px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-gamemenu">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">SPIELMENÜ</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="gamemenu" title="Schließen">✕</button>
+      </header>
+      <div id="win-gamemenu-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- OPTIONEN-FENSTER -->
+    <section id="win-options" class="ornate-window win-options nw-royal-frame hidden" style="left: 210px; top: 60px; width: 960px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-options">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">⚙️ OPTIONEN</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="options" title="Schließen">✕</button>
+      </header>
+      <div id="win-options-body" class="ornate-win-body"></div>
+    </section>
+
+    <!-- WELT-EVENTS & ZEITPLAN FENSTER (nur auf Abruf über Minimap-Button ✦, kein dauerhafter HUD-Block) -->
+    <section id="win-events" class="ornate-window win-events nw-royal-frame hidden" style="right: 248px; top: 28px; width: 396px;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-events">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">✦ AERYNDOR EVENTS &amp; ZEITPLAN</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="events" title="Schließen">✕</button>
+      </header>
+      <div id="win-events-body" class="ornate-win-body" style="padding:10px 12px 12px;"></div>
+    </section>
+
+    <!-- ENTWICKLER DEBUG-PANEL: TAG-/NACHT & ATMOSPHÄRE (F7) -->
+    <section id="win-daynight-debug" class="ornate-window win-daynight-debug nw-royal-frame hidden" style="left: 32px; top: 96px; width: 410px; z-index: 10000;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-daynight-debug">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title">☀️ TAG/NACHT &amp; ATMOSPHÄRE [F7]</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" data-close-win="daynight-debug" title="Schließen">✕</button>
+      </header>
+      <div id="win-daynight-debug-body" class="ornate-win-body" style="padding:10px 14px 14px; font-size:12px;"></div>
+    </section>
+
+    <!-- DIREKTES SPIELER-HANDELSFENSTER (TRADE) -->
+    <section id="win-trade" class="ornate-window win-trade nw-royal-frame hidden" style="left: 280px; top: 96px; width: 620px; z-index: 9500;">
+      <span class="nw-frame-corner tl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner tr" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner bl" aria-hidden="true">◆</span>
+      <span class="nw-frame-corner br" aria-hidden="true">◆</span>
+      <span class="nw-frame-side left" aria-hidden="true">◆</span>
+      <span class="nw-frame-side right" aria-hidden="true">◆</span>
+      <span class="nw-frame-bottom-gem" aria-hidden="true">◇</span>
+      <header class="ornate-win-header nw-royal-win-header" data-drag-handle="win-trade">
+        <div class="nw-win-star-emblem" aria-hidden="true">
+          <span class="nw-win-star-inner">✦</span>
+        </div>
+        <span class="win-title" id="win-trade-title">🤝 DIREKTER SPIELER-HANDEL</span>
+        <span class="nw-header-bottom-gem" aria-hidden="true">◇</span>
+        <button class="win-close-btn nw-chamfer-close" id="btn-close-trade" title="Handel abbrechen">✕</button>
+      </header>
+      <div id="win-trade-body" class="ornate-win-body" style="padding:12px 14px 14px;"></div>
+    </section>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- 12. TODES- & WIEDERBELEBUNGS-DIALOG BEI 0 HP                         -->
+  <!-- ==================================================================== -->
+  <div id="hud-death-overlay" class="hud-death-overlay hidden">
+    <div class="hud-death-vignette"></div>
+    <section class="ornate-window hud-death-card">
+      <header class="ornate-win-header" style="cursor:default;">
+        <span class="win-title">💀 DU BIST GEFALLEN</span>
+      </header>
+
+      <div class="ornate-win-body hud-death-body">
+        <div class="hud-death-emblem-row">
+          <div class="hud-death-skull">⚔️</div>
+          <div class="hud-death-text-col">
+            <div class="hud-death-headline">Deine Lebenspunkte haben 0 HP erreicht</div>
+            <div class="hud-death-subline">Wähle, wie du deine Reise in Aeryndor fortsetzen möchtest:</div>
+          </div>
+        </div>
+
+        <div class="hud-death-btn-group">
+          <button type="button" id="btn-respawn-here" class="hud-death-btn btn-respawn-here is-cooldown" disabled>
+            <span class="death-btn-ico" id="respawn-here-ico">⏳</span>
+            <span class="death-btn-main" id="respawn-here-label">Hier neu starten (8s)</span>
+            <span class="death-btn-sub" id="respawn-here-sub">Verfügbar nach 8 Sekunden Wartezeit</span>
+          </button>
+
+          <button type="button" id="btn-respawn-city" class="hud-death-btn btn-respawn-city">
+            <span class="death-btn-ico">🏛️</span>
+            <span class="death-btn-main">In der Stadt neu starten</span>
+            <span class="death-btn-sub">Sofort am Portal in deiner Stadt starten</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- 13. MODAL OVERLAY, TOOLTIPS & TOASTS                                 -->
+  <!-- ==================================================================== -->
+  <div id="modal-overlay" class="modal-overlay hidden"></div>
+  <div id="item-tooltip" class="item-tooltip hidden"></div>
+  <div id="toast-banner" class="toast-banner"></div>
+
+  <script type="module" src="./src/ui/app.js?v=v20261028_v585"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+Options/widgets/checkbox_off.png <= D:\ymir work\ui\game\advanced_game_options\radio_unselected.png 15x14
+Options/widgets/checkbox_on.png <= D:\ymir work\ui\game\advanced_game_options\radio_selected.png 15x14
+Options/widgets/radio_off.png <= D:\ymir work\ui\game\gameoption\radio_unselected.tga 20x20
+Options/widgets/radio_on.png <= D:\ymir work\ui\game\gameoption\radio_selected.tga 20x20
+Options/widgets/radio_hover.png <= D:\ymir work\ui\game\advanced_game_options\radio_over.tga 20x20
+Options/widgets/toggle_off.png <= D:\ymir work\ui\game\advanced_game_options\toggle_unselected.png 34x17
+Options/widgets/toggle_on.png <= D:\ymir work\ui\game\advanced_game_options\toggle_selected.png 34x17
+Options/widgets/toggle_hover.png <= D:\ymir work\ui\game\advanced_game_options\toggle_hover.png 34x17
+Options/widgets/slider_track.png <= D:\ymir work\ui\game\advanced_game_options\sliderbar.png 259x14
+Options/widgets/slider_thumb.png <= D:\ymir work\ui\game\advanced_game_options\sliderbar_cursor.png 21x14
+Options/widgets/scroll_track.png <= D:\ymir work\ui\game\advanced_game_options\scrollbar\scrollbar_bg_big.png [NO-ALPHA source mode RGB] 12x340
+Options/widgets/scroll_thumb_top.png <= D:\ymir work\ui\game\advanced_game_options\scrollbar\scrollbar_top.tga [NO-ALPHA source mode RGB] 5x7
+Options/widgets/scroll_thumb_mid.png <= D:\ymir work\ui\game\advanced_game_options\scrollbar\scrollbar_mid.tga [NO-ALPHA source mode RGB] 5x7
+Options/widgets/scroll_thumb_scale.png <= D:\ymir work\ui\game\advanced_game_options\scrollbar\scrollbar_scale.tga [NO-ALPHA source mode RGB] 5x1
+Options/widgets/scroll_thumb_bottom.png <= D:\ymir work\ui\game\advanced_game_options\scrollbar\scrollbar_bottom.tga [NO-ALPHA source mode RGB] 5x6
+Options/widgets/tab_normal.png <= D:\ymir work\ui\game\advanced_game_options\btn_cat_1.png 199x38
+Options/widgets/tab_hover.png <= D:\ymir work\ui\game\advanced_game_options\btn_cat_2.png 199x38
+Options/widgets/tab_down.png <= D:\ymir work\ui\game\advanced_game_options\btn_cat_3.png 199x38
+Options/widgets/subtab_normal.png <= D:\ymir work\ui\game\advanced_game_options\subcat_1.png 199x27
+Options/widgets/subtab_hover.png <= D:\ymir work\ui\game\advanced_game_options\subcat_2.png 199x27
+Options/widgets/subtab_down.png <= D:\ymir work\ui\game\advanced_game_options\subcat_3.png 199x27
+Options/widgets/btn_normal.png <= D:\ymir work\ui\game\advanced_game_options\btn_0.png [NO-ALPHA source mode RGB] 153x25
+Options/widgets/btn_hover.png <= D:\ymir work\ui\game\advanced_game_options\btn_1.png [NO-ALPHA source mode RGB] 153x25
+Options/widgets/btn_down.png <= D:\ymir work\ui\game\advanced_game_options\btn_2.png [NO-ALPHA source mode RGB] 153x25
+Options/widgets/combo.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_bg_main.sub [crop 0,90,244,18 of D:\ymir work\ui\npc_location_01.dds] 244x18
+Options/widgets/combo_arrow_normal.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_arrow_default.sub [crop 332,206,16,16 of D:\ymir work\ui\npc_location_01.dds] 16x16
+Options/widgets/combo_arrow_hover.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_arrow_over.sub [crop 352,206,16,16 of D:\ymir work\ui\npc_location_01.dds] 16x16
+Options/widgets/combo_arrow_down.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_arrow_down.sub [crop 352,226,16,16 of D:\ymir work\ui\npc_location_01.dds] 16x16
+Options/widgets/combo_list_top.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_bg_top.sub [crop 0,170,244,16 of D:\ymir work\ui\npc_location_01.dds] 244x16
+Options/widgets/combo_list_middle.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_bg_middle.sub [crop 0,186,244,16 of D:\ymir work\ui\npc_location_01.dds] 244x16
+Options/widgets/combo_list_bottom.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_bg_bottom.sub [crop 0,202,244,16 of D:\ymir work\ui\npc_location_01.dds] 244x16
+Options/widgets/combo_list_over.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_down_bg_over.sub [crop 0,222,244,14 of D:\ymir work\ui\npc_location_01.dds] 244x14
+Options/widgets/arrow_down_small.png <= D:\ymir work\ui\game\advanced_game_options\arrow_down.png 12x8
+Options/widgets/arrow_up_small.png <= D:\ymir work\ui\game\advanced_game_options\arrow_up.png 12x8
+Options/widgets/panel_bg.png <= D:\ymir work\ui\game\advanced_game_options\background.png 594x406
+Options/widgets/title_bar.png <= D:\ymir work\ui\game\advanced_game_options\option_title.png 352x23
+Options/widgets/reset_normal.png <= D:\ymir work\ui\game\advanced_game_options\reset_badge_button_default.tga 21x18
+Options/widgets/reset_hover.png <= D:\ymir work\ui\game\advanced_game_options\reset_badge_button_over.tga 21x18
+Options/widgets/reset_down.png <= D:\ymir work\ui\game\advanced_game_options\reset_badge_button_down.tga 21x18
+Options/icons/cat_game.png <= D:\ymir work\ui\game\advanced_game_options\category_icons\game.png 38x38
+Options/icons/cat_interface.png <= D:\ymir work\ui\game\advanced_game_options\category_icons\interface.png 38x38
+Options/icons/cat_audio.png <= D:\ymir work\ui\game\advanced_game_options\category_icons\sound.png 38x38
+Options/icons/cat_world.png <= D:\ymir work\ui\game\advanced_game_options\category_icons\environment.png 38x38
+Options/icons/cat_drops.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_item_info_default.sub [crop 263,66,21,23 of D:\ymir work\ui\npc_location_01.dds] 21x23
+Options/icons/cat_drops_hover.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_item_info_over.sub [crop 248,233,21,23 of D:\ymir work\ui\npc_location_01.dds] 21x23
+Options/icons/cat_drops_down.png <= D:\ymir work\ui\game\npc_location_helper\button_drop_item_info_down.sub [crop 273,233,21,23 of D:\ymir work\ui\npc_location_01.dds] 21x23
+Options/icons/cat_language.png <= D:\ymir work\ui\flag\en.tga [NO-ALPHA source mode RGB] 16x12
+Options/icons/flag_de.png <= D:\ymir work\ui\flag\de.tga [NO-ALPHA source mode RGB] 16x12
+Options/icons/flag_en.png <= D:\ymir work\ui\flag\en.tga [NO-ALPHA source mode RGB] 16x12
+Options/icons/cat_keys.png <= D:\ymir work\ui\game\treasure_hunt\event\key_icon.sub [crop 230,189,17,18 of D:\ymir work\ui\treasure_hunt_01.dds] 17x18
+Options/icons/time_day.png <= D:\Server\Infinity War\data\source\icon\action\weather1.tga 32x32
+Options/icons/weather_sun.png <= D:\Server\Infinity War\data\source\icon\action\weather1.tga 32x32
+Options/icons/time_night.png <= D:\Server\Infinity War\data\source\icon\action\weather3.tga 32x32
+Options/icons/minimap.png <= D:\ymir work\ui\minimap\minimap_open_default.sub [crop 0,177,32,32 of D:\ymir work\ui\minimap.dds] 32x32
+Options/icons/atlas_normal.png <= D:\ymir work\ui\minimap\atlas_open_default.sub [crop 0,231,25,25 of D:\ymir work\ui\minimap.dds] 25x25
+Options/widgets/scroll_thumb.png <= D:\ymir work\ui\game\advanced_game_options\scrollbar\scrollbar_top.tga + scrollbar_mid.tga + scrollbar_bottom.tga [stacked vertically, unscaled, no other edits] 5x20
+
+# Zusaetzlich im Optionsmenue verwendete Icons aus Content/UI/HUD (keine Kopie, direkter Pfad):
+# Ausgewaehlt, weil fuer diese Begriffe KEIN Original existiert. Herkunft siehe HUD/_sources.txt.
+HUD/weather_partly_cloudy.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Leicht bewoelkt]
+HUD/weather_cloudy.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Bewoelkt]
+HUD/weather_overcast.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Standard/unbekannt]
+HUD/weather_rain.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Leichter Regen, Regen]
+HUD/weather_heavy_rain.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Starker Regen]
+HUD/weather_storm.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Gewitter]
+HUD/weather_fog.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Nebel]
+HUD/weather_snow.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Schnee]
+HUD/weather_blizzard.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Wetter: Schneesturm]
+HUD/season_spring.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Jahreszeit Fruehling]
+HUD/season_summer.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Jahreszeit Sommer]
+HUD/season_autumn.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Jahreszeit Herbst]
+HUD/season_winter.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Jahreszeit Winter]
+HUD/temp.png <= NEW (nicht original, prozedural), siehe HUD/_sources.txt  [Temperatur]
+HUD/clock.png <= ORIGINAL D:\Server\Infinity War\Infinity War NEW\data\source\d_\ymir work\ui\kingdoms_war\clock.tga, siehe HUD/_sources.txt  [Tageszeit: Abend] 23x23
+# Sonnig bleibt Options/icons/weather_sun.png (Original weather1.tga).
+# Kategorie-Icons Anzeige (Monitor) und Grafik (Landschaft): kein passendes Original in
+# advanced_game_options/category_icons (nur general/game, environment/atmosphere, interface, sound) -> Text-Fallback.

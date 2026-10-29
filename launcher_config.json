@@ -1,0 +1,8 @@
+{
+  "ServerHost": "207.180.239.190:8090",
+  "ClientMode": "pc_client",
+  "GraphicsPreset": "ultra",
+  "WindowWidth": 1920,
+  "WindowHeight": 1080,
+  "StartFullscreen": true
+}

@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>AERYNDOR: Legacy of the Monoliths – Das Vermächtnis der Monolithen (Offizielle Lore &amp; Chronik)</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/homepage.css?v=522" />
+</head>
+<body>
+
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <canvas id="ember-canvas" aria-hidden="true"></canvas>
+
+  <header class="top-shell" id="top-shell">
+    <nav class="navbar" aria-label="Hauptnavigation">
+      <a href="/" class="nav-brand" title="Zurück zur Startseite">
+        <img src="/assets/client_ui/logo/1.png" alt="Aeryndor Wappen" class="nav-brand-crest" />
+        <div class="nav-brand-text">
+          <span class="nav-brand-title">AERYNDOR</span>
+          <span class="nav-brand-sub">Legacy of the Monoliths</span>
+        </div>
+      </a>
+
+      <div class="nav-links" id="nav-links">
+        <a href="/">Start</a>
+        <a href="/rangliste">🏆 Rangliste</a>
+        <a href="/download">⚡ Download</a>
+        <a href="/systeme">⚙️ Systeme</a>
+        <a href="/lore" class="active">📜 Lore</a>
+      </div>
+
+      <div class="nav-actions">
+        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="window.toggleColorTheme()" title="Zwischen Dark Mode &amp; Light Mode wechseln" aria-label="Farbschema umschalten">
+          <span id="theme-toggle-icon">☀️</span>
+        </button>
+                <a href="https://discord.gg/Q4gnqSAaSc" target="_blank" rel="noopener noreferrer" class="nav-btn-discord" title="Offizieller Aeryndor Discord-Server">
+          <svg class="discord-svg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+          <span>Discord</span>
+        </a>
+        <a href="/play" class="nav-btn-secondary" title="Sofort im Browser spielen (WebGL2 3D-Engine)">
+          <span class="nav-play-badge" aria-hidden="true">▶</span>
+          <span>Play Browser</span>
+          <span class="nav-play-dot" aria-hidden="true"></span>
+        </a>
+        <a href="/#userpanel" class="nav-btn-primary">
+          <span>Userpanel</span>
+        </a>
+        <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" onclick="window.toggleMobileDrawer()" aria-label="Menü öffnen" aria-expanded="false">
+          <span id="mobile-menu-icon">☰</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+      <div class="mobile-drawer-links">
+        <a href="/"><span>🏰</span> Startseite &amp; Userpanel</a>
+        <a href="/rangliste"><span>🏆</span> Ruhmeshalle (Rangliste)</a>
+        <a href="/download"><span>⚡</span> PC-Client Download</a>
+        <a href="/systeme"><span>⚙️</span> Spielsysteme &amp; Galerie</a>
+        <a href="/lore" class="active"><span>📜</span> Komplette Lore &amp; Klassen</a>
+      </div>
+    </div>
+
+    <div class="di-dock">
+      <div class="dynamic-island" id="dynamic-island" data-state="compact" role="region" aria-live="polite" tabindex="0">
+        <div class="di-compact" id="di-compact-trigger" title="Klicken zum Aufklappen">
+          <div class="di-leading">
+            <span class="di-orb" id="di-orb" data-tone="emerald"></span>
+          </div>
+          <div class="di-summary">
+            <span class="di-title" id="di-compact-title">Die Geschichte</span>
+            <span class="di-sep" aria-hidden="true">•</span>
+            <span class="di-sub" id="di-compact-sub">0 Online • -- ms</span>
+          </div>
+          <div class="di-trailing">
+            <span class="di-badge-pill" id="di-compact-badge">ONLINE</span>
+          </div>
+        </div>
+        <div class="di-expanded" id="di-expanded-panel" aria-hidden="true">
+          <div class="di-exp-top">
+            <div class="di-exp-head">
+              <div class="di-exp-icon">📜</div>
+              <div class="di-exp-titles">
+                <div class="di-exp-kicker">DAS VERMÄCHTNIS DER MONOLITHEN</div>
+                <div class="di-exp-main" id="di-exp-title">Die Archive von Seiryu &amp; Kaeryu</div>
+              </div>
+            </div>
+            <button type="button" class="di-close-btn" id="di-close-btn">✕</button>
+          </div>
+          <div class="di-exp-body" id="di-exp-body">
+            Du liest die vollständige Hintergrundgeschichte von Aeryndor (Kapitel I bis VIII • Level 1 bis 90).
+          </div>
+          <div class="di-exp-actions">
+            <a href="/systeme" class="di-btn primary" style="text-decoration:none;text-align:center;">⚙️ Zu den Spielsystemen</a>
+            <a href="/" class="di-btn" style="text-decoration:none;text-align:center;">🏰 Zur Startseite</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="subpage-hero">
+    <div class="hero-backdrop" aria-hidden="true"></div>
+    <div class="hero-vignette" aria-hidden="true"></div>
+    <div class="subpage-hero-inner">
+      <div class="subpage-logos-bar">
+        <img src="/assets/client_ui/logo/2.png" alt="AERYNDOR: Legacy of the Monoliths" class="wordmark-lg" />
+      </div>
+      <h1 style="font-family:'Cinzel',serif;font-size:clamp(2rem,3.6vw,3rem);font-weight:900;line-height:1.12;">
+        LORE, WELT &amp; KLASSEN
+      </h1>
+      <p class="hero-lead" style="max-width:820px;margin:0 auto;">
+        Das Erwachen uralter Rissmonolithen, das Zerbrechen der Grenzen zwischen den Dimensionen und das vergessene Vermächtnis einer untergegangenen Zivilisation – die gesamte Hintergrundgeschichte der offenen Welt von Aeryndor.
+      </p>
+    </div>
+  </section>
+
+  <nav class="sticky-subnav" aria-label="Lore-Kapitel Navigation">
+    <a href="#kap-1" class="active">1. Bedeutung des Namens</a>
+    <a href="#kap-2">2–4. Die Ersten Hüter &amp; Der Erste Bruch</a>
+    <a href="#kap-5">5. Das Erwachen</a>
+    <a href="#staedte">6–8. Städte, Weol &amp; See Sohan</a>
+    <a href="#monolithen">9–10. 18 Rissmonolithen &amp; 5 Seltenheiten</a>
+    <a href="#klassen-lore">11. Die 4 Klassen</a>
+    <a href="#hauptgeschichte">12. Story Lv. 1–90 (Kapitel I–VIII)</a>
+    <a href="#zukunft">13–17. Botschaft &amp; Zukunft</a>
+  </nav>
+
+  <!-- 1. DIE BEDEUTUNG DES NAMENS -->
+  <section class="section-wrap reveal-on-scroll" id="kap-1">
+    <div class="lore-chapter-card full-span spotlight-card">
+      <span class="lore-chapter-num">KAPITEL 1 • URSPRUNG DES TITELS</span>
+      <h3>1. Die Bedeutung des Namens – „Legacy of the Monoliths“</h3>
+      <p>
+        <strong>Aeryndor: Legacy of the Monoliths</strong> (Deutscher Untertitel: <em>Das Vermächtnis der Monolithen</em>) ist mehr als die Bezeichnung eines Fantasy-MMORPGs. Der Titel beschreibt den Ursprung des zentralen Konflikts, der die gesamte offene, zusammenhängende Spielwelt prägt.
+      </p>
+      <p>
+        Aeryndor ist eine uralte Welt, deren Landschaften, Völker und Königreiche auf den Überresten längst vergessener Zeitalter entstanden sind. Unter den grünen Wiesen des Nordens, den Ruinen alter Tempel und den herbstlichen Wäldern des Südens liegen Geheimnisse verborgen, deren Bedeutung selbst die ältesten Gelehrten nicht vollständig verstehen. Eines dieser Geheimnisse sind die <strong>Rissmonolithen</strong>.
+      </p>
+      <p>
+        Diese monumentalen Steingebilde wurden vor unzähligen Generationen errichtet. Ihre Oberfläche ist von rätselhaften Runen durchzogen, ihre Kerne speichern gewaltige Energiemengen und ihre Anwesenheit verändert die Umgebung auf unheimliche Weise. Lange Zeit galten sie als stumme Denkmäler einer untergegangenen Kultur – doch sie sind uralte Konstruktionen, die mit den Grenzen zwischen den Dimensionen verbunden sind.
+      </p>
+
+      <div class="legacy-triad-grid">
+        <div class="legacy-pillar-card">
+          <div class="pillar-icon">🏛️</div>
+          <h4>Das Vermächtnis der Vergangenheit</h4>
+          <p>Eine verschwundene Zivilisation hinterließ die monumentalen Rissmonolithen und das versiegelte Wissen über ihre übernatürlichen Kräfte.</p>
+        </div>
+        <div class="legacy-pillar-card">
+          <div class="pillar-icon">⚡</div>
+          <h4>Das Vermächtnis der Macht</h4>
+          <p>Die Monolithen besitzen uralte Energien, die sowohl zur Bewahrung und Stabilisierung als auch zur Zerstörung der Welt eingesetzt werden können.</p>
+        </div>
+        <div class="legacy-pillar-card">
+          <div class="pillar-icon">🔮</div>
+          <h4>Das Vermächtnis der Zukunft</h4>
+          <p>Die heutigen Bewohner und Helden Aeryndors müssen entscheiden, wie sie mit dieser Macht umgehen und welches Schicksal ihre Welt erwartet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2, 3 & 4: ENTSTEHUNG, DIE ERSTEN HÜTER & DER ERSTE GROSSE DIMENSIONSBRUCH -->
+  <section class="section-wrap reveal-on-scroll" id="kap-2">
+    <div class="section-head">
+      <div class="section-kicker">DAS VERGESSENE ZEITALTER</div>
+      <h2 class="section-title">Die Ersten Hüter &amp; Der Erste Dimensionsbruch</h2>
+      <p class="section-desc">
+        Wie eine hochentwickelte Zivilisation versuchte, die Grenzen zwischen den Welten zu bändigen – und dadurch beinahe den Untergang Aeryndors heraufbeschwor.
+      </p>
+    </div>
+
+    <div class="lore-story-grid">
+      <div class="lore-chapter-card spotlight-card">
+        <span class="lore-chapter-num">KAPITEL 2 • FRÜHZEIT</span>
+        <h3>2. Die Entstehung der Welt Aeryndor</h3>
+        <p>
+          Lange bevor die ersten Königreiche gegründet wurden, war Aeryndor eine Welt gewaltiger Naturkräfte. Hohe Gebirge erhoben sich über endlose Wälder, Flüsse schnitten tiefe Täler in das Gestein und riesige Seen spiegelten den Himmel wider.
+        </p>
+        <p>
+          In dieser frühen Zeit waren die Grenzen zwischen den Welten noch nicht vollständig gefestigt. Unsichtbare Ströme fremder Energie durchzogen die Erde: An manchen Orten erschienen unerklärliche Lichter, an anderen verschwanden Reisende spurlos. Doch eine hochentwickelte Zivilisation erkannte, dass jenseits ihrer Wirklichkeit weitere Dimensionen lagen – getrennt durch unsichtbare Grenzen, die durchbrochen werden konnten. Aus dieser Erkenntnis entstand die Erschaffung der ersten Monolithen.
+        </p>
+      </div>
+
+      <div class="lore-chapter-card spotlight-card">
+        <span class="lore-chapter-num">KAPITEL 3 • DIE ERBAUER</span>
+        <h3>3. Die vergessenen Erbauer: Die Ersten Hüter</h3>
+        <p>
+          Unter dem Namen <strong>Die Ersten Hüter</strong> vereinte sich eine uralte Gemeinschaft aus Gelehrten, Baumeistern, Runenmeistern und Kriegern. Ihr Ziel war ursprünglich nicht die Eroberung fremder Dimensionen, sondern die <strong>Stabilisierung der Grenzen zwischen den Welten</strong>.
+        </p>
+        <p>
+          Sie errichteten gewaltige Steinkonstruktionen an den Kreuzungspunkten der unsichtbaren Energieströme. Einige Monolithen dienten als Anker, andere als Speicher oder Verbindungspunkte. Doch mit der Zeit wollte ein Teil der Hüter nicht länger nur die Grenzen bewachen, sondern die unbegrenzten Kräfte dahinter beherrschen. Aus wissenschaftlicher Neugier wurde ein verhängnisvoller Konflikt um die Kontrolle der Monolithen.
+        </p>
+      </div>
+
+      <div class="lore-chapter-card full-span spotlight-card" id="kap-4">
+        <span class="lore-chapter-num">KAPITEL 4 &amp; 5 • KATASTROPHE &amp; ERWACHEN</span>
+        <h3>4. Der Erste Bruch &amp; 5. Das Erwachen der Rissmonolithen</h3>
+        <p>
+          An einem unbekannten Tag versuchten die Ersten Hüter, mehrere mächtige Monolithen gleichzeitig zu aktivieren, um einen dauerhaften Übergang in eine unerforschte Dimension zu öffnen. Die Energien gerieten außer Kontrolle: <strong>Der Erste Bruch</strong> entstand. Der Himmel verdunkelte sich, Berge bebten, Flüsse änderten ihren Lauf und fremdartige Kreaturen drangen in Aeryndor ein. Die Monolithen wurden zu unkontrollierbaren Portalen.
+        </p>
+        <p>
+          Unter dem Opfer eines großen Teils ihrer eigenen Macht und durch die bewusste Zerstörung wichtiger Netzwerk-Teile gelang es den Ersten Hütern schließlich, den größten Dimensionsriss zu versiegeln. Ihre Zivilisation zerfiel – zurück blieben nur stumme, unbewegliche Monolithen.
+        </p>
+        <p id="kap-5" style="padding-top:8px;border-top:1px solid var(--glass-border-subtle);color:var(--text-primary);">
+          <strong>Das erneute Erwachen (Gegenwart):</strong> Viele Generationen später leuchten die Runen der Rissmonolithen erneut auf. Wenn ein Monolith zerstört wird, verändert sich an anderer Stelle die Energie; neue Risse entstehen und andere Monolithen werden instabil. Die Gelehrten vermuten: Entweder wurde das Netzwerk von einer unbekannten Macht aktiviert – oder das uralte Siegel des Ersten Bruchs beginnt von selbst zu zerfallen.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6, 7 & 8: DIE DREI STÄDTE, WEOL-DENKMAL & SEE SOHAN -->
+  <section class="section-wrap reveal-on-scroll" id="staedte">
+    <div class="section-head">
+      <div class="section-kicker">KAPITEL 6 BIS 8 • GEOGRAFIE &amp; HEILIGTÜMER</div>
+      <h2 class="section-title">Die Drei Städte, das Weol-Denkmal &amp; See Sohan</h2>
+      <p class="section-desc">
+        Zwischen den grünen Regionen des Nordens und den herbstlichen Landschaften des Südens erheben sich die drei bedeutendsten Städte sowie zwei mystische Schlüsselorte des alten Netzwerks.
+      </p>
+    </div>
+
+    <div class="world-showcase" style="margin-bottom:26px;">
+      <div class="world-map-frame zoomable-media" onclick="window.openLightbox('/assets/homepage/world_map.jpg', 'Die Welt von Aeryndor: Kaeryu (Nordwesten), Seiryu (Nordosten), Weol-Denkmal, See Sohan &amp; Bakra (Süden)')">
+        <img src="/assets/homepage/world_map.jpg" alt="Weltkarte von Aeryndor" loading="lazy" />
+        <div style="text-align:center;padding-top:8px;font-size:0.78rem;color:var(--gold-light);font-weight:700;">
+          🔍 Karte anklicken für Vollbild-Ansicht
+        </div>
+      </div>
+
+      <div class="world-zones">
+        <div class="zone-card spotlight-card">
+          <div class="zone-head">
+            <span class="zone-name">🏰 Kaeryu – Die Stadt der Wächter</span>
+            <span class="zone-lvl">Nordwesten • Grüne Region</span>
+          </div>
+          <p class="zone-desc">
+            Befestigte Stadt mit Wachposten und Verteidigungsanlagen. Die Bewohner von Kaeryu legen großen Wert auf Disziplin, Schwertkunst und den Schutz der umliegenden Straßen. Alte Legenden berichten, dass Kaeryu auf den Überresten einer Grenzfestung errichtet wurde, die einst die westlichen Pfade zu den Monolithen überwachte.
+          </p>
+        </div>
+
+        <div class="zone-card spotlight-card">
+          <div class="zone-head">
+            <span class="zone-name">🏛️ Seiryu – Die Stadt des Wissens</span>
+            <span class="zone-lvl">Nordosten • Grüne Region</span>
+          </div>
+          <p class="zone-desc">
+            Bekannt für ihre Gelehrten, Runenforscher und Historiker. In Seiryu werden alte Schriften gesammelt, Überreste der Ruinen untersucht und Theorien über die Herkunft der Rissmonolithen entwickelt. Viele glauben, dass in den Archiven von Seiryu Hinweise auf die Ersten Hüter verborgen liegen.
+          </p>
+        </div>
+
+        <div class="zone-card spotlight-card">
+          <div class="zone-head">
+            <span class="zone-name">🍂 Bakra – Die Stadt des herbstlichen Südens</span>
+            <span class="zone-lvl">Südliche Herbstregion</span>
+          </div>
+          <p class="zone-desc">
+            Umgeben von gold-, orange- und rotgefärbten Wäldern, Hügeln und alten Handelswegen wirkt Bakra auf den ersten Blick ruhig – liegt jedoch näher an stärkeren Dimensionsrissen als die Städte des Nordens. Reisende berichten von zunehmenden Angriffen verdorbener Kreaturen und ungewöhnlichen Energieschwankungen.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="lore-story-grid">
+      <div class="lore-chapter-card spotlight-card">
+        <span class="lore-chapter-num">KAPITEL 7 • DAS VERGESSENE HEILIGTUM</span>
+        <h3>⛩️ Das Weol-Denkmal</h3>
+        <p>
+          Im zentralen Norden von Aeryndor erhebt sich das <strong>Weol-Denkmal</strong>, eine alte Ruinenanlage auf einer erhöhten Steinplattform, umgeben von Wasserfällen und verwitterten Statuen. Nach den ältesten Überlieferungen war das Weol-Denkmal ein <strong>Kontrollpunkt des Monolithennetzwerks</strong>. Unterhalb des Denkmals soll sich eine versiegelte Kammer befinden, in der ein beschädigter Energiekern ruht.
+        </p>
+      </div>
+
+      <div class="lore-chapter-card spotlight-card">
+        <span class="lore-chapter-num">KAPITEL 8 • VERBORGENE ERINNERUNGEN</span>
+        <h3>🌊 See Sohan</h3>
+        <p>
+          Südlich des Weol-Denkmals liegt der große <strong>See Sohan</strong>. Alte Berichte sprechen davon, dass während des Ersten Bruchs ein mächtiger Monolith im Zentrum des heutigen Sees versank. Fischer und Reisende erzählen von schwachen Lichtern unter der Wasseroberfläche in klaren Nächten und von seltsamen, pulsierenden Geräuschen aus der Tiefe – ein alter Knotenpunkt des Netzwerks.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 & 10: DIE 18 RISSMONOLITHEN & DIE 5 SELTENHEITEN -->
+  <section class="section-wrap reveal-on-scroll" id="monolithen">
+    <div class="section-head">
+      <div class="section-kicker">KAPITEL 9 &amp; 10 • DAS MONOLITHEN-NETZWERK</div>
+      <h2 class="section-title">Die 18 Rissmonolithen &amp; Ihre 3 Stufen</h2>
+      <p class="section-desc">
+        Die 18 Rissmonolithen von Level 5 bis Level 90 durchlaufen drei aufeinander aufbauende Resonanz-Stufen – von <strong>Schlafend</strong> über <strong>Instabil</strong> bis <strong>Erweckt</strong>.
+      </p>
+    </div>
+
+    <h3 style="font-family:'Cinzel',serif;font-size:1.35rem;color:var(--text-primary);margin-bottom:8px;">
+      💎 Die drei Stufen der Rissmonolithen
+    </h3>
+    <div class="rarity-grid" style="margin-bottom:34px;">
+      <div class="rarity-card r-schlafend spotlight-card">
+        <span class="rarity-tag" style="color:#60a5fa;">🔵 STUFE 1 • EISBLAU</span>
+        <h4>Schlafend</h4>
+        <p>Ein ruhender Rissmonolith in seiner Grundform (<strong>100% TP • 1,0× Beute</strong>). Beim Angriff beschwört er ausschließlich normale Dimensions-Wächter (keine Elite-Bosse). Er lässt <strong>Monolithensplitter</strong> fallen und kann mit <strong>1× Monolithensplitter</strong> gezielt auf Stufe 2 (<em>Instabil</em>) erweckt werden.</p>
+      </div>
+      <div class="rarity-card r-instabil spotlight-card">
+        <span class="rarity-tag" style="color:#c084fc;">🟣 STUFE 2 • VIOLETT</span>
+        <h4>Instabil</h4>
+        <p>Durch einen <strong>Monolithensplitter</strong> oder natürlichen Riss-Ausbruch destabilisiert (<strong>225% TP • 2,4× Beute • +2 Extra-Drops</strong>). Färbt den Himmel im Umkreis violett, beschwört je nach Monolith-Level <strong>1 bis 4 mächtige Elite-Bosse</strong> und kann mit <strong>1× Erwachter Risskern</strong> auf Stufe 3 (<em>Erweckt</em>) gesteigert werden.</p>
+      </div>
+      <div class="rarity-card r-erweckt spotlight-card">
+        <span class="rarity-tag" style="color:#f43f5e;">🔴 STUFE 3 • KARMESINROT</span>
+        <h4>Erweckt</h4>
+        <p>Die höchste Eskalationsstufe eines Rissmonolithen (<strong>600% TP • 5,0× Beute • +4 Extra-Drops</strong>). Öffnet ein Dimensionsportal, beschwört <strong>1 mächtigen Weltboss</strong> (max. 1 pro Gebiet, 1 Std. Timer), löst einen serverweiten Dynamic-Island-Alarm mit Karten-Markierung aus und gewährt legendäre Beute.</p>
+      </div>
+    </div>
+
+    <div class="lb-card spotlight-card">
+      <div class="lb-header">
+        <div>
+          <h3 style="font-family:'Cinzel',serif;font-size:1.3rem;color:var(--text-primary);">⚡ Alle 18 Rissmonolithen (Level 5 bis Level 90)</h3>
+          <p style="font-size:0.84rem;color:var(--text-secondary);">Filtere nach den Monolithen der aktuellen Spielwelt (Lv. 5–40) oder den zukünftigen Highlevel-Gebieten (Lv. 45–90)</p>
+        </div>
+        <div class="lb-filter-pills" id="mono-filter-pills">
+          <button type="button" class="lb-pill active" onclick="window.filterMonoliths('all', this)">Alle 18 (Lv. 5–90)</button>
+          <button type="button" class="lb-pill" onclick="window.filterMonoliths('current', this)">🟢 Aktuelle Welt (Lv. 5–40)</button>
+          <button type="button" class="lb-pill" onclick="window.filterMonoliths('future', this)">🟣 Highlevel-Gebiete (Lv. 45–90)</button>
+        </div>
+      </div>
+
+      <div class="lb-table-wrap">
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th>Nr.</th>
+              <th>Level</th>
+              <th>Rissmonolith</th>
+              <th>Welt-Phase / Region</th>
+              <th>Bedeutung innerhalb der Geschichte</th>
+            </tr>
+          </thead>
+          <tbody id="monolith-table-body">
+            <tr data-phase="current"><td><span class="rank-badge">1</span></td><td><span class="lvl-pill">Lv. 5</span></td><td class="char-cell">Rissmonolith des Erwachens</td><td><span class="class-pill">Aktuelle Spielwelt (Norden)</span></td><td>Die ersten Anzeichen der zurückkehrenden Dimensionsenergie</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">2</span></td><td><span class="lvl-pill">Lv. 10</span></td><td class="char-cell">Rissmonolith der Wildnis</td><td><span class="class-pill">Aktuelle Spielwelt (Norden)</span></td><td>Die fremde Energie beginnt, die Natur zu beeinflussen</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">3</span></td><td><span class="lvl-pill">Lv. 15</span></td><td class="char-cell">Rissmonolith des Blutmondes</td><td><span class="class-pill">Aktuelle Spielwelt (Norden)</span></td><td>Aggressive und zerstörerische Energien treten hervor</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">4</span></td><td><span class="lvl-pill">Lv. 20</span></td><td class="char-cell">Rissmonolith der verlorenen Seelen</td><td><span class="class-pill">Aktuelle Spielwelt (Übergang)</span></td><td>Die Grenze zwischen Leben, Tod und fremden Dimensionen wird schwächer</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">5</span></td><td><span class="lvl-pill">Lv. 25</span></td><td class="char-cell">Rissmonolith des Zwielichts</td><td><span class="class-pill">Aktuelle Spielwelt (Süden)</span></td><td>Unterschiedliche Dimensionseinflüsse beginnen sich zu überlagern</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">6</span></td><td><span class="lvl-pill">Lv. 30</span></td><td class="char-cell">Rissmonolith der Verderbnis</td><td><span class="class-pill">Aktuelle Spielwelt (Bakra)</span></td><td>Die Energie verändert Kreaturen und ihre Umgebung</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">7</span></td><td><span class="lvl-pill">Lv. 35</span></td><td class="char-cell">Rissmonolith des Chaos</td><td><span class="class-pill">Aktuelle Spielwelt (Süden)</span></td><td>Das Monolithennetzwerk verliert zunehmend seine Stabilität</td></tr>
+            <tr data-phase="current"><td><span class="rank-badge">8</span></td><td><span class="lvl-pill">Lv. 40</span></td><td class="char-cell">Rissmonolith des Abgrunds</td><td><span class="class-pill">Aktuelle Spielwelt (Finale)</span></td><td>Ein mächtiger Zugang zu einer gefährlichen fremden Dimension</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">9</span></td><td><span class="lvl-pill">Lv. 45</span></td><td class="char-cell">Rissmonolith der Verdammnis</td><td><span class="class-pill" style="color:#c084fc;">Highlevel-Gebiete</span></td><td>Die zerstörerischen Kräfte der alten Katastrophe kehren zurück</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">10</span></td><td><span class="lvl-pill">Lv. 50</span></td><td class="char-cell">Rissmonolith der Finsternis</td><td><span class="class-pill" style="color:#c084fc;">Highlevel-Gebiete</span></td><td>Schattenenergien beginnen, ganze Regionen zu beeinflussen</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">11</span></td><td><span class="lvl-pill">Lv. 55</span></td><td class="char-cell">Rissmonolith des Seelensturms</td><td><span class="class-pill" style="color:#c084fc;">Highlevel-Gebiete</span></td><td>Mächtige Seelen- und Dimensionsenergien verbinden sich</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">12</span></td><td><span class="lvl-pill">Lv. 60</span></td><td class="char-cell">Rissmonolith der ewigen Nacht</td><td><span class="class-pill" style="color:#c084fc;">Highlevel-Gebiete</span></td><td>Die Energie kann selbst Licht und Atmosphäre verändern</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">13</span></td><td><span class="lvl-pill">Lv. 65</span></td><td class="char-cell">Rissmonolith der Zerstörung</td><td><span class="class-pill" style="color:#c084fc;">Highlevel-Gebiete</span></td><td>Gewaltige Kräfte bedrohen die Stabilität der Landschaft</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">14</span></td><td><span class="lvl-pill">Lv. 70</span></td><td class="char-cell">Rissmonolith des Dimensionsbruchs</td><td><span class="class-pill" style="color:#c084fc;">Highlevel-Gebiete</span></td><td>Die Grenzen zwischen mehreren Dimensionen zerfallen</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">15</span></td><td><span class="lvl-pill">Lv. 75</span></td><td class="char-cell">Rissmonolith der Leere</td><td><span class="class-pill" style="color:#fb923c;">Endgame-Zone</span></td><td>Eine unbekannte Macht entzieht ihrer Umgebung Energie</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">16</span></td><td><span class="lvl-pill">Lv. 80</span></td><td class="char-cell">Rissmonolith der Urgewalten</td><td><span class="class-pill" style="color:#fb923c;">Endgame-Zone</span></td><td>Die ursprünglichen Natur- und Dimensionskräfte treten hervor</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge">17</span></td><td><span class="lvl-pill">Lv. 85</span></td><td class="char-cell">Rissmonolith des Weltenendes</td><td><span class="class-pill" style="color:#fb923c;">Endgame-Zone</span></td><td>Die Gefahr eines neuen großen Dimensionsbruchs erreicht ihren Höhepunkt</td></tr>
+            <tr data-phase="future"><td><span class="rank-badge r1">18</span></td><td><span class="lvl-pill" style="background:rgba(250,204,21,0.22);color:#fde047;">Lv. 90</span></td><td class="char-cell" style="color:var(--gold-light);">👑 Rissmonolith des Ursprungsspalts</td><td><span class="class-pill" style="color:#fde047;border-color:rgba(250,204,21,0.5);">Ursprungsspalt (Lv. 90)</span></td><td>Der mögliche Ursprung des gesamten Monolithennetzwerks</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="ursprungsspalt-banner spotlight-card">
+      <div class="zoomable-media" onclick="window.openLightbox('/assets/client_ui/logo/3.png', 'Der Rissmonolith des Ursprungsspalts (Level 90) – Das Herz des Monolithennetzwerks')">
+        <img src="/assets/client_ui/logo/3.png" alt="Der Rissmonolith des Ursprungsspalts" loading="lazy" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <span class="lore-chapter-num" style="background:rgba(168,85,247,0.22);border-color:rgba(168,85,247,0.5);color:#e9d5ff;">LEVEL 90 • DAS LETZTE SIEGEL</span>
+        <h3 style="font-family:'Cinzel',serif;font-size:1.75rem;color:#ffffff;">Der Rissmonolith des Ursprungsspalts</h3>
+        <p style="color:#cbd5e1;line-height:1.7;">
+          Am Ende dieser Entwicklung steht <strong>Der Rissmonolith des Ursprungsspalts (Level 90)</strong>. Nach den geheimsten Schriften von Seiryu ist dieser Monolith mit dem Ort verbunden, an dem der Erste Bruch seinen Anfang nahm.
+        </p>
+        <p style="color:#cbd5e1;line-height:1.7;">
+          Sein <strong>goldvioletter Kern</strong>, der monumentale Obsidianstein und die schwebenden Fragmente deuten darauf hin, dass in ihm sowohl die ursprüngliche Schutzmacht der Ersten Hüter als auch die zerstörerische Kraft des Dimensionsbruchs eingeschlossen sind. Manche Gelehrte fürchten, dass er das <strong>letzte verbliebene Siegel</strong> ist, das eine noch größere Gefahr zurückhält.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. DIE VIER SPIELBAREN KLASSEN UND IHRE ROLLE IN DER LORE -->
+  <section class="section-wrap reveal-on-scroll" id="klassen-lore">
+    <div class="section-head">
+      <div class="section-kicker">KAPITEL 11 • DIE ERBEN DER ALTEN ORDEN</div>
+      <h2 class="section-title">Die Vier Klassen und ihre Rolle in Aeryndor</h2>
+      <p class="section-desc">
+        Jede der vier spielbaren Klassen ist tief in der Geschichte der Ersten Hüter verwurzelt. Schalte live zwischen Männlich/Weiblich und Start Ausrüstung/Charakter-Ansicht um.
+      </p>
+    </div>
+
+    <div class="class-showcase-controls">
+      <button type="button" class="toggle-pill active" id="lore-btn-gender-m" onclick="window.setLoreClassGender('m')">♂️ Männliche Helden</button>
+      <button type="button" class="toggle-pill" id="lore-btn-gender-f" onclick="window.setLoreClassGender('f')">♀️ Weibliche Heldinnen</button>
+      <span style="width:1px;height:24px;background:rgba(255,255,255,0.14);margin:0 6px;"></span>
+      <button type="button" class="toggle-pill active" id="lore-btn-gear-armor" onclick="window.setLoreClassGear('armor')">🛡️ Start Ausrüstung</button>
+      <button type="button" class="toggle-pill" id="lore-btn-gear-base" onclick="window.setLoreClassGear('base')">⚔️ Charaktere</button>
+    </div>
+
+    <div class="classes-grid">
+      <div class="class-card spotlight-card">
+        <div class="class-img-stage">
+          <img id="lore-img-warrior" src="/assets/homepage/warrior_m_armor.png?v=2" alt="Klingenwächter" loading="lazy" />
+        </div>
+        <div class="class-body">
+          <span class="class-role">Die Verteidiger der Welt • Einhand &amp; Zweihand</span>
+          <h3 class="class-name">Klingenwächter</h3>
+          <p class="class-desc">
+            Die Klingenwächter stehen in der Tradition alter Verteidigerorden, die einst die Zugänge zu den Monolithen schützten. Als unbeugsame Frontkämpfer in schwerer Stahlrüstung führen sie gewaltige Zweihandklingen sowie Einhand-Schwerter und bilden die erste Verteidigungslinie von Kaeryu, Seiryu und Bakra.
+          </p>
+          <div class="class-bars">
+            <div class="bar-row"><span class="bar-lbl">Angriff</span><div class="bar-track"><div class="bar-fill" style="width:92%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Abwehr</span><div class="bar-track"><div class="bar-fill" style="width:95%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Magie</span><div class="bar-track"><div class="bar-fill" style="width:30%"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="class-card spotlight-card">
+        <div class="class-img-stage">
+          <img id="lore-img-assassin" src="/assets/homepage/assassin_m_armor.png?v=2" alt="Schattenjäger" loading="lazy" />
+        </div>
+        <div class="class-body">
+          <span class="class-role">Augen der verborgenen Pfade • Dolche &amp; Bogen</span>
+          <h3 class="class-name">Schattenjäger</h3>
+          <p class="class-desc">
+            Kundschafter, Späher und lautlose Jäger der Nacht, die sich in gefährliche Regionen wagen, lange bevor Armeen aufbrechen. Sie entdecken neue Rissmonolithen, kennen geheime Wege der Ersten Hüter und schlagen aus der Tarnung mit Zwillingsdolchen oder präzisen Langbögen zu.
+          </p>
+          <div class="class-bars">
+            <div class="bar-row"><span class="bar-lbl">Angriff</span><div class="bar-track"><div class="bar-fill" style="width:98%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Abwehr</span><div class="bar-track"><div class="bar-fill" style="width:55%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Tempo</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="class-card spotlight-card">
+        <div class="class-img-stage">
+          <img id="lore-img-sura" src="/assets/homepage/sura_m_armor.png?v=2" alt="Runenkrieger / Runenmagier" loading="lazy" />
+        </div>
+        <div class="class-body">
+          <span class="class-role">Träger der vergessenen Macht • Runenklinge</span>
+          <h3 class="class-name">Runenkrieger / Runenmagier</h3>
+          <p class="class-desc">
+            Keine Klasse ist enger mit dem Vermächtnis der Monolithen verbunden. Sie tränken ihr Einhand-Schwert in uralte Runenenergie aus der Zeit der Ersten Hüter, entziehen Widersachern Lebenskraft und wandeln auf dem schmalen Grat zwischen Beherrschung und Versuchung.
+          </p>
+          <div class="class-bars">
+            <div class="bar-row"><span class="bar-lbl">Angriff</span><div class="bar-track"><div class="bar-fill" style="width:88%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Abwehr</span><div class="bar-track"><div class="bar-fill" style="width:82%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Magie</span><div class="bar-track"><div class="bar-fill" style="width:94%"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="class-card spotlight-card">
+        <div class="class-img-stage">
+          <img id="lore-img-shaman" src="/assets/homepage/shaman_m_armor.png?v=2" alt="Seelenweber" loading="lazy" />
+        </div>
+        <div class="class-body">
+          <span class="class-role">Bewahrer des Gleichgewichts • Äther-Stab</span>
+          <h3 class="class-name">Seelenweber</h3>
+          <p class="class-desc">
+            Die Seelenweber verstehen die unsichtbaren Ströme zwischen Natur, Geist und Dimensionsenergie. Mit ihrem universellen Äther-Stab vereinen sie starke Mount-Schläge mit Blitzgewittern, Heilung und göttlichen Schutz-Auren, um das Gleichgewicht Aeryndors zu bewahren.
+          </p>
+          <div class="class-bars">
+            <div class="bar-row"><span class="bar-lbl">Angriff</span><div class="bar-track"><div class="bar-fill" style="width:78%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Support</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div></div>
+            <div class="bar-row"><span class="bar-lbl">Magie</span><div class="bar-track"><div class="bar-fill" style="width:98%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. HAUPTGESCHICHTE VON LEVEL 1 BIS 90 -->
+  <section class="section-wrap reveal-on-scroll" id="hauptgeschichte">
+    <div class="section-head">
+      <div class="section-kicker">KAPITEL 12 • DIE REISE DEINES HELDEN</div>
+      <h2 class="section-title">Hauptgeschichte von Level 1 bis 90 (Kapitel I – VIII)</h2>
+      <p class="section-desc">
+        Vom ersten erwachenden Rissmonolithen vor den Toren von Kaeryu und Seiryu bis zur finalen Entscheidung am Ursprungsspalt.
+      </p>
+    </div>
+
+    <div class="timeline-grid">
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel I</span><span class="timeline-lvl">Level 1 – 10</span></div>
+        <h4>Die ersten Zeichen</h4>
+        <p>Der Spieler beginnt seine Reise im Norden Aeryndors nahe Kaeryu oder Seiryu. Erste Tiere verhalten sich ungewöhnlich aggressiv, und in den umliegenden Gebieten tauchen die ersten <strong>Rissmonolithen des Erwachens</strong> auf.</p>
+      </div>
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel II</span><span class="timeline-lvl">Level 11 – 20</span></div>
+        <h4>Das Flüstern der Wildnis</h4>
+        <p>Die Risse breiten sich in den Wäldern und Wiesen des Nordens aus. Gelehrte aus Seiryu und Krieger aus Kaeryu untersuchen die <strong>Rissmonolithen der Wildnis, des Blutmondes und der verlorenen Seelen</strong>.</p>
+      </div>
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel III</span><span class="timeline-lvl">Level 21 – 30</span></div>
+        <h4>Das Geheimnis des Weol-Denkmals</h4>
+        <p>Die Spur führt zum <strong>Weol-Denkmal</strong> und zum <strong>See Sohan</strong>. Dort entdecken die Spieler alte Runeninschriften der Ersten Hüter, während Monolithen des Zwielichts und der Verderbnis erscheinen.</p>
+      </div>
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel IV</span><span class="timeline-lvl">Level 31 – 40</span></div>
+        <h4>Die Verderbnis des Südens</h4>
+        <p>Im herbstlichen Süden rund um <strong>Bakra</strong> bedrohen die <strong>Rissmonolithen des Chaos und des Abgrunds</strong> die Handelswege. Zum ersten Mal zeigt sich, dass die Aktivierung einem Muster folgt.</p>
+      </div>
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel V</span><span class="timeline-lvl">Level 41 – 55</span></div>
+        <h4>Die verlorenen Archive</h4>
+        <p>Jenseits der bekannten Regionen werden alte Außenposten der Ersten Hüter entdeckt. Die Spieler stoßen auf die <strong>Monolithen der Verdammnis, der Finsternis und des Seelensturms</strong>.</p>
+      </div>
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel VI</span><span class="timeline-lvl">Level 56 – 70</span></div>
+        <h4>Die zerbrechenden Grenzen</h4>
+        <p><strong>Rissmonolithen der ewigen Nacht, der Zerstörung und des Dimensionsbruchs</strong> verändern ganze Landstriche, während Kreaturen der fremden Dimension dauerhafte Übergänge schaffen wollen.</p>
+      </div>
+      <div class="timeline-card spotlight-card">
+        <div class="timeline-head"><span class="timeline-chap">Kapitel VII</span><span class="timeline-lvl">Level 71 – 85</span></div>
+        <h4>Das Vermächtnis der Ersten Hüter</h4>
+        <p>In den ältesten Heiligtümern begegnen die Helden den <strong>Monolithen der Leere, der Urgewalten und des Weltenendes</strong> und erfahren: Das Netzwerk wurde einst nur versiegelt, nicht abgeschaltet.</p>
+      </div>
+      <div class="timeline-card spotlight-card" style="border-color:rgba(216,178,92,0.5);">
+        <div class="timeline-head"><span class="timeline-chap" style="color:#fde047;">👑 Kapitel VIII • Finale</span><span class="timeline-lvl" style="background:rgba(250,204,21,0.2);color:#fde047;">Level 86 – 90</span></div>
+        <h4>Der Ursprungsspalt</h4>
+        <p>Im Zentrum der größten Dimensionsstörung erhebt sich <strong>Der Rissmonolith des Ursprungsspalts</strong>. Hier entscheidet sich das Schicksal von ganz Aeryndor.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13 BIS 17 -->
+  <section class="section-wrap reveal-on-scroll" id="zukunft">
+    <div class="lore-chapter-card full-span spotlight-card" style="text-align:center;align-items:center;">
+      <span class="lore-chapter-num">KAPITEL 13 BIS 17 • DAS VERMÄCHTNIS LEBT WEITER</span>
+      <h3 style="font-size:2rem;">„Das Vermächtnis erwacht. Deine Legende beginnt.“</h3>
+      <p style="max-width:840px;">
+        Das Vermächtnis der Ersten Hüter ist nicht länger Vergangenheit – es ist die Prüfung der Gegenwart. Und jeder Held, der Aeryndor betritt, wird Teil dieser Geschichte.
+      </p>
+    </div>
+  </section>
+
+  <div class="lightbox-modal" id="lightbox-modal" onclick="window.closeLightbox(event)" role="dialog" aria-modal="true">
+    <div class="lightbox-box" onclick="event.stopPropagation()">
+      <button type="button" class="lightbox-close" onclick="window.closeLightbox()">✕</button>
+      <img id="lightbox-img" src="" alt="Vollbild-Vorschau" />
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="/assets/client_ui/logo/2.png" alt="Aeryndor: Legacy of the Monoliths" class="wordmark" />
+        <span>© 2026 AERYNDOR: Legacy of the Monoliths – Das Vermächtnis der Monolithen.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+      function applyTheme(theme) {
+        const clean = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', clean);
+        const iconEl = document.getElementById('theme-toggle-icon');
+        if (iconEl) iconEl.textContent = clean === 'dark' ? '☀️' : '🌙';
+        try { localStorage.setItem('aeryndor_hp_theme', clean); } catch (_e) {}
+      }
+      window.toggleColorTheme = function () {
+        const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+      };
+      try {
+        const saved = localStorage.getItem('aeryndor_hp_theme');
+        if (saved === 'light' || saved === 'dark') applyTheme(saved);
+      } catch (_e) {}
+
+      window.toggleMobileDrawer = function () {
+        const d = document.getElementById('mobile-drawer');
+        if (d) d.classList.toggle('open');
+      };
+
+      const islandEl = document.getElementById('dynamic-island');
+      const trigger = document.getElementById('di-compact-trigger');
+      const closeBtn = document.getElementById('di-close-btn');
+      if (trigger && islandEl) {
+        trigger.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          islandEl.setAttribute('data-state', islandEl.getAttribute('data-state') === 'expanded' ? 'compact' : 'expanded');
+        });
+      }
+      if (closeBtn && islandEl) {
+        closeBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          islandEl.setAttribute('data-state', 'compact');
+        });
+      }
+
+      async function pollStatus() {
+        const t0 = performance.now();
+        try {
+          const res = await fetch('/api/homepage-stats', { cache: 'no-store' });
+          if (!res.ok) return;
+          const data = await res.json();
+          const ping = Math.max(4, Math.round(performance.now() - t0));
+          const online = Number(data.onlinePlayers != null ? data.onlinePlayers : (data.onlineCount || 0));
+          const subEl = document.getElementById('di-compact-sub');
+          if (subEl) subEl.textContent = online + ' Online • ' + ping + ' ms';
+        } catch (_e) {}
+      }
+      pollStatus();
+      setInterval(pollStatus, 25000);
+
+      window.filterMonoliths = function (phase, btnEl) {
+        document.querySelectorAll('#mono-filter-pills .lb-pill').forEach(function (b) { b.classList.toggle('active', b === btnEl); });
+        document.querySelectorAll('#monolith-table-body tr').forEach(function (row) {
+          row.style.display = (phase === 'all' || row.getAttribute('data-phase') === phase) ? '' : 'none';
+        });
+      };
+
+      let loreGender = 'm';
+      let loreGear = 'armor';
+      function updateLoreClassImages() {
+        ['warrior', 'assassin', 'sura', 'shaman'].forEach(function (cls) {
+          const img = document.getElementById('lore-img-' + cls);
+          if (img) img.src = '/assets/homepage/' + cls + '_' + loreGender + '_' + loreGear + '.png?v=2';
+        });
+      }
+      window.setLoreClassGender = function (g) {
+        loreGender = g === 'f' ? 'f' : 'm';
+        document.getElementById('lore-btn-gender-m').classList.toggle('active', loreGender === 'm');
+        document.getElementById('lore-btn-gender-f').classList.toggle('active', loreGender === 'f');
+        updateLoreClassImages();
+      };
+      window.setLoreClassGear = function (gear) {
+        loreGear = gear === 'base' ? 'base' : 'armor';
+        document.getElementById('lore-btn-gear-armor').classList.toggle('active', loreGear === 'armor');
+        document.getElementById('lore-btn-gear-base').classList.toggle('active', loreGear === 'base');
+        updateLoreClassImages();
+      };
+
+      window.openLightbox = function (src, cap) {
+        const m = document.getElementById('lightbox-modal');
+        const img = document.getElementById('lightbox-img');
+        const c = document.getElementById('lightbox-caption');
+        if (!m || !img) return;
+        img.src = src;
+        if (c) c.textContent = cap || '';
+        m.classList.add('open');
+      };
+      window.closeLightbox = function () {
+        const m = document.getElementById('lightbox-modal');
+        if (m) m.classList.remove('open');
+      };
+      window.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') window.closeLightbox();
+        if (ev.key === 'F5' || ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R'))) {
+          ev.preventDefault();
+          window.location.reload();
+        }
+      });
+
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('is-visible'); obs.unobserve(e.target); }
+          });
+        }, { threshold: 0.08 });
+        document.querySelectorAll('.reveal-on-scroll').forEach(function (el) { obs.observe(el); });
+      } else {
+        document.querySelectorAll('.reveal-on-scroll').forEach(function (el) { el.classList.add('is-visible'); });
+      }
+    })();
+  </script>
+  <script src="/js/lang-switcher.js?v=532"></script>
+</body>
+</html>
