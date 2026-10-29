@@ -25010,7 +25010,7 @@ export class OpenWorld3DEngine {
       depthWrite: false,
     });
     const sprite = new THREE.Sprite(mat);
-    sprite.center.set(0.5, 0.0);
+    sprite.center.set(0.5, 0.5);
     sprite.renderOrder = 9999;
     sprite.layers.enable(0);
     sprite.layers.enable(1);
@@ -25078,7 +25078,7 @@ export class OpenWorld3DEngine {
     if (!spriteData) return;
 
     const isMounted = Boolean(targetActor.mountGroup?.visible);
-    const startY = isMounted ? 3.68 : 3.04;
+    const startY = isMounted ? 3.48 : 2.84;
     spriteData.sprite.position.set(0, startY, 0);
     targetActor.root.add(spriteData.sprite);
 
@@ -25117,7 +25117,7 @@ export class OpenWorld3DEngine {
       }
 
       const isMounted = Boolean(b.actor?.mountGroup?.visible);
-      const targetY = isMounted ? 3.68 : 3.04;
+      const targetY = isMounted ? 3.48 : 2.84;
       b.sprite.position.y += (targetY - b.sprite.position.y) * Math.min(1.0, dt * 10.0);
 
       const remain = (b.expiresAt - now) / 800.0;
