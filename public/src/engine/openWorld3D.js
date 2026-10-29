@@ -24886,30 +24886,27 @@ export class OpenWorld3DEngine {
     return sprite;
   }
 
-  // --- ECHTES 3D-CHAT-SPRECHBLASEN-SYSTEM (Texte über dem Kopf des Charakters) ---
+  // --- ECHTES 3D-CHAT-SPRECHBLASEN-SYSTEM (Kompakter Metin2-Stil & Nameplate-Typografie) ---
   createSpeechBubbleSprite(text = '', channel = 'normal', sender = '') {
     if (!text) return null;
     const cleanText = String(text).trim();
     if (!cleanText) return null;
 
-    const isSA = Boolean(String(sender || '').startsWith('[SA]') || (this.localPlayerName && this.localPlayerName.startsWith('[SA]')));
-    const isGM = Boolean(isSA || String(sender || '').startsWith('[GM]') || String(sender || '').startsWith('[GA]'));
-
     const measureCanvas = document.createElement('canvas');
     const mCtx = measureCanvas.getContext('2d');
-    const fontSize = 26;
-    mCtx.font = `bold ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    const fontSize = 23;
+    const fontStr = `bold ${fontSize}px Inter, "Segoe UI", Tahoma, sans-serif`;
+    mCtx.font = fontStr;
 
-    const maxTextWidth = 380;
+    const maxTextWidth = 300;
     const rawWords = cleanText.split(/\s+/);
-    // Lange Wörter ohne Leerzeichen sicher aufteilen
     const words = [];
     for (const w of rawWords) {
-      if (w.length > 24) {
+      if (w.length > 20) {
         let rem = w;
-        while (rem.length > 24) {
-          words.push(rem.slice(0, 24));
-          rem = rem.slice(24);
+        while (rem.length > 20) {
+          words.push(rem.slice(0, 20));
+          rem = rem.slice(20);
         }
         if (rem) words.push(rem);
       } else {
@@ -24951,18 +24948,17 @@ export class OpenWorld3DEngine {
       if (w > longestLineWidth) longestLineWidth = w;
     }
 
-    const padX = 26;
-    const padY = 16;
-    const lineHeight = 34;
-    const tailW = 20;
-    const tailH = 14;
+    // Kompaktes Metin2-Design: Schlankes Padding, dezent transluzenter Grund, passende Proportionen
+    const padX = 10;
+    const padY = 5;
+    const lineHeight = 27;
 
-    const bubbleW = Math.max(160, Math.min(480, Math.ceil(longestLineWidth + padX * 2)));
-    const bubbleH = padY * 2 + lines.length * lineHeight;
+    const bubbleW = Math.ceil(longestLineWidth + padX * 2);
+    const bubbleH = Math.ceil(padY * 2 + lines.length * lineHeight);
 
-    const margin = 10;
+    const margin = 4;
     const canvasW = Math.ceil((bubbleW + margin * 2) / 4) * 4;
-    const canvasH = Math.ceil((bubbleH + tailH + margin * 2) / 4) * 4;
+    const canvasH = Math.ceil((bubbleH + margin * 2) / 4) * 4;
 
     const canvas = document.createElement('canvas');
     canvas.width = canvasW;
@@ -24972,80 +24968,46 @@ export class OpenWorld3DEngine {
 
     const bx = (canvasW - bubbleW) / 2;
     const by = margin;
-    const radius = 16;
-    const tailX = canvasW / 2;
-    const tailTipY = by + bubbleH + tailH;
 
-    // Sprechblasen-Silhouette mit Zeigerspitze exakt nach unten zum Kopf
-    ctx.beginPath();
-    ctx.moveTo(bx + radius, by);
-    ctx.lineTo(bx + bubbleW - radius, by);
-    ctx.quadraticCurveTo(bx + bubbleW, by, bx + bubbleW, by + radius);
-    ctx.lineTo(bx + bubbleW, by + bubbleH - radius);
-    ctx.quadraticCurveTo(bx + bubbleW, by + bubbleH, bx + bubbleW - radius, by + bubbleH);
-    ctx.lineTo(tailX + tailW / 2, by + bubbleH);
-    ctx.lineTo(tailX, tailTipY);
-    ctx.lineTo(tailX - tailW / 2, by + bubbleH);
-    ctx.lineTo(bx + radius, by + bubbleH);
-    ctx.quadraticCurveTo(bx, by + bubbleH, bx, by + bubbleH - radius);
-    ctx.lineTo(bx, by + radius);
-    ctx.quadraticCurveTo(bx, by, bx + radius, by);
-    ctx.closePath();
-
-    // Edler Glassmorphism-Hintergrundverlauf
-    const bgGrad = ctx.createLinearGradient(0, by, 0, by + bubbleH + tailH);
-    bgGrad.addColorStop(0, 'rgba(15, 23, 42, 0.94)');
-    bgGrad.addColorStop(1, 'rgba(10, 15, 29, 0.96)');
-    ctx.fillStyle = bgGrad;
-
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 4;
-    ctx.fill();
-
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Farbiger Zierrahmen je nach Rang/Kanal
-    if (isSA) {
-      ctx.strokeStyle = '#f59e0b'; // Goldene Serverleitung Kontur
-      ctx.lineWidth = 3.5;
-    } else if (isGM) {
-      ctx.strokeStyle = '#ec4899'; // GM Magenta
-      ctx.lineWidth = 3.5;
-    } else if (channel === 'global') {
-      ctx.strokeStyle = '#fbbf24'; // Global Gelb
-      ctx.lineWidth = 3;
-    } else if (channel === 'trade') {
-      ctx.strokeStyle = '#34d399'; // Handel Grün
-      ctx.lineWidth = 3;
-    } else if (channel === 'guild') {
-      ctx.strokeStyle = '#38bdf8'; // Gilde Cyan
-      ctx.lineWidth = 3;
+    // Schlank abgerundeter, dezenter transluzenter Container (Metin2 Stil)
+    ctx.fillStyle = 'rgba(11, 18, 30, 0.75)';
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bubbleW, bubbleH, 4);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
     } else {
-      ctx.strokeStyle = '#94a3b8'; // Normales Silber-Weiß
-      ctx.lineWidth = 2.5;
+      ctx.fillRect(bx, by, bubbleW, bubbleH);
     }
-    ctx.stroke();
 
-    // Text mit schwarzer Kontur für kristallklare Lesbarkeit
-    ctx.font = `bold ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    // Text mit tiefschwarzer Kontur und dezentem Schatten (exakt wie Spieler-Nameplate)
+    ctx.font = fontStr;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.miterLimit = 2;
     ctx.lineJoin = 'round';
 
     let textColor = '#ffffff';
-    if (channel === 'global') textColor = '#fef3c7';
-    else if (channel === 'trade') textColor = '#d1fae5';
-    else if (channel === 'guild') textColor = '#e0f2fe';
+    if (channel === 'global') textColor = '#ffd700';
+    else if (channel === 'trade') textColor = '#34d399';
+    else if (channel === 'guild') textColor = '#38bdf8';
 
     const textStartY = by + padY + lineHeight / 2;
     for (let idx = 0; idx < lines.length; idx++) {
       const lineY = textStartY + idx * lineHeight;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-      ctx.lineWidth = 5;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1.5;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 4.8;
       ctx.strokeText(lines[idx], canvasW / 2, lineY);
+
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
       ctx.fillStyle = textColor;
       ctx.fillText(lines[idx], canvasW / 2, lineY);
     }
@@ -25062,16 +25024,15 @@ export class OpenWorld3DEngine {
       depthWrite: false,
     });
     const sprite = new THREE.Sprite(mat);
-    // Pivot-Punkt exakt an die Zeigerspitze (V-Koordinate) setzen
-    const vTailTip = margin / canvasH;
-    sprite.center.set(0.5, vTailTip);
+    sprite.center.set(0.5, 0.5);
     sprite.renderOrder = 9999;
     sprite.layers.enable(0);
     sprite.layers.enable(1);
 
-    const worldPixelScale = 0.0085;
-    const baseW = Math.max(2.4, canvasW * worldPixelScale);
-    const baseH = baseW * (canvasH / canvasW);
+    // Exakte optische Übereinstimmung mit der Nameplate (0.00525 Einheiten/Pixel):
+    const worldPixelScale = 0.00525;
+    const baseW = Math.max(0.42, canvasW * worldPixelScale);
+    const baseH = canvasH * worldPixelScale;
     sprite.scale.set(baseW, baseH, 1);
 
     return { sprite, worldW: baseW, worldH: baseH };
@@ -25131,7 +25092,7 @@ export class OpenWorld3DEngine {
     if (!spriteData) return;
 
     const isMounted = Boolean(targetActor.mountGroup?.visible);
-    const startY = isMounted ? 4.05 : 3.40;
+    const startY = isMounted ? 4.16 : 3.52;
     spriteData.sprite.position.set(0, startY, 0);
     targetActor.root.add(spriteData.sprite);
 
@@ -25154,7 +25115,7 @@ export class OpenWorld3DEngine {
   updateSpeechBubbles(dt) {
     if (!this._activeSpeechBubbles || this._activeSpeechBubbles.size === 0) return;
     const now = performance.now();
-    const zoomScale = Math.min(1.0, Math.max(0.55, this.cameraDistance / 13.5));
+    const zoomScale = Math.min(1.0, Math.max(0.42, this.cameraDistance / 13.5));
 
     for (const b of Array.from(this._activeSpeechBubbles)) {
       if (!b.sprite || !b.parent) {
@@ -25170,7 +25131,7 @@ export class OpenWorld3DEngine {
       }
 
       const isMounted = Boolean(b.actor?.mountGroup?.visible);
-      const targetY = isMounted ? 4.05 : 3.40;
+      const targetY = isMounted ? 4.16 : 3.52;
       b.sprite.position.y += (targetY - b.sprite.position.y) * Math.min(1.0, dt * 10.0);
 
       const remain = (b.expiresAt - now) / 800.0;

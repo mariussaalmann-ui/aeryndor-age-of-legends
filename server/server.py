@@ -477,7 +477,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
 
     if action == "check_char_name":
         req_name = str(payload.get("name") or "").strip()
-        if account_key == "admin" and req_name:
+        if account_key in ("admin", "blackzimple") and req_name:
             req_name = DB._normalize_sa_char_name(req_name)
         excl_pid = str(payload.get("excludePlayerId") or "").strip() or None
         taken = DB.is_character_name_taken(req_name, exclude_player_id=excl_pid)
@@ -485,7 +485,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             "ok": not taken,
             "available": not taken,
             "normalizedName": req_name,
-            "message": f"✓ Name verfügbar ({req_name})" if (not taken and account_key == "admin") else ("✓ Name verfügbar" if not taken else "⚠️ Dieser Spielername ist bereits vergeben!"),
+            "message": f"✓ Name verfügbar ({req_name})" if (not taken and account_key in ("admin", "blackzimple")) else ("✓ Name verfügbar" if not taken else "⚠️ Dieser Spielername ist bereits vergeben!"),
         }
 
     if action == "create_character":
@@ -494,7 +494,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         new_pid = str(char_obj.get("playerId") or player_id or "").strip()
         cls_id = str(char_obj.get("classId") or payload.get("classId") or "warrior").strip()
         emp = str(char_obj.get("empire") or payload.get("empire") or "seiryu").strip()
-        is_sa_create = account_key == "admin" or req_name.upper().startswith("[SA]")
+        is_sa_create = account_key in ("admin", "blackzimple") or req_name.upper().startswith("[SA]")
         base_name = req_name[4:].strip() if req_name.upper().startswith("[SA]") else req_name
         if len(base_name) < 2 or len(base_name) > 16:
             return {
@@ -614,12 +614,12 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         p["lastSeen"] = time.time() if in_world_flag else 0.0
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
-            if account_key == "admin":
+            if account_key in ("admin", "blackzimple"):
                 req_name = DB._normalize_sa_char_name(req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
         is_sa_join = bool(
-            account_key == "admin"
+            account_key in ("admin", "blackzimple")
             or str(p.get("name") or "").upper().startswith("[SA]")
             or p.get("isSA")
             or player_id == "hero_admin_sa"
@@ -1285,7 +1285,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         txt = (payload.get("text") or "").strip()
         is_sa = (
             WORLD._is_sa_player(p, player_id)
-            or account_key == "admin"
+            or account_key in ("admin", "blackzimple")
             or p.get("name", "").startswith("[SA]")
             or p.get("name", "").startswith("[GA]")
             or p.get("role") == "sa"

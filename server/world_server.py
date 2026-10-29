@@ -10757,7 +10757,7 @@ class WorldAuthority:
         quests_sa = bool((p.get("quests") or {}).get("__is_sa__")) if isinstance(p.get("quests"), dict) else False
         return (
             name.upper().startswith("[SA]")
-            or acc == "admin"
+            or acc in ("admin", "blackzimple")
             or bool(p.get("isSA"))
             or role == "sa"
             or quests_sa

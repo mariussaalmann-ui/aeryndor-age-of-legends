@@ -248,6 +248,7 @@ class GameDatabase:
                 self._migrate_starter_eq_plus0_conn(conn)
                 self._migrate_starter_shoes_conn(conn)
                 self._ensure_sa_admin_account_conn(conn)
+                self._ensure_sa_blackzimple_account_conn(conn)
                 conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_players_unique_name ON players(LOWER(TRIM(name)));")
                 conn.commit()
             finally:
@@ -263,6 +264,50 @@ class GameDatabase:
             base = raw[4:].strip()
             return f"[SA]{base}"[:28] if base else "[SA]Admin"
         return f"[SA]{raw}"[:28]
+
+    def _ensure_sa_blackzimple_account_conn(self, conn: sqlite3.Connection):
+        """Sichert die SA/GM-Rechte f?r den Account 'blackzimple' und Charakter '[SA]Nemesis'."""
+        now = time.time()
+        row = conn.execute("SELECT * FROM accounts WHERE username_key = 'blackzimple'").fetchone()
+        if not row:
+            return
+        try:
+            chars = json.loads(row["characters_json"] or "[null,null,null,null]")
+            if not isinstance(chars, list):
+                chars = [None, None, None, None]
+        except Exception:
+            chars = [None, None, None, None]
+        chars = (chars + [None, None, None, None])[:4]
+        for idx, ch in enumerate(chars):
+            if not isinstance(ch, dict):
+                continue
+            cpid = str(ch.get("playerId") or "").strip()
+            ch["name"] = "[SA]Nemesis"
+            ch["isSA"] = True
+            ch["isGM"] = True
+            ch["role"] = "SA"
+            ch["guild"] = "Serverleitung"
+            if cpid:
+                conn.execute("UPDATE players SET name = ? WHERE player_id = ?", ("[SA]Nemesis", cpid))
+                prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
+                if prow:
+                    try:
+                        q = json.loads(prow["quests_json"] or "{}")
+                        if not isinstance(q, dict):
+                            q = {}
+                    except Exception:
+                        q = {}
+                    q["__is_sa__"] = True
+                    q["__guild_name__"] = "Serverleitung"
+                    conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
+        conn.execute(
+            """
+            UPDATE accounts
+            SET coins = MAX(coins, 999999), characters_json = ?, updated_at = ?
+            WHERE username_key = 'blackzimple'
+            """,
+            (json.dumps(chars, ensure_ascii=False), now),
+        )
 
     def _ensure_sa_admin_account_conn(self, conn: sqlite3.Connection):
         """Richtet den offiziellen SA-Account ('admin' / Passwort '123') ein und versieht alle seine Charaktere automatisch mit [SA]."""
@@ -2188,7 +2233,7 @@ class GameDatabase:
         clean_email = (email or "").strip()[:80]
         if any(ch in clean_email for ch in ("<", ">", '"', "'", "`", ";", "\x00")):
             clean_email = ""
-        clean_code = "".join(ch for ch in str(delete_code or "1234") if ch.isdigit())[:4] or ("123" if ukey == "admin" else "1234")
+        clean_code = "".join(ch for ch in str(delete_code or "1234") if ch.isdigit())[:4] or ("123" if ukey in ("admin", "blackzimple") else "1234")
 
         with DB_LOCK:
             conn = self._connect()
@@ -2210,7 +2255,7 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey == "admin" and cname:
+                            if ukey in ("admin", "blackzimple") and cname:
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
@@ -2229,7 +2274,7 @@ class GameDatabase:
                         "email": clean_email or f"{ukey}@aeryndor.de",
                         "deleteCode": clean_code,
                         "characters": chars,
-                        "isSA": ukey == "admin",
+                        "isSA": ukey in ("admin", "blackzimple"),
                     }
                     conn.execute(
                         """
@@ -2251,7 +2296,7 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey == "admin" and cname:
+                            if ukey in ("admin", "blackzimple") and cname:
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
@@ -2268,9 +2313,9 @@ class GameDatabase:
                     acc_obj = {
                         "username": uname,
                         "email": (client_account_obj or {}).get("email") or f"{ukey}@aeryndor.de",
-                        "deleteCode": "123" if ukey == "admin" else ((client_account_obj or {}).get("deleteCode") or "1234"),
+                        "deleteCode": "123" if ukey in ("admin", "blackzimple") else ((client_account_obj or {}).get("deleteCode") or "1234"),
                         "characters": chars,
-                        "isSA": ukey == "admin",
+                        "isSA": ukey in ("admin", "blackzimple"),
                     }
                     conn.execute(
                         """
@@ -2306,7 +2351,7 @@ class GameDatabase:
                         if not isinstance(ch, dict):
                             continue
                         cname = str(ch.get("name") or "").strip()
-                        if ukey == "admin" and cname:
+                        if ukey in ("admin", "blackzimple") and cname:
                             cname = self._normalize_sa_char_name(cname)
                             ch["isSA"] = True
                             ch["isGM"] = True
@@ -2332,7 +2377,7 @@ class GameDatabase:
                 dirty_chars = False
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
-                        if ukey == "admin":
+                        if ukey in ("admin", "blackzimple"):
                             norm_n = self._normalize_sa_char_name(ch.get("name") or "Admin")
                             if ch.get("name") != norm_n or not ch.get("isSA"):
                                 ch["name"] = norm_n
@@ -2351,7 +2396,7 @@ class GameDatabase:
                                 ch["level"] = new_lvl
                                 dirty_chars = True
                             db_name = str(prow["name"] or "").strip()
-                            if ukey == "admin" and db_name:
+                            if ukey in ("admin", "blackzimple") and db_name:
                                 db_name = self._normalize_sa_char_name(db_name)
                                 if prow["name"] != db_name:
                                     conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (db_name, ch["playerId"]))
@@ -2368,9 +2413,9 @@ class GameDatabase:
                 acc_obj = {
                     "username": row["username"] or uname,
                     "email": row["email"] or f"{ukey}@aeryndor.de",
-                    "deleteCode": "123" if ukey == "admin" else (row["delete_code"] or "1234"),
+                    "deleteCode": "123" if ukey in ("admin", "blackzimple") else (row["delete_code"] or "1234"),
                     "characters": srv_chars,
-                    "isSA": ukey == "admin",
+                    "isSA": ukey in ("admin", "blackzimple"),
                 }
                 return True, "Erfolgreich eingeloggt.", acc_obj
             finally:
@@ -2418,7 +2463,7 @@ class GameDatabase:
                     cname = str(ch.get("name") or "").strip()[:28]
                     if not cpid or not cname:
                         continue
-                    if ukey == "admin":
+                    if ukey in ("admin", "blackzimple"):
                         cname = self._normalize_sa_char_name(cname)
                         ch["isSA"] = True
                         ch["isGM"] = True
@@ -2445,7 +2490,7 @@ class GameDatabase:
                     new_pids.add(cpid)
                     ch["name"] = cname
                     clean_chars[idx] = ch
-                    if ukey == "admin":
+                    if ukey in ("admin", "blackzimple"):
                         conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (cname, cpid))
 
                 # Gelöschte Charaktere dieses Accounts auch aus der players-Tabelle löschen, damit der Name wieder frei wird

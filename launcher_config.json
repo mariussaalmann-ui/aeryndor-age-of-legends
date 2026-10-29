@@ -4,5 +4,6 @@
   "GraphicsPreset": "ultra",
   "WindowWidth": 1920,
   "WindowHeight": 1080,
-  "StartFullscreen": true
+  "StartFullscreen": true,
+  "DiscordClientId": "1564764632952995890"
 }
