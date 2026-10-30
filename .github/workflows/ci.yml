@@ -1,8 +1,10 @@
 name: CI (Syntax-Check)
 
+# Läuft nur für Feature-Branches & Pull Requests.
+# Auf main/develop prüft der Deploy-Workflow die Syntax selbst vor dem Ausrollen (keine doppelten Läufe).
 on:
   push:
-    branches: ["**"]
+    branches-ignore: ["main", "develop"]
   pull_request:
 
 jobs:
