@@ -25122,7 +25122,10 @@ export class OpenWorld3DEngine {
 
       const remain = (b.expiresAt - now) / 800.0;
       if (remain <= 1.0) {
-        b.sprite.material.opacity = Math.max(0.0, remain);
+        const fadeT = Math.max(0.0, remain);
+        b.sprite.material.opacity = fadeT;
+        // Sanfter Aufstiegsschwebe-Effekt beim Ausfaden (typischer MMORPG-Effekt)
+        b.sprite.position.y += (1.0 - fadeT) * 0.12 * Math.min(1.0, dt * 6.0);
       } else {
         b.sprite.material.opacity = 1.0;
       }

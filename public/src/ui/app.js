@@ -7859,12 +7859,18 @@ class AeryndorMMOApp {
         const gmCrown = isSA
           ? `<span class="chat-sa-crown" style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;font-weight:bold;border-radius:4px;padding:2px 6px;font-size:11px;margin-right:4px;box-shadow:0 0 8px rgba(245,158,11,0.6);">👑 [SA]</span>`
           : (isGM ? `<span class="chat-gm-crown">👑 GM</span>` : '');
-        const txt = this.expandClientSmileys(this.escapeHtml(m.text));
+        const myName = String(this.selfState?.name || this.customPlayerName || '').trim().toLowerCase();
+        const rawTxt = String(m.text || '');
+        const isMentioned = Boolean(myName && rawTxt.toLowerCase().includes(myName) && m.sender !== this.selfState?.name);
+        const mentionCls = isMentioned ? ' chat-line-mentioned' : '';
+        let txt = this.expandClientSmileys(this.escapeHtml(rawTxt));
+        // Item-Links in Chatnachrichten formatieren z. B. [Giftschwert+9]
+        txt = txt.replace(/\[([^\]]{2,32})\]/g, '<span class="chat-item-link">[$1]</span>');
         const senderHtml =
           ch === 'system' || ch === 'event' || ch === 'drops'
             ? `<strong>${this.escapeHtml(m.sender)}:</strong>`
             : `${gmCrown}<strong class="chat-sender-link" data-chat-whisper="${this.escapeHtml(m.sender)}" title="Klicken für Direkt-Konversation mit ${this.escapeHtml(m.sender)}">${this.escapeHtml(m.sender)}:</strong>`;
-        return `<div class="${lineCls}"><span class="chat-ch-tag ${ch}">${tagLbl}</span>[${m.time || ''}] ${senderHtml} ${txt}</div>`;
+        return `<div class="${lineCls}${mentionCls}"><span class="chat-ch-tag ${ch}">${tagLbl}</span>[${m.time || ''}] ${senderHtml} ${txt}</div>`;
       })
       .join('');
     box.scrollTop = box.scrollHeight;
@@ -9028,15 +9034,83 @@ class AeryndorMMOApp {
   submitOrMinimizeChat() {
     const chatInput = document.getElementById('chat-input');
     const smileyPopup = document.getElementById('chat-smiley-popup');
-    const text = (chatInput?.value || '').trim();
-    if (text) {
+    const rawText = (chatInput?.value || '').trim();
+    if (rawText) {
+      if (!this.sentChatHistory) this.sentChatHistory = [];
+      this.sentChatHistory.push(rawText);
+      if (this.sentChatHistory.length > 50) this.sentChatHistory.shift();
+      this.chatHistoryIdx = -1;
+      this.chatDraftText = '';
+
       chatInput.value = '';
       smileyPopup?.classList.add('hidden');
-      this.sendAction('chat', { text, channel: this.chatChannel });
 
-      // Sofort optimistisch die Sprechblase über dem eigenen Kopf anzeigen (null Latenz)
-      const myName = this.selfState?.name || this.customPlayerName || 'Krieger';
-      this.engine?.showSpeechBubble?.(myName, text, this.chatChannel, this.selfState?.player_id, true);
+      const low = rawText.toLowerCase();
+      // Slash-Befehle (/clear, /help, /w, /pn, /shout, /trade, /guild)
+      if (low === '/clear') {
+        const box = document.getElementById('chat-messages');
+        if (box) box.innerHTML = `<div class="chat-line-system"><span class="chat-ch-tag system">System</span>Chatfenster geleert.</div>`;
+        this.minimizeChatBox();
+        return;
+      }
+
+      if (low === '/help' || low === '/hilfe') {
+        const box = document.getElementById('chat-messages');
+        if (box) {
+          box.innerHTML += `
+            <div class="chat-line-system" style="line-height:1.45;margin-top:3px;">
+              <span class="chat-ch-tag system">Hilfe</span>
+              <strong>Chat-Befehle &amp; Tipps:</strong><br>
+              • <code>/w Name Text</code> oder <code>/pn Name Text</code> (Flüstern)<br>
+              • <code>!</code> oder <code>/shout Text</code> (Globaler Rufchat)<br>
+              • <code>$</code> oder <code>/trade Text</code> (Handelschat)<br>
+              • <code>%</code> oder <code>/guild Text</code> (Gildenchat)<br>
+              • <code>Tab</code>: Chat-Kanal durchwechseln<br>
+              • <code>↑ / ↓</code>: Vorherige Nachrichten aufrufen<br>
+              • <code>Shift + Klick auf Item</code>: Item-Name direkt in den Chat verlinken<br>
+              • <code>/clear</code>: Chatfenster leeren
+            </div>
+          `;
+          box.scrollTop = box.scrollHeight;
+        }
+        this.minimizeChatBox();
+        return;
+      }
+
+      let text = rawText;
+      let targetChannel = this.chatChannel;
+
+      if (text.startsWith('/w ') || text.startsWith('/pn ') || text.startsWith('/whisper ')) {
+        const parts = text.split(/\s+/);
+        const targetPlayer = parts[1];
+        const msg = parts.slice(2).join(' ');
+        if (targetPlayer) {
+          this.openConversationWith?.(targetPlayer);
+          if (msg) {
+            this.sendAction('whisper_message', { target: targetPlayer, text: msg });
+          }
+        }
+        this.minimizeChatBox();
+        return;
+      }
+
+      if (text.startsWith('/shout ') || text.startsWith('/ruf ') || text.startsWith('/global ')) {
+        targetChannel = 'global';
+        text = text.replace(/^\/(?:shout|ruf|global)\s+/i, '');
+      } else if (text.startsWith('/trade ') || text.startsWith('/handel ')) {
+        targetChannel = 'trade';
+        text = text.replace(/^\/(?:trade|handel)\s+/i, '');
+      } else if (text.startsWith('/guild ') || text.startsWith('/gilde ')) {
+        targetChannel = 'guild';
+        text = text.replace(/^\/(?:guild|gilde)\s+/i, '');
+      }
+
+      if (text) {
+        this.sendAction('chat', { text, channel: targetChannel });
+        // Sofort optimistisch die 3D-Schrift über dem eigenen Kopf anzeigen (null Latenz)
+        const myName = this.selfState?.name || this.customPlayerName || 'Krieger';
+        this.engine?.showSpeechBubble?.(myName, text, targetChannel, this.selfState?.player_id, true);
+      }
     }
     this.minimizeChatBox();
   }
@@ -9047,11 +9121,45 @@ class AeryndorMMOApp {
       const activeTag = activeEl?.tagName;
 
       // Spezielles Verhalten für das Haupt-Chat-Eingabefeld (#chat-input):
-      // Enter sendet den Text (falls vorhanden) UND minimiert den Chat; leeres Enter oder Escape minimiert den Chat.
+      // Enter sendet den Text, Tab wechselt Kanäle, Pfeil hoch/runter ruft den Verlauf ab
       if (activeEl?.id === 'chat-input') {
         if (ev.key === 'Escape') {
           ev.preventDefault();
           this.minimizeChatBox();
+          return;
+        }
+        if (ev.key === 'Tab') {
+          ev.preventDefault();
+          const chOrder = ['normal', 'global', 'trade', 'guild'];
+          const idx = chOrder.indexOf(this.chatChannel);
+          this.chatChannel = chOrder[(idx + 1) % chOrder.length];
+          this.updateChatChannelBadgeUI();
+          return;
+        }
+        if (ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          if (!this.sentChatHistory || this.sentChatHistory.length === 0) return;
+          if (this.chatHistoryIdx === -1 || this.chatHistoryIdx === undefined) {
+            this.chatDraftText = activeEl.value;
+            this.chatHistoryIdx = this.sentChatHistory.length - 1;
+          } else if (this.chatHistoryIdx > 0) {
+            this.chatHistoryIdx--;
+          }
+          activeEl.value = this.sentChatHistory[this.chatHistoryIdx] || '';
+          activeEl.setSelectionRange(activeEl.value.length, activeEl.value.length);
+          return;
+        }
+        if (ev.key === 'ArrowDown') {
+          ev.preventDefault();
+          if (this.chatHistoryIdx === -1 || this.chatHistoryIdx === undefined) return;
+          if (this.chatHistoryIdx < this.sentChatHistory.length - 1) {
+            this.chatHistoryIdx++;
+            activeEl.value = this.sentChatHistory[this.chatHistoryIdx] || '';
+          } else {
+            this.chatHistoryIdx = -1;
+            activeEl.value = this.chatDraftText || '';
+          }
+          activeEl.setSelectionRange(activeEl.value.length, activeEl.value.length);
           return;
         }
         if (ev.key === 'Enter') {
@@ -15107,6 +15215,20 @@ class AeryndorMMOApp {
 
       el.addEventListener('click', (ev) => {
         ev.stopPropagation();
+        if (ev.shiftKey) {
+          ev.preventDefault();
+          const plusTxt = item.plusLevel > 0 ? `+${item.plusLevel}` : '';
+          const tag = `[${item.name}${plusTxt}]`;
+          this.openChatBox();
+          const inp = document.getElementById('chat-input');
+          if (inp) {
+            inp.value = inp.value ? `${inp.value} ${tag} ` : `${tag} `;
+            inp.focus();
+            inp.setSelectionRange(inp.value.length, inp.value.length);
+          }
+          this.audio?.playUiClick?.();
+          return;
+        }
         body.querySelectorAll('.inv-slot.ui-slot-selected-gold').forEach((sEl) => {
           if (sEl !== el) sEl.classList.remove('ui-slot-selected-gold');
         });
