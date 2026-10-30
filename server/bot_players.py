@@ -3712,6 +3712,9 @@ def run_live_bots(server_url: str = "http://127.0.0.1:8090"):
                 mem["_lastPosZ"] = cur_z
                 mem["_lastKills"] = cur_kills
                 mem["_lastExpEarned"] = cur_exp_earned
+                if is_afk_idle_now and (p_state.get("townErrand") or "Stadtrundgang" in str(p_state.get("autoFarmStatus", ""))):
+                    # Stadtrundgang ist kein AFK -> keine "Selbstheilung", die das NPC-Ziel ueberschreibt
+                    is_afk_idle_now = False
                 if is_afk_idle_now:
                     mem["afkSecondsExcluded"] = round(float(mem.get("afkSecondsExcluded", 0.0)) + 2.5, 1)
                     mem["afkIdleTicks"] = int(mem.get("afkIdleTicks", 0)) + 1

@@ -4424,7 +4424,11 @@ class WorldAuthority:
             p["autoFarmTargetId"] = None
             p["autoFarmNextTargetId"] = None
             if isinstance(p.get("townErrand"), dict):
-                # Stadtrundgang / NPC-Gang steuert die Bewegung selbst (_tick_bot_town_errand) -> keine Doppelsteuerung
+                # Stadtrundgang / NPC-Gang: Ziel (NPC) setzt _tick_bot_town_errand als Anker. Hier nur fluessig
+                # mit echtem dt dorthin laufen (bis direkt vor den NPC), niemals Richtung Jagdgebiet.
+                ex, ez = af.get("anchorX"), af.get("anchorZ")
+                if ex is not None and ez is not None and dist2d(p["pos_x"], p["pos_z"], float(ex), float(ez)) > 9.0:
+                    self._move_player_towards(p, float(ex), float(ez), dt)
                 return
             nav_ax = af.get("anchorX")
             nav_az = af.get("anchorZ")
