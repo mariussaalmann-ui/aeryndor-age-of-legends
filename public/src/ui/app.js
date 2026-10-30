@@ -8028,38 +8028,42 @@ class AeryndorMMOApp {
   }
 
   // ==========================================================================
-  // METIN2-STYLE WHISPER-ZETTEL (Pergament-Scroll rechts am Bildschirmrand)
+  // METIN2-STYLE WHISPER-ZETTEL (Pergament-Scroll direkt unter den Quests)
   // ==========================================================================
-  showWhisperScroll(senderName, previewText) {
+  showWhisperScroll(senderName, previewText, isUnread = true) {
+    if (!senderName) return;
     const stack = document.getElementById('whisper-scroll-stack');
     if (!stack) return;
-    // Keine doppelten Zettel fuer denselben Absender
-    const existing = stack.querySelector(`[data-ws-sender="${CSS.escape(senderName)}"]`);
-    if (existing) {
-      const prev = existing.querySelector('.whisper-scroll-preview');
-      if (prev) prev.textContent = previewText || '';
-      const icon = existing.querySelector('.whisper-scroll-icon');
-      if (icon) { icon.style.animation = 'none'; void icon.offsetWidth; icon.style.animation = ''; }
+    let pill = stack.querySelector(`[data-ws-sender="${CSS.escape(senderName)}"]`);
+    if (pill) {
+      const prev = pill.querySelector('.whisper-scroll-preview');
+      if (prev && previewText) prev.textContent = previewText;
+      if (isUnread) {
+        pill.classList.remove('is-read');
+        pill.classList.add('is-unread');
+        const dot = pill.querySelector('.ws-unread-dot');
+        if (dot) dot.style.display = '';
+      }
       return;
     }
-    const pill = document.createElement('div');
-    pill.className = 'whisper-scroll-pill';
+    pill = document.createElement('div');
+    pill.className = `whisper-scroll-pill ${isUnread ? 'is-unread' : 'is-read'}`;
     pill.setAttribute('data-ws-sender', senderName);
     pill.innerHTML = `
       <div class="whisper-scroll-icon">
         \u{1F4DC}
-        <span class="ws-unread-dot"></span>
+        <span class="ws-unread-dot" style="${isUnread ? '' : 'display:none;'}"></span>
       </div>
       <div class="whisper-scroll-body">
         <div class="whisper-scroll-sender">\u2709\uFE0F ${this.escapeHtml(senderName)}</div>
-        <div class="whisper-scroll-preview">${this.escapeHtml(previewText || '')}</div>
+        <div class="whisper-scroll-preview">${this.escapeHtml(previewText || 'Neue Nachricht')}</div>
       </div>
-      <button type="button" class="whisper-scroll-close" title="Schlie\u00dfen">\u2715</button>
+      <button type="button" class="whisper-scroll-close" title="Zettel schlie\u00dfen">\u2715</button>
     `;
     pill.addEventListener('click', (e) => {
       if (e.target.closest('.whisper-scroll-close')) return;
       this.openConversationWith(senderName);
-      this.dismissWhisperScroll(senderName);
+      this.markWhisperScrollRead(senderName);
     });
     pill.querySelector('.whisper-scroll-close')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -8069,7 +8073,18 @@ class AeryndorMMOApp {
     while (stack.children.length > 5) {
       stack.removeChild(stack.firstElementChild);
     }
-    pill._wsTimeout = setTimeout(() => this.dismissWhisperScroll(senderName), 30000);
+  }
+
+  markWhisperScrollRead(senderName) {
+    if (!senderName) return;
+    const stack = document.getElementById('whisper-scroll-stack');
+    if (!stack) return;
+    const pill = stack.querySelector(`[data-ws-sender="${CSS.escape(senderName)}"]`);
+    if (!pill) return;
+    pill.classList.remove('is-unread');
+    pill.classList.add('is-read');
+    const dot = pill.querySelector('.ws-unread-dot');
+    if (dot) dot.style.display = 'none';
   }
 
   dismissWhisperScroll(senderName) {
@@ -8077,10 +8092,28 @@ class AeryndorMMOApp {
     if (!stack) return;
     const pill = stack.querySelector(`[data-ws-sender="${CSS.escape(senderName)}"]`);
     if (!pill) return;
-    if (pill._wsTimeout) clearTimeout(pill._wsTimeout);
     pill.classList.add('removing');
     pill.addEventListener('animationend', () => pill.remove(), { once: true });
-    setTimeout(() => { if (pill.parentNode) pill.remove(); }, 500);
+    setTimeout(() => { if (pill.parentNode) pill.remove(); }, 400);
+  }
+
+  syncWhisperScrolls() {
+    const stack = document.getElementById('whisper-scroll-stack');
+    if (!stack || !this.selfState?.social) return;
+    const soc = this.selfState.social;
+    const unreadMap = soc.unread || {};
+    const conversations = soc.conversations || {};
+    const frWin = document.getElementById('win-friends');
+    const isFriendsOpen = frWin && !frWin.classList.contains('hidden');
+
+    for (const [senderName, count] of Object.entries(unreadMap)) {
+      if (Number(count) > 0) {
+        const msgs = Array.isArray(conversations[senderName]) ? conversations[senderName] : [];
+        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].text : 'Neue Nachricht';
+        const isCurrentlyActiveInOpenWindow = isFriendsOpen && (this.activeConversation || '').toLowerCase() === senderName.toLowerCase();
+        this.showWhisperScroll(senderName, lastMsg, !isCurrentlyActiveInOpenWindow);
+      }
+    }
   }
 
   // ==========================================================================
@@ -9240,14 +9273,27 @@ class AeryndorMMOApp {
       let text = rawText;
       let targetChannel = this.chatChannel;
 
+      if (low === '/testpn' || low === '/testwhisper' || low === '/zettel') {
+        this.showWhisperScroll('[SA]Klingenw\xc3\xa4chter', 'Sei gegr\xc3\xbc\xc3\x9ft, edler Held! Ich habe neue Nachrichten f\xc3\xbcr dich.', true);
+        this.showToast('\xe2\x9c\x89\xef\xb8\x8f Test-Whisper-Zettel unter den Quests eingeblendet (blinkt!). Klicke darauf zum \xc3\x96ffnen.');
+        this.minimizeChatBox();
+        return;
+      }
+
       if (text.startsWith('/w ') || text.startsWith('/pn ') || text.startsWith('/whisper ')) {
         const parts = text.split(/\s+/);
         const targetPlayer = parts[1];
         const msg = parts.slice(2).join(' ');
         if (targetPlayer) {
-          this.openConversationWith?.(targetPlayer);
           if (msg) {
-            this.sendAction('whisper_message', { target: targetPlayer, text: msg });
+            this.sendAction('social', {
+              subAction: 'send_message',
+              recipient: targetPlayer,
+              text: msg,
+            });
+            this.showToast(`\xf0\x9f\x92\xac PN an ${targetPlayer}: "${msg}"`);
+          } else {
+            this.openConversationWith?.(targetPlayer);
           }
         }
         this.minimizeChatBox();
@@ -16470,6 +16516,7 @@ class AeryndorMMOApp {
 
   updateMessengerBadges() {
     if (!this.selfState?.social) return;
+    this.syncWhisperScrolls();
     const { unread, requests, total } = this.getMessengerUnreadCounts();
 
     const frBtn = document.getElementById('btn-chat-open-friends');
@@ -18251,6 +18298,7 @@ class AeryndorMMOApp {
     if (activeContact && unreadMap[activeContact.name] > 0) {
       delete unreadMap[activeContact.name];
       this.sendAction('social', { subAction: 'mark_read', name: activeContact.name });
+      this.markWhisperScrollRead(activeContact.name);
     }
 
     const convMessages = activeContact ? conversations[activeContact.name] || [] : [];

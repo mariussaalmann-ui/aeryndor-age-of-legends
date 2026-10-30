@@ -1320,6 +1320,15 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
     if action == "social":
         return WORLD.handle_social_action(player_id, payload.get("subAction", ""), payload)
 
+    if action in ("whisper_message", "whisper"):
+        target_name = payload.get("target") or payload.get("recipient") or ""
+        msg_text = payload.get("text") or payload.get("message") or ""
+        return WORLD.handle_social_action(
+            player_id,
+            "send_message",
+            {"recipient": target_name, "text": msg_text}
+        )
+
     if action == "party_action":
         return WORLD.handle_party_action(player_id, str(payload.get("subAction", "")), payload)
 

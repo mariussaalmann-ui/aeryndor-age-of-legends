@@ -16477,51 +16477,94 @@ div.p2-method-card {
 
 
 /* ==========================================================================
-   METIN2-STYLE WHISPER-ZETTEL (Pergament-Scroll rechts am Bildschirmrand)
+   METIN2-STYLE WHISPER-ZETTEL (Direkt UNTERHALB der Quests im HUD-Minimap Stack)
    ========================================================================== */
 .whisper-scroll-stack {
-  position: fixed;
-  right: 18px;
-  top: 38%;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 9999;
-  pointer-events: none;
+  position: relative !important;
+  width: 244px !important;
+  max-width: 244px !important;
+  min-width: 244px !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  z-index: 60 !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
 }
 
 .whisper-scroll-pill {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px 8px 10px;
-  min-width: 180px;
-  max-width: 260px;
+  pointer-events: auto !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 24px 8px 10px !important;
+  width: 244px !important;
+  max-width: 244px !important;
+  box-sizing: border-box !important;
   background: linear-gradient(
-    135deg,
-    rgba(58, 42, 22, 0.94) 0%,
-    rgba(38, 26, 12, 0.97) 50%,
-    rgba(28, 18, 8, 0.98) 100%
-  );
-  border: 1.5px solid rgba(212, 168, 72, 0.72);
-  border-radius: 6px;
+    180deg,
+    rgba(38, 26, 16, 0.95) 0%,
+    rgba(22, 15, 9, 0.98) 100%
+  ) !important;
+  border: 1.5px solid rgba(212, 168, 72, 0.72) !important;
+  border-radius: 6px !important;
   box-shadow:
-    0 0 12px rgba(212, 168, 72, 0.25),
-    inset 0 1px 0 rgba(255, 244, 214, 0.12),
-    0 4px 16px rgba(0, 0, 0, 0.6);
-  cursor: pointer;
-  animation: whisperScrollSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    0 4px 14px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 244, 214, 0.18) !important;
+  cursor: pointer !important;
+  animation: whisperScrollSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, opacity 0.18s ease !important;
+  user-select: none !important;
 }
 
 .whisper-scroll-pill:hover {
-  transform: scale(1.04) translateX(-4px);
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 244, 214, 0.25) !important;
+}
+
+/* 1. NOCH NICHT GELESEN: BLINKT KONTINUIERLICH IM METIN2-STIL */
+.whisper-scroll-pill.is-unread {
   border-color: #fde047;
-  box-shadow:
-    0 0 18px rgba(253, 224, 71, 0.35),
-    inset 0 1px 0 rgba(255, 244, 214, 0.18),
-    0 6px 22px rgba(0, 0, 0, 0.7);
+  animation: metin2ScrollBlink 1.4s ease-in-out infinite;
+}
+
+@keyframes metin2ScrollBlink {
+  0%, 100% {
+    border-color: rgba(212, 168, 72, 0.55);
+    box-shadow: 0 0 6px rgba(212, 168, 72, 0.25), inset 0 1px 0 rgba(255, 244, 214, 0.12);
+    filter: brightness(1);
+  }
+  50% {
+    border-color: #fde047;
+    box-shadow: 0 0 18px rgba(253, 224, 71, 0.85), inset 0 0 10px rgba(253, 224, 71, 0.35);
+    filter: brightness(1.22);
+  }
+}
+
+/* 2. GELESEN: HÖRT AUF ZU BLINKEN (RUHIGER, EDLER METIN2-GOLDRAHMEN) */
+.whisper-scroll-pill.is-read {
+  animation: none !important;
+  border-color: rgba(180, 140, 60, 0.45) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+  filter: none !important;
+  opacity: 0.86;
+}
+
+.whisper-scroll-pill.is-read .ws-unread-dot {
+  display: none !important;
+}
+
+.whisper-scroll-pill.is-read .whisper-scroll-icon {
+  animation: none !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.whisper-scroll-pill.is-read:hover {
+  opacity: 1;
+  border-color: rgba(212, 168, 72, 0.85) !important;
+  box-shadow: 0 0 12px rgba(212, 168, 72, 0.4) !important;
 }
 
 .whisper-scroll-pill.removing {
@@ -16531,7 +16574,7 @@ div.p2-method-card {
 @keyframes whisperScrollSlideIn {
   0% {
     opacity: 0;
-    transform: translateX(80px) scale(0.85);
+    transform: translateX(40px) scale(0.9);
   }
   100% {
     opacity: 1;
@@ -16546,7 +16589,7 @@ div.p2-method-card {
   }
   100% {
     opacity: 0;
-    transform: translateX(100px) scale(0.8);
+    transform: translateX(40px) scale(0.9);
   }
 }
 
@@ -16554,19 +16597,19 @@ div.p2-method-card {
 .whisper-scroll-icon {
   position: relative;
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
-  animation: whisperIconPulse 2.2s ease-in-out infinite;
+  animation: whisperIconPulse 2s ease-in-out infinite;
 }
 
 @keyframes whisperIconPulse {
   0%, 100% { filter: drop-shadow(0 0 3px rgba(253, 224, 71, 0.3)); }
-  50%      { filter: drop-shadow(0 0 10px rgba(253, 224, 71, 0.7)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(253, 224, 71, 0.75)); }
 }
 
 /* Ungelesen-Punkt oben rechts am Icon */
@@ -16574,13 +16617,13 @@ div.p2-method-card {
   position: absolute;
   top: -2px;
   right: -2px;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #f87171;
   border: 1.5px solid #1a0f06;
   box-shadow: 0 0 6px #f87171;
-  animation: wsDotPulse 1.6s ease-in-out infinite;
+  animation: wsDotPulse 1.4s ease-in-out infinite;
 }
 
 @keyframes wsDotPulse {
@@ -16594,14 +16637,15 @@ div.p2-method-card {
   flex-direction: column;
   gap: 1px;
   overflow: hidden;
+  flex: 1;
 }
 
 .whisper-scroll-sender {
   font-family: 'Cinzel', serif;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #fde68a;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -16609,12 +16653,12 @@ div.p2-method-card {
 
 .whisper-scroll-preview {
   font-family: 'Noto Sans', Arial, sans-serif;
-  font-size: 10.5px;
+  font-size: 10px;
   color: #d4b896;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 150px;
 }
 
 /* Schließen-X oben rechts */
@@ -16625,9 +16669,9 @@ div.p2-method-card {
   background: none;
   border: none;
   color: rgba(245, 230, 200, 0.45);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
-  padding: 2px;
+  padding: 2px 4px;
   line-height: 1;
   transition: color 0.15s;
 }
