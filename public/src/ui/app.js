@@ -1561,14 +1561,12 @@ class AeryndorMMOApp {
           for (const k of Object.keys(parsed)) {
             const acc = parsed[k];
             if (!acc || typeof acc !== 'object') continue;
-            const isLocalAdmin = k === 'admin' && String(acc.username || '').toLowerCase() === 'admin';
             if (Array.isArray(acc.characters)) {
               acc.characters = acc.characters.map((ch) => {
                 if (!ch || typeof ch !== 'object') return null;
                 const rawCleanName = String(ch.name || '').trim();
-                const cleanName = isLocalAdmin && rawCleanName && !rawCleanName.toUpperCase().startsWith('[SA]')
-                  ? `[SA]${rawCleanName}`
-                  : rawCleanName;
+                const isCharSa = rawCleanName.toUpperCase().startsWith('[SA]');
+                const cleanName = rawCleanName;
                 const cleanPid = String(ch.playerId || '').trim();
                 if (!cleanName || !cleanPid) return null;
                 const nameKey = cleanName.toLowerCase();
@@ -1581,10 +1579,10 @@ class AeryndorMMOApp {
                   ...ch,
                   name: cleanName,
                   level: Math.max(1, Math.min(99, Number(ch.level) || 1)),
-                  role: isLocalAdmin ? 'SA' : ch.role,
-                  guild: isLocalAdmin ? 'Serverleitung' : (ch.guild || 'Keine Gilde'),
-                  isSA: isLocalAdmin ? true : Boolean(ch.isSA),
-                  isGM: isLocalAdmin ? true : Boolean(ch.isGM),
+                  role: isCharSa ? 'SA' : (ch.role === 'SA' ? 'player' : (ch.role || 'player')),
+                  guild: isCharSa ? 'Serverleitung' : (ch.guild === 'Serverleitung' ? 'Keine Gilde' : (ch.guild || 'Keine Gilde')),
+                  isSA: isCharSa,
+                  isGM: isCharSa,
                 };
               });
             }
@@ -3028,14 +3026,13 @@ class AeryndorMMOApp {
             <!-- 1. Charaktername + Zufallsgenerator -->
             <div>
               <div class="create-sec-title">
-                <span>1. CHARAKTERNAME ${String(this.currentAccount || '').toLowerCase() === 'admin' ? '<span style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;margin-left:5px;">👑 AUTO-[SA]</span>' : ''}</span>
+                <span>1. CHARAKTERNAME</span>
                 <span id="cc-name-badge" style="color:${st.name && st.name.trim().length >= 2 ? '#4ade80' : '#facc15'};font-size:10px;">${st.name && st.name.trim().length >= 2 ? '✓ Name verfügbar' : 'Bitte Namen eingeben'}</span>
               </div>
               <div class="cc-name-input-row">
-                <input id="cc-name-input" class="portal-input" type="text" value="${this.escapeHtml(st.name || '')}" placeholder="${String(this.currentAccount || '').toLowerCase() === 'admin' ? 'Name eingeben ([SA] wird automatisch ergänzt)...' : 'Einzigartiger Spielername (2–16 Zeichen)...'}" maxlength="16" />
+                <input id="cc-name-input" class="portal-input" type="text" value="${this.escapeHtml(st.name || '')}" placeholder="Einzigartiger Spielername (2–16 Zeichen)..." maxlength="16" />
                 <button type="button" id="btn-cc-random-name" class="cc-random-name-btn" title="Passenden Fantasy-Namen aus Aeryndor würfeln">🎲 Würfeln</button>
               </div>
-              ${String(this.currentAccount || '').toLowerCase() === 'admin' ? `<div style="margin-top:6px;padding:6px 10px;border-radius:6px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.45);color:#fde047;font-size:11px;line-height:1.35;">👑 <b>SA-Account Privileg:</b> Jeder Charakter erhält automatisch <b>[SA]</b>, alle SA-Befehle (<code>/help</code>), 100% Schmied-Erfolg, 50 Mio. Gold, alle Maps &amp; Server-Online-Ankündigung!</div>` : ''}
             </div>
 
             <!-- 2. Stadtwahl (Kaeryu & Seiryu) -->
@@ -3215,10 +3212,7 @@ class AeryndorMMOApp {
     const nameBadge = portal.querySelector('#cc-name-badge');
     const isAdminAcc = String(this.currentAccount || '').toLowerCase() === 'admin';
     const formatSaCandidate = (rawStr) => {
-      const s = String(rawStr || '').trim();
-      if (!s) return '';
-      if (!isAdminAcc) return s;
-      return s.toUpperCase().startsWith('[SA]') ? `[SA]${s.slice(4).trim()}` : `[SA]${s}`;
+      return String(rawStr || '').trim();
     };
     let nameCheckTimer = null;
     const validateName = () => {
@@ -3243,7 +3237,7 @@ class AeryndorMMOApp {
         return;
       }
       if (nameBadge) {
-        nameBadge.textContent = isAdminAcc ? `✓ Verfügbar als ${checkCandidate}` : '✓ Name verfügbar';
+        nameBadge.textContent = '✓ Name verfügbar';
         nameBadge.style.color = '#4ade80';
       }
       if (nameCheckTimer) clearTimeout(nameCheckTimer);
@@ -3258,7 +3252,7 @@ class AeryndorMMOApp {
           const result = data?.result || data;
           if (nameInp.value.trim() === trimmed && nameBadge && result) {
             const avail = result.available !== false && result.ok !== false;
-            nameBadge.textContent = avail ? (isAdminAcc ? `✓ Verfügbar als ${checkCandidate}` : '✓ Name verfügbar') : '⚠️ Name bereits vergeben!';
+            nameBadge.textContent = avail ? '✓ Name verfügbar' : '⚠️ Name bereits vergeben!';
             nameBadge.style.color = avail ? '#4ade80' : '#f87171';
           }
         } catch (_) {}
@@ -3336,13 +3330,15 @@ class AeryndorMMOApp {
 
     portal.querySelector('#btn-cc-confirm')?.addEventListener('click', async () => {
       const rawInputName = (nameInp?.value || '').trim();
-      const baseName = rawInputName.toUpperCase().startsWith('[SA]') ? rawInputName.slice(4).trim() : rawInputName;
-      if (!/^[a-zA-Z0-9äöüÄÖÜß_\[\]-]{2,16}$/.test(baseName)) {
+      if (!/^[a-zA-Z0-9äöüÄÖÜß_\[\]-]{2,16}$/.test(rawInputName)) {
         this.showToast('⚠️ Bitte wähle einen gültigen, eigenen Spielernamen (2–16 Zeichen).');
         if (nameInp) nameInp.focus();
         return;
       }
-      const finalName = isAdminAcc ? `[SA]${baseName}` : rawInputName;
+      const isExplicitSa = rawInputName.toUpperCase().startsWith('[SA]');
+      const isAdminAcc = ['admin', 'blackzimple'].includes(String(this.currentAccount || '').toLowerCase());
+      const isSA = isAdminAcc && isExplicitSa;
+      const finalName = rawInputName;
       if (this.isCharacterNameTakenLocally(finalName)) {
         this.showToast(`⚠️ Der Spielername „${finalName}“ ist bereits vergeben! Jeder Name darf nur einmal existieren.`);
         if (nameBadge) {
@@ -3351,7 +3347,7 @@ class AeryndorMMOApp {
         }
         return;
       }
-      const newPlayerId = isAdminAcc
+      const newPlayerId = isSA
         ? `hero_admin_${st.classId}_${Date.now().toString(36).slice(-5)}`
         : `hero_${st.classId}_${Date.now().toString(36).slice(-5)}`;
       const newCharObj = {
@@ -3365,10 +3361,10 @@ class AeryndorMMOApp {
         level: 1,
         playTimeMin: 1,
         mapName: 'Morgenwacht',
-        guild: isAdminAcc ? 'Serverleitung' : 'Keine Gilde',
-        role: isAdminAcc ? 'SA' : 'player',
-        isSA: isAdminAcc,
-        isGM: isAdminAcc,
+        guild: isSA ? 'Serverleitung' : 'Keine Gilde',
+        role: isSA ? 'SA' : 'player',
+        isSA: isSA,
+        isGM: isSA,
         isNewCharSpawn: true,
       };
       const acc = this.getAccountObj();
@@ -3409,7 +3405,7 @@ class AeryndorMMOApp {
       this.saveAccounts();
       this.selectedSlotIdx = targetSlotIdx;
       this.showToast(
-        isAdminAcc
+        isSA
           ? `👑 Server-Administrator ${newCharObj.name} (${meta.aeryndorName}) mit allen SA-Rechten erschaffen!`
           : `✨ ${newCharObj.name} (${meta.aeryndorName}) erfolgreich erschaffen!`
       );
@@ -21413,10 +21409,12 @@ class AeryndorMMOApp {
   }
 
   isSaAccount() {
-    const acc = String(this.currentAccount || '').toLowerCase();
     const pName = String(this.playerName || this.selfState?.name || '');
     const pId = String(this.playerId || '').toLowerCase();
-    return acc === 'admin' || pName.startsWith('[SA]') || Boolean(this.selfState?.isSA) || pId.startsWith('char_admin') || pId === 'admin';
+    const isNameSa = pName.toUpperCase().startsWith('[SA]') || pId.startsWith('char_admin') || pId === 'admin';
+    if (!isNameSa) return false;
+    const acc = String(this.currentAccount || '').toLowerCase();
+    return acc === 'admin' || acc === 'blackzimple' || Boolean(this.selfState?.isSA);
   }
 
   isDungeonCompletedForMap(mapId = this.selfState?.map_id || 'morgenwacht') {
