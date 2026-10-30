@@ -257,7 +257,7 @@ def execute_sa_command(p: dict, raw_cmd: str) -> bool:
     if cmd == "/help":
         help_text = (
             "👑 [SA-Befehle] /yang <Betrag> | /level <Lv> | /item <ID> [Menge] [Plus] | "
-            "/notice <Text> | /warp <x> <z> | /mob <ID> [Anzahl] | /killall | /maxskills | /fullset | /speed <%> | /heal"
+            "/notice <Text> | /bignotice <Text> | /warp <x> <z> | /mob <ID> [Anzahl] | /killall | /maxskills | /fullset | /speed <%> | /heal"
         )
         WORLD.add_chat_message("[SYSTEM]", help_text, "system")
         return True
@@ -303,6 +303,28 @@ def execute_sa_command(p: dict, raw_cmd: str) -> bool:
                 "title": "SERVER-ANKÜNDIGUNG",
                 "text": msg_text,
             },
+        )
+        return True
+
+    if cmd in ("/bignotice", "/big_notice", "/b"):
+        raw_msg = raw_cmd.strip()[len(parts[0]):].strip()
+        if not raw_msg:
+            WORLD.add_chat_message("[SYSTEM]", "ℹ️ Verwendung: /bignotice <Nachricht> (oder /big_notice, /b)", "system")
+            return True
+        if len(raw_msg) > 400:
+            WORLD.add_chat_message("[SYSTEM]", "⚠️ Die Ankündigung ist zu lang (maximal 400 Zeichen erlaubt).", "system")
+            return True
+
+        sa_name = p.get("name", "[SA] Serverleitung")
+        try:
+            print(f"[ADMIN BIG NOTICE] von {sa_name}: {raw_msg}")
+        except Exception:
+            pass
+        WORLD.add_chat_message("📢 [SERVER-ANKÜNDIGUNG]", f"👑 {sa_name}: {raw_msg}", "event")
+        WORLD.broadcast_big_notice(
+            sa_name=sa_name,
+            text=raw_msg,
+            title="SERVER-ANKÜNDIGUNG"
         )
         return True
 
@@ -1291,8 +1313,17 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             or p.get("role") == "sa"
             or p.get("player_id") == "hero_admin_sa"
         )
-        if is_sa and txt.startswith("/"):
-            if execute_sa_command(p, txt):
+        if txt.startswith("/"):
+            parts_cmd = txt.split()
+            cmd_name = parts_cmd[0].lower() if parts_cmd else ""
+            if cmd_name in ("/bignotice", "/big_notice", "/b"):
+                if not is_sa:
+                    print(f"SECURITY ALERT: Unberechtigter Big-Notice-Versuch von Spieler '{p.get('name')}' (PID: {player_id})")
+                    WORLD.add_chat_message("[SICHERHEIT]", "⛔ Keine Berechtigung. Big Notice Ankündigungen sind der Serverleitung ([SA]) vorbehalten.", "system")
+                    return {"ok": False, "error": "unauthorized"}
+                execute_sa_command(p, txt)
+                return {"ok": True}
+            if is_sa and execute_sa_command(p, txt):
                 return {"ok": True}
         txt_low = txt.lower()
         chat_tactic_map = {

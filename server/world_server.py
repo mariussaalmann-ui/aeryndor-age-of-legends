@@ -198,6 +198,7 @@ class WorldAuthority:
         self.drops: Dict[str, dict] = {}
         self.telegraphs: List[dict] = []
         self.combat_events: List[dict] = []
+        self.active_big_notice: Optional[dict] = None
         self.world_boss_cooldown_until: Dict[str, float] = {}
         self.last_world_boss_awakened_at: Dict[str, float] = {}
         now_hm = time.strftime("%H:%M")
@@ -13597,6 +13598,31 @@ class WorldAuthority:
         if len(self.combat_events) > 80:
             self.combat_events = self.combat_events[-80:]
 
+    def broadcast_big_notice(self, sa_name: str, text: str, title: str = "SERVER-ANKÜNDIGUNG"):
+        """Sendet eine Big Notice Ankündigung an alle Spieler über alle Karten hinweg."""
+        notice_id = f"bn_{uuid.uuid4().hex[:8]}"
+        payload = {
+            "id": notice_id,
+            "saName": sa_name,
+            "title": title,
+            "text": text,
+            "time": time.time(),
+        }
+        self.active_big_notice = payload
+        self.combat_events.append(
+            {
+                "id": notice_id,
+                "mapId": "*",
+                "type": "big_notice",
+                "x": 0.0,
+                "z": 0.0,
+                "data": payload,
+                "t": time.time(),
+            }
+        )
+        if len(self.combat_events) > 80:
+            self.combat_events = self.combat_events[-80:]
+
     # ========================================================================
     # 10. SNAPSHOT FÜR CLIENT-SYNCHRONISATION
     # ========================================================================
@@ -13873,7 +13899,7 @@ class WorldAuthority:
             d_view["despawnRemainingSec"] = exp_rem
             d_view["isGroupLoot"] = is_group_loot
             map_drops.append(d_view)
-        recent_events = [e for e in self.combat_events if e["mapId"] == map_id and e["t"] > since_time]
+        recent_events = [e for e in self.combat_events if (e.get("mapId") in (map_id, "*", "global", "all")) and e["t"] > since_time]
         map_telegraphs = [t for t in self.telegraphs if t["mapId"] == map_id]
 
         party_snap = self._build_party_snapshot(p) if p else None
@@ -13942,6 +13968,7 @@ class WorldAuthority:
                 "pendingTradeRequest": pending_trade,
                 "socialNotice": p.get("lastSocialNotice") if p else None,
                 "whisperNotice": p.get("lastWhisperNotice") if p else None,
+                "bigNotice": self.active_big_notice if (self.active_big_notice and (now - float(self.active_big_notice.get("time", 0.0)) < 12.0)) else None,
                 "otherPlayers": other_players,
                 "onlineCount": sum(1 for pid, x in self.players.items() if pid != "hero_default" and x.get("online") and x.get("inWorld", False)),
                 "monsters": mobs,
@@ -14002,6 +14029,7 @@ class WorldAuthority:
             "pendingTradeRequest": pending_trade,
             "socialNotice": p.get("lastSocialNotice") if p else None,
             "whisperNotice": p.get("lastWhisperNotice") if p else None,
+            "bigNotice": self.active_big_notice if (self.active_big_notice and (now - float(self.active_big_notice.get("time", 0.0)) < 12.0)) else None,
             "otherPlayers": other_players,
             "onlineCount": sum(1 for pid, x in self.players.items() if pid != "hero_default" and x.get("online") and x.get("inWorld", False)),
             "monsters": mobs,

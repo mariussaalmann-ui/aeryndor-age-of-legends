@@ -4370,8 +4370,15 @@ class AeryndorMMOApp {
         } else if (ev.type === 'sa_online_notice') {
           this._seenWorldBossEventIds.add(ev.id);
           this.triggerSaOnlineDynamicIslandAlert(ev.data || {});
+        } else if (ev.type === 'big_notice') {
+          this._seenWorldBossEventIds.add(ev.id);
+          this.triggerBigNoticeAlert(ev.data || {});
         }
       }
+    }
+    if (snap.bigNotice && snap.bigNotice.id && snap.bigNotice.id !== this._lastBigNoticeId) {
+      this._lastBigNoticeId = snap.bigNotice.id;
+      this.triggerBigNoticeAlert(snap.bigNotice);
     }
     if (snap.activeWorldBoss && snap.activeWorldBoss.id && this._lastNotifiedWorldBossId !== snap.activeWorldBoss.id) {
       this._lastNotifiedWorldBossId = snap.activeWorldBoss.id;
@@ -5461,6 +5468,78 @@ class AeryndorMMOApp {
         }, 380);
       }
     }, 9500);
+  }
+
+  triggerBigNoticeAlert(info = {}) {
+    const saName = info.saName || '[SA] Serverleitung';
+    let text = info.text || '';
+    if (!text) return;
+
+    // Convert explicit \n or newlines to <br> safely after escaping HTML
+    const formattedText = this.escapeHtml(text)
+      .replace(/\\n/g, '<br>')
+      .replace(/\n/g, '<br>');
+
+    let board = document.getElementById('aeryndor-big-notice-board');
+    if (!board) {
+      board = document.createElement('div');
+      board.id = 'aeryndor-big-notice-board';
+      board.style.cssText = [
+        'position: fixed',
+        'top: 135px',
+        'left: 50%',
+        'transform: translateX(-50%) scale(0.95)',
+        'width: min(740px, 92vw)',
+        'max-width: 740px',
+        'z-index: 9999',
+        'pointer-events: none',
+        'display: flex',
+        'flex-direction: column',
+        'align-items: center',
+        'padding: 16px 28px 20px 28px',
+        'border-radius: 12px',
+        'background: linear-gradient(180deg, rgba(24, 18, 12, 0.96) 0%, rgba(13, 9, 6, 0.98) 100%)',
+        'border: 2px solid #f59e0b',
+        'outline: 1px solid rgba(245, 158, 11, 0.35)',
+        'outline-offset: -5px',
+        'box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 35px rgba(245, 158, 11, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.12)',
+        'backdrop-filter: blur(14px)',
+        'opacity: 0',
+        'transition: opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1), transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+      ].join(';');
+      document.body.appendChild(board);
+    }
+
+    board.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-bottom:8px;">
+        <span style="font-size:20px;filter:drop-shadow(0 0 8px #facc15);">👑</span>
+        <span style="font-family:'Cinzel', Georgia, serif;font-size:13px;font-weight:800;letter-spacing:2.5px;color:#fde047;text-shadow:0 0 12px rgba(250,204,21,0.85);text-transform:uppercase;">SERVER-ANKÜNDIGUNG</span>
+        <span style="background:linear-gradient(135deg,#b45309,#7c2d12);color:#fef08a;padding:2px 8px;border-radius:4px;font-family:Inter,sans-serif;font-size:11px;font-weight:800;border:1px solid rgba(254,240,138,0.4);">${this.escapeHtml(saName)}</span>
+      </div>
+      <div style="width:100%;height:1px;background:linear-gradient(90deg,transparent,#f59e0b,transparent);margin-bottom:12px;opacity:0.8;"></div>
+      <div style="font-family:'Cinzel', 'Inter', sans-serif;font-size:19px;font-weight:800;line-height:1.45;color:#ffffff;text-shadow:0 2px 5px rgba(0,0,0,0.95), 0 0 14px rgba(253,224,71,0.5);text-align:center;word-break:break-word;width:100%;">
+        ${formattedText}
+      </div>
+    `;
+
+    // Force reflow and show with smooth scale & fade-in
+    void board.offsetWidth;
+    board.style.display = 'flex';
+    requestAnimationFrame(() => {
+      board.style.opacity = '1';
+      board.style.transform = 'translateX(-50%) scale(1.0)';
+    });
+
+    if (this._bigNoticeHideTimer) clearTimeout(this._bigNoticeHideTimer);
+    this._bigNoticeHideTimer = setTimeout(() => {
+      if (board) {
+        board.style.opacity = '0';
+        board.style.transform = 'translateX(-50%) scale(0.95)';
+        setTimeout(() => {
+          if (board && board.style.opacity === '0') board.style.display = 'none';
+        }, 400);
+      }
+    }, 8500);
   }
 
   triggerWorldBossDynamicIslandAlert(wb) {
@@ -9334,11 +9413,23 @@ class AeryndorMMOApp {
         text = text.replace(/^\/(?:guild|gilde)\s+/i, '');
       }
 
+      if (text.startsWith('/testbignotice') || text.startsWith('/testb ') || text === '/testb') {
+        const testMsg = text.replace(/^\/(?:testbignotice|testb)\s*/i, '').trim() || 'Dies ist eine große Test-Ankündigung der Serverleitung!';
+        this.triggerBigNoticeAlert({
+          saName: this.selfState?.name || '[SA] Serverleitung',
+          title: 'SERVER-ANKÜNDIGUNG',
+          text: testMsg,
+        });
+        this.minimizeChatBox();
+        return;
+      }
+
       if (text) {
         this.sendAction('chat', { text, channel: targetChannel });
-        // Sofort optimistisch die 3D-Schrift über dem eigenen Kopf anzeigen (null Latenz)
-        const myName = this.selfState?.name || this.customPlayerName || 'Krieger';
-        this.engine?.showSpeechBubble?.(myName, text, targetChannel, this.selfState?.player_id, true);
+        if (!text.startsWith('/')) {
+          const myName = this.selfState?.name || this.customPlayerName || 'Krieger';
+          this.engine?.showSpeechBubble?.(myName, text, targetChannel, this.selfState?.player_id, true);
+        }
       }
     }
     this.minimizeChatBox();
