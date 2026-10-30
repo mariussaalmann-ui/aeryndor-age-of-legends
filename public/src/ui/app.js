@@ -7863,10 +7863,7 @@ class AeryndorMMOApp {
         const rawTxt = String(m.text || '');
         const isMentioned = Boolean(myName && rawTxt.toLowerCase().includes(myName) && m.sender !== this.selfState?.name);
         const mentionCls = isMentioned ? ' chat-line-mentioned' : '';
-        if (isMentioned && !this._lastMentionSound || (performance.now() - (this._lastMentionSound || 0) > 3000)) {
-          this._lastMentionSound = performance.now();
-          this.audio?.playNotify?.();
-        }
+
         if (m.sender && m.sender !== this.selfState?.name) {
           this.lastWhisperSender = m.sender;
         }
@@ -16449,8 +16446,9 @@ class AeryndorMMOApp {
       if (this._baseDocTitle === undefined) this._baseDocTitle = document.title.replace(/^\(\d+\+?\)\s*/, '');
       document.title = total > 0 ? `(${total > 99 ? '99+' : total}) ${this._baseDocTitle}` : this._baseDocTitle;
       // Dezenter Hinweiston nur bei neu eingehenden Nachrichten (nicht beim ersten Laden)
+      // Geräusch für Nachrichten entfernt
       if (this._lastMessengerBadgeTotal !== undefined && unread > (this._lastMessengerUnread || 0)) {
-        audioSystem?.playNotify?.();
+        // silent
       }
       this._lastMessengerBadgeTotal = total;
       this._lastMessengerUnread = unread;
