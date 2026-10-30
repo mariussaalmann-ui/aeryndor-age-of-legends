@@ -7863,6 +7863,13 @@ class AeryndorMMOApp {
         const rawTxt = String(m.text || '');
         const isMentioned = Boolean(myName && rawTxt.toLowerCase().includes(myName) && m.sender !== this.selfState?.name);
         const mentionCls = isMentioned ? ' chat-line-mentioned' : '';
+        if (isMentioned && !this._lastMentionSound || (performance.now() - (this._lastMentionSound || 0) > 3000)) {
+          this._lastMentionSound = performance.now();
+          this.audio?.playNotify?.();
+        }
+        if (m.sender && m.sender !== this.selfState?.name) {
+          this.lastWhisperSender = m.sender;
+        }
         let txt = this.expandClientSmileys(this.escapeHtml(rawTxt));
         // Item-Links in Chatnachrichten formatieren z. B. [Giftschwert+9]
         txt = txt.replace(/\[([^\]]{2,32})\]/g, '<span class="chat-item-link">[$1]</span>');
@@ -7876,13 +7883,112 @@ class AeryndorMMOApp {
     box.scrollTop = box.scrollHeight;
 
     box.querySelectorAll('[data-chat-whisper]').forEach((el) => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
         const target = el.getAttribute('data-chat-whisper');
         if (!target) return;
-        this.selectOtherPlayer(target);
-        this.openConversationWith(target);
+        this.showChatPlayerContextMenu(ev, target);
+      });
+      el.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const target = el.getAttribute('data-chat-whisper');
+        if (!target) return;
+        this.showChatPlayerContextMenu(ev, target);
       });
     });
+  }
+
+  showChatPlayerContextMenu(ev, targetName) {
+    if (!targetName) return;
+    const cleanTarget = String(targetName).trim();
+    const myName = String(this.selfState?.name || this.customPlayerName || '').trim();
+    if (cleanTarget.toLowerCase() === myName.toLowerCase()) return;
+
+    let menu = document.getElementById('chat-player-context-menu');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.id = 'chat-player-context-menu';
+      menu.className = 'chat-player-context-menu';
+      document.body.appendChild(menu);
+
+      document.addEventListener('pointerdown', (e) => {
+        if (!e.target.closest('#chat-player-context-menu') && !e.target.closest('[data-chat-whisper]')) {
+          menu.classList.add('hidden');
+        }
+      });
+    }
+
+    const op = (this.snapshot?.otherPlayers || []).find(
+      (p) => String(p.name || '').toLowerCase() === cleanTarget.toLowerCase()
+    );
+    const opLevel = op?.level ? ` (Lv. ${op.level})` : '';
+
+    menu.innerHTML = `
+      <div class="cp-menu-header">
+        <span class="cp-menu-title">👤 ${this.escapeHtml(cleanTarget)}${opLevel}</span>
+      </div>
+      <div class="cp-menu-items">
+        <button type="button" class="cp-menu-btn" data-cp-act="whisper">
+          <span class="cp-icon">✉️</span> Flüstern (PN)
+        </button>
+        <button type="button" class="cp-menu-btn" data-cp-act="party">
+          <span class="cp-icon">👥</span> In Gruppe einladen
+        </button>
+        <button type="button" class="cp-menu-btn" data-cp-act="trade">
+          <span class="cp-icon">🤝</span> Handel anfragen
+        </button>
+        <button type="button" class="cp-menu-btn" data-cp-act="friend">
+          <span class="cp-icon">➕</span> Freund hinzufügen
+        </button>
+        <button type="button" class="cp-menu-btn" data-cp-act="copy">
+          <span class="cp-icon">📋</span> Namen kopieren
+        </button>
+      </div>
+    `;
+
+    menu.querySelectorAll('[data-cp-act]').forEach((btn) => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        menu.classList.add('hidden');
+        const act = btn.getAttribute('data-cp-act');
+        if (act === 'whisper') {
+          this.selectOtherPlayer?.(cleanTarget);
+          this.openConversationWith?.(cleanTarget);
+          this.lastWhisperSender = cleanTarget;
+        } else if (act === 'party') {
+          const res = await this.sendAction('party_action', {
+            subAction: 'invite',
+            targetPlayerId: op?.id || null,
+            targetName: cleanTarget,
+          });
+          if (res?.message) this.showToast(res.message);
+        } else if (act === 'trade') {
+          const res = await this.sendAction('trade_action', {
+            subAction: 'request',
+            targetPlayerId: op?.id || null,
+            targetName: cleanTarget,
+          });
+          if (res?.message) this.showToast(res.message);
+        } else if (act === 'friend') {
+          const res = await this.sendAction('social', {
+            subAction: 'add_friend',
+            name: cleanTarget,
+          });
+          if (res?.message) this.showToast(res.message);
+        } else if (act === 'copy') {
+          navigator.clipboard?.writeText?.(cleanTarget);
+          this.showToast(`✓ Name kopiert: ${cleanTarget}`);
+        }
+      };
+    });
+
+    menu.classList.remove('hidden');
+    const x = Math.min(window.innerWidth - 185, Math.max(10, ev.clientX || 100));
+    const y = Math.min(window.innerHeight - 210, Math.max(10, (ev.clientY || 200) - 100));
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
   }
 
   openConversationWith(contactName) {
@@ -9231,6 +9337,21 @@ class AeryndorMMOApp {
       }
 
       const k = ev.key.toLowerCase();
+
+      // Taste 'R': Metin2 Quick-Reply auf die letzte erhaltene Nachricht
+      if (k === 'r' && !ev.ctrlKey && !ev.altKey && !ev.metaKey && this.inWorld && !activeTag) {
+        if (this.lastWhisperSender) {
+          ev.preventDefault();
+          this.openChatBox();
+          const inp = document.getElementById('chat-input');
+          if (inp) {
+            inp.value = `/w ${this.lastWhisperSender} `;
+            inp.focus();
+            inp.setSelectionRange(inp.value.length, inp.value.length);
+          }
+          return;
+        }
+      }
 
       // Strg + H oder Strg + G: Klassisches Aeryndor / Projekt 1 Reittier Auf-/Absitzen (InfinityWarCharacter Zeile 1312)
       if ((ev.ctrlKey || ev.metaKey) && (k === 'h' || k === 'g')) {
