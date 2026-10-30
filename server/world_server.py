@@ -10772,6 +10772,32 @@ class WorldAuthority:
             or pid == "admin"
         )
 
+    def _get_player_team_rank(self, p: dict, player_id: str = "") -> Optional[str]:
+        if not p:
+            return None
+        valid_ranks = ("SA", "SGA", "GA", "TM", "CM", "SGM", "GM", "TGM", "JGM", "EM", "DEV", "SUP")
+        
+        # 1. Explizit gesetzter Rang
+        explicit_rank = str(p.get("teamRank") or p.get("team_rank") or "").strip().upper()
+        if explicit_rank in valid_ranks:
+            return explicit_rank
+
+        role = str(p.get("role", "")).strip().upper()
+        if role in valid_ranks:
+            return role
+
+        # 2. Prüfe Namenspräfix (z. B. [SA]Name, [GM]Test)
+        name = str(p.get("name", "")).strip().upper()
+        for r in valid_ranks:
+            if name.startswith(f"[{r}]") or name.startswith(f"({r})"):
+                return r
+
+        # 3. Fallback: SA-Prüfung
+        if self._is_sa_player(p, player_id):
+            return "SA"
+
+        return None
+
     def change_map(self, player_id: str, target_map_id: str, spawn_x: Optional[float] = None, spawn_z: Optional[float] = None) -> Tuple[bool, str]:
         p = self.players.get(player_id)
         m = MAPS.get(target_map_id)
@@ -11680,14 +11706,30 @@ class WorldAuthority:
                 or not op.get("inWorld", False)
             ):
                 continue
-            if self._is_sa_player(op, op_id):
+            op_trank = self._get_player_team_rank(op, op_id)
+            if op_trank or self._is_sa_player(op, op_id):
+                rank_tag = op_trank or "SA"
+                role_desc = {
+                    "SA": "Serverleitung & Administration",
+                    "SGA": "Senior Game Administration",
+                    "GA": "Game Administration",
+                    "TM": "Teamleitung & Organisation",
+                    "CM": "Community Management",
+                    "SGM": "Super Game Master",
+                    "GM": "Game Master & Support",
+                    "TGM": "Trial Game Master",
+                    "JGM": "Junior Game Master",
+                    "EM": "Event Management",
+                    "DEV": "Entwicklung & Technik",
+                    "SUP": "Spieler-Support",
+                }.get(rank_tag, "Server-Team")
                 op_cdef = CHARACTER_CLASSES.get(op.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
                 op_map = MAPS.get(op.get("map_id", "morgenwacht"), {}).get("name", "Morgenwacht")
                 live_gm_list.append(
                     {
                         "name": op["name"],
-                        "role": "Serverleitung & Administration",
-                        "badge": "SA",
+                        "role": role_desc,
+                        "badge": rank_tag,
                         "classId": op.get("class_id", "warrior"),
                         "className": op_cdef["name"],
                         "level": int(op.get("level", 99)),
@@ -11695,7 +11737,8 @@ class WorldAuthority:
                         "zone": op_map,
                         "lastSeen": "Jetzt online",
                         "isGM": True,
-                        "isSA": True,
+                        "isSA": (rank_tag == "SA"),
+                        "teamRank": rank_tag,
                     }
                 )
         soc["gmList"] = live_gm_list
@@ -13689,12 +13732,16 @@ class WorldAuthority:
                 < 0.75
                 and not op.get("isDead", False)
             )
+            team_rank = self._get_player_team_rank(op, pid)
+            is_sa = (team_rank == "SA") or self._is_sa_player(op, pid)
+            is_gm = bool(team_rank)
             op_entry = {
                 "id": pid,
                 "name": op["name"],
-                "isSA": self._is_sa_player(op, pid),
-                "isGM": self._is_sa_player(op, pid),
-                "role": "SA" if self._is_sa_player(op, pid) else op.get("role", "player"),
+                "isSA": is_sa,
+                "isGM": is_gm,
+                "teamRank": team_rank or "",
+                "role": team_rank if team_rank else op.get("role", "player"),
                 "classId": op["class_id"],
                 "className": op_cdef["name"],
                 "gender": op.get("gender", "male"),
@@ -13942,6 +13989,14 @@ class WorldAuthority:
                 "despawnAt": round(despawn_at, 1),
                 "remainingSec": rem_sec,
             }
+
+        if p:
+            self_team_rank = self._get_player_team_rank(p, for_player_id)
+            if self_team_rank:
+                p["teamRank"] = self_team_rank
+                p["isGM"] = True
+                if self_team_rank == "SA":
+                    p["isSA"] = True
 
         if fast_tick:
             p_fast = None

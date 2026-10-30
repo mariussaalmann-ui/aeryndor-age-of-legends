@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261029_v600';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261030_v601';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -498,6 +498,10 @@ class AeryndorMMOApp {
       showMonsterLevel: true,
       showPlayerNames: true,
       showGuildNames: true,
+      showTeamEmblems: true,
+      showTeamRankLabels: true,
+      showTeamGlow: true,
+      showTeamParticles: true,
       showMonsterHPBar: true,
       masterVol: 85,
       musicVol: 65,
@@ -567,6 +571,10 @@ class AeryndorMMOApp {
         if (typeof savedHudVis.minimapRotation === 'string') this.clientSettings.minimapRotation = savedHudVis.minimapRotation;
         if (typeof savedHudVis.showPlayerNames === 'boolean') this.clientSettings.showPlayerNames = savedHudVis.showPlayerNames;
         if (typeof savedHudVis.showGuildNames === 'boolean') this.clientSettings.showGuildNames = savedHudVis.showGuildNames;
+        if (typeof savedHudVis.showTeamEmblems === 'boolean') this.clientSettings.showTeamEmblems = savedHudVis.showTeamEmblems;
+        if (typeof savedHudVis.showTeamRankLabels === 'boolean') this.clientSettings.showTeamRankLabels = savedHudVis.showTeamRankLabels;
+        if (typeof savedHudVis.showTeamGlow === 'boolean') this.clientSettings.showTeamGlow = savedHudVis.showTeamGlow;
+        if (typeof savedHudVis.showTeamParticles === 'boolean') this.clientSettings.showTeamParticles = savedHudVis.showTeamParticles;
         if (typeof savedHudVis.minimapNPCs === 'boolean') this.clientSettings.minimapNPCs = savedHudVis.minimapNPCs;
         if (typeof savedHudVis.uiTheme === 'string' && ['light', 'dark', 'auto'].includes(savedHudVis.uiTheme)) {
           this.clientSettings.uiTheme = savedHudVis.uiTheme;
@@ -807,6 +815,10 @@ class AeryndorMMOApp {
           minimapRotation: cs.minimapRotation || 'north',
           showPlayerNames: cs.showPlayerNames !== false,
           showGuildNames: cs.showGuildNames !== false,
+          showTeamEmblems: cs.showTeamEmblems !== false,
+          showTeamRankLabels: cs.showTeamRankLabels !== false,
+          showTeamGlow: cs.showTeamGlow !== false,
+          showTeamParticles: cs.showTeamParticles !== false,
           minimapNPCs: cs.minimapNPCs !== false,
           uiTheme: this.getUiThemePref?.() || cs.uiTheme || localStorage.getItem('aeryndor_ui_theme') || 'dark',
         })
@@ -4391,6 +4403,10 @@ class AeryndorMMOApp {
         activeChar?.guild && activeChar.guild !== 'Keine Gilde' ? activeChar.guild : 'Drachenorden';
       this.engine.showPlayerNames = this.clientSettings?.showPlayerNames !== false;
       this.engine.showGuildNames = this.clientSettings?.showGuildNames !== false;
+      this.engine.showTeamEmblems = this.clientSettings?.showTeamEmblems !== false;
+      this.engine.showTeamRankLabels = this.clientSettings?.showTeamRankLabels !== false;
+      this.engine.showTeamGlow = this.clientSettings?.showTeamGlow !== false;
+      this.engine.showTeamParticles = this.clientSettings?.showTeamParticles !== false;
       this.engine.syncSnapshot(snap);
     }
 
@@ -24483,6 +24499,34 @@ class AeryndorMMOApp {
                 </label>
                 <label class="iw-check-row">
                   <span class="iw-opt-row-label">
+                    <span class="iw-opt-ico" style="color:#f59e0b;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+                    <span>Team-Wappen (3D-Insignien)</span>
+                  </span>
+                  <input type="checkbox" data-cs-check="showTeamEmblems" ${cs.showTeamEmblems !== false ? 'checked' : ''} />
+                </label>
+                <label class="iw-check-row">
+                  <span class="iw-opt-row-label">
+                    <span class="iw-opt-ico" style="color:#38bdf8;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="7" y1="12" x2="17" y2="12"/></svg></span>
+                    <span>Team-Rangbanner ([SA], [GM])</span>
+                  </span>
+                  <input type="checkbox" data-cs-check="showTeamRankLabels" ${cs.showTeamRankLabels !== false ? 'checked' : ''} />
+                </label>
+                <label class="iw-check-row">
+                  <span class="iw-opt-row-label">
+                    <span class="iw-opt-ico" style="color:#22d3ee;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
+                    <span>Team-Aura &amp; Leuchteffekte</span>
+                  </span>
+                  <input type="checkbox" data-cs-check="showTeamGlow" ${cs.showTeamGlow !== false ? 'checked' : ''} />
+                </label>
+                <label class="iw-check-row">
+                  <span class="iw-opt-row-label">
+                    <span class="iw-opt-ico" style="color:#a855f7;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg></span>
+                    <span>Team-Energiepartikel</span>
+                  </span>
+                  <input type="checkbox" data-cs-check="showTeamParticles" ${cs.showTeamParticles !== false ? 'checked' : ''} />
+                </label>
+                <label class="iw-check-row">
+                  <span class="iw-opt-row-label">
                     <span class="iw-opt-ico" style="color:#a855f7;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
                     <span>NPCs, Quests &amp; Monolithen markieren</span>
                   </span>
@@ -25040,9 +25084,13 @@ class AeryndorMMOApp {
           if (k === 'reducedUiMotion') {
             document.body.classList.toggle('reduced-ui-motion', Boolean(chk.checked));
           }
-          if ((k === 'showPlayerNames' || k === 'showGuildNames') && this.engine) {
+          if ((['showPlayerNames', 'showGuildNames', 'showTeamEmblems', 'showTeamRankLabels', 'showTeamGlow', 'showTeamParticles'].includes(k)) && this.engine) {
             this.engine.showPlayerNames = this.clientSettings.showPlayerNames !== false;
             this.engine.showGuildNames = this.clientSettings.showGuildNames !== false;
+            this.engine.showTeamEmblems = this.clientSettings.showTeamEmblems !== false;
+            this.engine.showTeamRankLabels = this.clientSettings.showTeamRankLabels !== false;
+            this.engine.showTeamGlow = this.clientSettings.showTeamGlow !== false;
+            this.engine.showTeamParticles = this.clientSettings.showTeamParticles !== false;
             if (this.snapshot) this.engine.syncSnapshot(this.snapshot);
           }
           this.audio?.applySettings?.(this.clientSettings);
@@ -25147,6 +25195,10 @@ class AeryndorMMOApp {
       this.clientSettings.minimapNPCs = true;
       this.clientSettings.showPlayerNames = true;
       this.clientSettings.showGuildNames = true;
+      this.clientSettings.showTeamEmblems = true;
+      this.clientSettings.showTeamRankLabels = true;
+      this.clientSettings.showTeamGlow = true;
+      this.clientSettings.showTeamParticles = true;
       this.clientSettings.showDamageNumbers = true;
       this.clientSettings.showMonsterHPBar = true;
       this.clientSettings.showFPS = true;
