@@ -39,3 +39,7 @@ runtimes/
 Thumbs.db
 *.tmp
 *.bak
+
+# Bot-Navigation (Laufzeitdaten: vom Client gemeldete Hindernisse & gelerntes Gedaechtnis)
+data/world_obstacles_*.json
+data/bot_nav_memory.json

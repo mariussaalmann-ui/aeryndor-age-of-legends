@@ -2322,6 +2322,10 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # 2. Statische Spieldaten (/api/config)
+        if clean_path == "/api/world-obstacles":
+            self._send_json({"ok": True, **WORLD.nav.summary()})
+            return
+
         if clean_path == "/api/config":
             self._send_json(
                 {
@@ -4688,6 +4692,32 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                 with open(ctrl_path, "w", encoding="utf-8") as cf:
                     json.dump(ctrl, cf, indent=2, ensure_ascii=False)
                 self._send_json({"ok": True, "message": msg, "control": ctrl})
+            except Exception as e:
+                self._send_json({"ok": False, "message": str(e)}, status=400)
+            return
+
+        if parsed.path == "/api/world-obstacles":
+            # Client meldet seine Kollisionsdaten (Haeuser, Mauern, Felsen, Baeume) fuer die Bot-Navigation
+            raw = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else "{}"
+            try:
+                if not check_rate_limit(client_ip, "world_obstacles", 400, 300.0):
+                    self._send_json({"ok": False, "message": "Rate-Limit"}, status=429)
+                    return
+                body = json.loads(raw)
+                pid = str(body.get("playerId") or "")
+                tok = str(body.get("sessionToken") or "")
+                wp = WORLD.players.get(pid)
+                if not wp or not wp.get("online") or (wp.get("sessionToken") and wp.get("sessionToken") != tok):
+                    self._send_json({"ok": False, "message": "Nicht eingeloggt"}, status=403)
+                    return
+                res = WORLD.nav.receive_upload(
+                    body.get("mapId"),
+                    body.get("layoutHash"),
+                    int(body.get("part", 0) or 0),
+                    int(body.get("parts", 1) or 1),
+                    body,
+                )
+                self._send_json(res)
             except Exception as e:
                 self._send_json({"ok": False, "message": str(e)}, status=400)
             return

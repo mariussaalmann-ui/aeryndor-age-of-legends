@@ -14,6 +14,7 @@ import uuid
 from typing import Dict, List, Optional, Tuple
 
 from database import GameDatabase
+from bot_navigation import BotNavigator
 from game_data import (
     BLACKSMITH_RATES,
     CHARACTER_CLASSES,
@@ -191,6 +192,8 @@ class WorldAuthority:
     def __init__(self, db: GameDatabase):
         self.db = db
         self.boot_id = uuid.uuid4().hex[:10]
+        # Serverseitige Hindernis-Navigation & Navigations-Gedaechtnis der Bots (siehe bot_navigation.py)
+        self.nav = BotNavigator(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"))
         self.players: Dict[str, dict] = {}
         self.parties: Dict[str, dict] = {}
         self.trades: Dict[str, dict] = {}
@@ -2619,6 +2622,7 @@ class WorldAuthority:
     def tick(self, dt: float):
         now = time.time()
         active_maps = set()
+        self.nav.save_memory()
 
         # 1. Regeneriere Spieler-TP/MP & führe Auto-Farming / Ziel-Angriff für verbundene Spieler aus
         for pid, p in list(self.players.items()):
@@ -3213,6 +3217,12 @@ class WorldAuthority:
                     dir_label = "Map 1 Nord → Map 2 Süd" if tz > 0.0 else "Map 2 Süd → Map 1 Nord"
                     p["autoFarmStatus"] = f"🌉 Bot-Route: Überquere {bridge_label} ({dir_label})"
 
+        # Intelligente Hindernis-Umgehung (Haeuser, Mauern, Felsen, Baeume) + gelerntes Navigations-Gedaechtnis
+        nav_map_id = p.get("map_id", "morgenwacht")
+        use_obstacle_nav = is_bot or bool(af_cfg.get("enabled"))
+        if use_obstacle_nav:
+            eff_tx, eff_tz = self.nav.next_waypoint(p, nav_map_id, cx, cz, eff_tx, eff_tz, now_t)
+
         dx = eff_tx - cx
         dz = eff_tz - cz
         d = math.hypot(dx, dz)
@@ -3231,6 +3241,10 @@ class WorldAuthority:
         dir_z = math.cos(chosen_ang)
         nx = max(-1360.0, min(1360.0, cx + dir_x * step))
         nz = max(-1360.0, min(1360.0, cz + dir_z * step))
+        if use_obstacle_nav:
+            nx, nz, nav_hit = self.nav.resolve_step(nav_map_id, cx, cz, nx, nz)
+            p["rot_y"] = chosen_ang
+            self.nav.report_progress(p, nav_map_id, cx, cz, nx, nz, step, dt, nav_hit)
 
         last_tx = float(p.get("_lastTrailRecX", -9999.0))
         last_tz = float(p.get("_lastTrailRecZ", -9999.0))

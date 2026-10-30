@@ -10887,6 +10887,8 @@ export class OpenWorld3DEngine {
     this._worldObstacleCircles = [];
     this._worldObstacleSegments = [];
     this._worldWallSegments = [];
+    this._worldNavBoxes = [];
+    this._navSyncState = null;
     this._cachedTownsHouseMapId = null;
     this._cachedTownsHouseMap = null;
 
@@ -14076,6 +14078,10 @@ export class OpenWorld3DEngine {
       houseConfigs.forEach((hc, hIdx) => {
         if (this._worldObstacleCircles) {
           this._worldObstacleCircles.push([hc.x, hc.z, Math.min(hc.w, hc.d) * 0.56]);
+        }
+        // Exakter Haus-Grundriss (inkl. Sockel) fuer die serverseitige Bot-Navigation
+        if (this._worldNavBoxes) {
+          this._worldNavBoxes.push([hc.x, hc.z, hc.w + 0.7, hc.d + 0.7, hc.rot || 0]);
         }
         const hGroup = new THREE.Group();
         const hy = this.getGroundTerrainHeight(hc.x, hc.z, this.currentMapId);
@@ -28611,7 +28617,57 @@ export class OpenWorld3DEngine {
   }
 
   // Flüssige 60-FPS-Dead-Reckoning-Extrapolation, Bewegung & Kampf-Combo-Animation für alle Bots und anderen Spieler
+  // Meldet die Kollisionsdaten der aktuellen Map einmalig an den Server, damit Bots Haeuser, Mauern,
+  // Felsen & Baeume intelligent umlaufen koennen. Der Layout-Hash aendert sich nur, wenn die Map umgebaut wurde
+  // -> der Server vergisst dann das alte Bot-Navigationsgedaechtnis und die Bots lernen neu.
+  _maybeSyncNavObstacles() {
+    const now = performance.now();
+    if (this._navSyncNextCheck && now < this._navSyncNextCheck) return;
+    this._navSyncNextCheck = now + 2000;
+    if (!this.callbacks || typeof this.callbacks.onNavObstaclesReady !== 'function') return;
+    const mapId = this.currentMapId;
+    const circles = this._worldObstacleCircles || [];
+    const segs = this._worldObstacleSegments || [];
+    const walls = this._worldWallSegments || [];
+    const boxes = this._worldNavBoxes || [];
+    const total = circles.length + segs.length + walls.length + boxes.length;
+    if (total < 20) return;
+    const st = this._navSyncState;
+    if (!st || st.mapId !== mapId || st.total !== total) {
+      this._navSyncState = { mapId, total, stableSince: now, sent: false };
+      return;
+    }
+    if (st.sent || now - st.stableSince < 6000) return;
+    st.sent = true;
+    const r1 = (v) => Math.round(Number(v || 0) * 10) / 10;
+    const payload = {
+      mapId,
+      circles: circles.filter((c) => c && c[2] >= 0.3).map((c) => [r1(c[0]), r1(c[1]), r1(c[2])]),
+      segments: segs
+        .map((sg) => [r1(sg[0]), r1(sg[1]), r1(sg[2]), r1(sg[3]), r1(sg[4] || 0.8)])
+        .concat(walls.map((w) => [r1(w.ax), r1(w.az), r1(w.bx), r1(w.bz), r1(w.halfThick || 1.2)])),
+      boxes: boxes.map((b) => [r1(b[0]), r1(b[1]), r1(b[2]), r1(b[3]), Math.round(Number(b[4] || 0) * 1000) / 1000]),
+    };
+    let h = 0x811c9dc5;
+    const feed = (v) => {
+      const n = Math.round(v) | 0;
+      h = Math.imul(h ^ (n & 0xffff), 0x01000193) >>> 0;
+      h = Math.imul(h ^ ((n >>> 16) & 0xffff), 0x01000193) >>> 0;
+    };
+    for (const arr of [payload.circles, payload.segments, payload.boxes]) {
+      feed(arr.length);
+      for (const it of arr) for (const v of it) feed(v);
+    }
+    payload.layoutHash = `${mapId}_${h.toString(16)}`;
+    try {
+      this.callbacks.onNavObstaclesReady(payload);
+    } catch (e) {
+      console.warn('[BotNav] Upload der Hindernisdaten fehlgeschlagen', e);
+    }
+  }
+
   updateOtherPlayers(dt, elapsed) {
+    this._maybeSyncNavObstacles();
     if (!this.otherPlayerMeshes || this.otherPlayerMeshes.size === 0) return;
     const nowPerf = performance.now();
     for (const mesh of this.otherPlayerMeshes.values()) {

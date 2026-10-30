@@ -3747,9 +3747,47 @@ class AeryndorMMOApp {
   // ==========================================================================
   // 1. 3D-OPEN-WORLD-ENGINE & MULTIPLAYER-NETZWERK
   // ==========================================================================
+  // Sendet die Kollisionsdaten der Map in Teilpaketen an den Server (nur wenn der Server sie noch nicht kennt)
+  async uploadNavObstacles(payload) {
+    try {
+      if (!payload || !payload.mapId || !payload.layoutHash || !this.playerId) return;
+      const info = await fetch(`${this.apiBase}/api/world-obstacles`).then((r) => r.json()).catch(() => null);
+      if (info?.maps?.[payload.mapId]?.layoutHash === payload.layoutHash) return;
+      const CHUNK = 600;
+      const parts = Math.max(
+        1,
+        Math.ceil(payload.circles.length / CHUNK),
+        Math.ceil(payload.segments.length / CHUNK),
+        Math.ceil(payload.boxes.length / CHUNK)
+      );
+      for (let part = 0; part < parts; part++) {
+        const body = {
+          playerId: this.playerId,
+          sessionToken: this.getSessionToken(),
+          mapId: payload.mapId,
+          layoutHash: payload.layoutHash,
+          part,
+          parts,
+          circles: payload.circles.slice(part * CHUNK, (part + 1) * CHUNK),
+          segments: payload.segments.slice(part * CHUNK, (part + 1) * CHUNK),
+          boxes: payload.boxes.slice(part * CHUNK, (part + 1) * CHUNK),
+        };
+        const res = await fetch(`${this.apiBase}/api/world-obstacles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }).then((r) => r.json()).catch(() => null);
+        if (!res || !res.ok || res.known || res.pending || res.stored) break;
+      }
+    } catch (e) {
+      console.warn('[BotNav] uploadNavObstacles', e);
+    }
+  }
+
   init3DEngine() {
     const container = document.getElementById('world-canvas-container');
     this.engine = new OpenWorld3DEngine(container, {
+      onNavObstaclesReady: (payload) => this.uploadNavObstacles(payload),
       onGroundClick: (x, z) => {
         const px = this.engine?.localPlayerPos?.x;
         const pz = this.engine?.localPlayerPos?.z;

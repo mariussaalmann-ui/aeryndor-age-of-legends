@@ -1867,8 +1867,21 @@ def step_bot_ai(
             moved_d = dist2d(p["pos_x"], p["pos_z"], last_pos_info[0], last_pos_info[1])
             if moved_d < 0.35 and not p.get("targetId"):
                 b_stat["afkRecoveries"] += 1
-                p["pos_x"] += random.uniform(-6.0, 6.0)
-                p["pos_z"] += random.uniform(-6.0, 6.0)
+                nav = getattr(world, "nav", None)
+                map_id = p.get("map_id", "morgenwacht")
+                if nav is not None:
+                    # Feststeck-Stelle merken & nur auf einen freien Punkt (nicht in ein Haus) ausweichen
+                    nav.remember_blocked(map_id, float(p["pos_x"]), float(p["pos_z"]), 0)
+                    for _try in range(12):
+                        ox = float(p["pos_x"]) + random.uniform(-6.0, 6.0)
+                        oz = float(p["pos_z"]) + random.uniform(-6.0, 6.0)
+                        if not nav.is_point_blocked(map_id, ox, oz):
+                            p["pos_x"], p["pos_z"] = ox, oz
+                            break
+                    p.pop("_nav", None)
+                else:
+                    p["pos_x"] += random.uniform(-6.0, 6.0)
+                    p["pos_z"] += random.uniform(-6.0, 6.0)
         collector._bot_last_pos[pid] = (float(p["pos_x"]), float(p["pos_z"]), now)
 
     # 3. Intelligentes Heiltrank- & Mana-Management (kauft Tränke regulär mit Yang statt Gratis-Cheat)
