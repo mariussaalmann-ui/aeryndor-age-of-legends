@@ -536,13 +536,27 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
 
     if action == "check_char_name":
         req_name = str(payload.get("name") or "").strip()
-        team_tag = get_team_rank_tag(req_name)
-        if team_tag and account_key not in TEAM_ACCOUNTS:
+        if "[" in req_name or "]" in req_name:
             return {
                 "ok": False,
                 "available": False,
                 "normalizedName": req_name,
-                "message": f"⚠️ Der Team-Rang [{team_tag}] ({TEAM_RANKS.get(team_tag, 'Team')}) ist dem Server-Team vorbehalten!",
+                "message": "⚠️ Der Charaktername darf keine eckigen Klammern [ ] enthalten!",
+            }
+        team_tag = get_team_rank_tag(req_name)
+        if team_tag:
+            return {
+                "ok": False,
+                "available": False,
+                "normalizedName": req_name,
+                "message": f"⚠️ Team-Ränge wie [{team_tag}] dürfen nicht im Charakter-Menü erstellt werden!",
+            }
+        if not re.match(r"^[a-zA-Z0-9äöüÄÖÜß_-]{2,16}$", req_name):
+            return {
+                "ok": False,
+                "available": False,
+                "normalizedName": req_name,
+                "message": "⚠️ Bitte wähle einen gültigen Spielernamen (2–16 Zeichen, ohne Klammern).",
             }
         excl_pid = str(payload.get("excludePlayerId") or "").strip() or None
         taken = DB.is_character_name_taken(req_name, exclude_player_id=excl_pid)
@@ -560,28 +574,32 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         cls_id = str(char_obj.get("classId") or payload.get("classId") or "warrior").strip()
         emp = str(char_obj.get("empire") or payload.get("empire") or "seiryu").strip()
 
-        # 1. Team-Ränge dürfen NUR von autorisierten Team-Accounts erstellt werden
-        is_team_account = account_key in TEAM_ACCOUNTS
-        team_tag = get_team_rank_tag(req_name)
-        if team_tag and not is_team_account:
-            return {
-                "ok": False,
-                "reason": "forbidden_rank",
-                "message": f"⚠️ Der Team-Rang [{team_tag}] ({TEAM_RANKS.get(team_tag, 'Team')}) ist dem Server-Team vorbehalten!",
-            }
-
-        # 2. Namenslänge prüfen
-        base_name = req_name
-        if team_tag and req_name.upper().startswith(f"[{team_tag}]"):
-            base_name = req_name[len(team_tag) + 2:].strip()
-        if len(base_name) < 2 or len(base_name) > 16:
+        # 1. Eckige Klammern [ ] komplett sperren (für alle Accounts ausnahmslos)
+        if "[" in req_name or "]" in req_name:
             return {
                 "ok": False,
                 "reason": "invalid_name",
-                "message": "⚠️ Bitte wähle einen gültigen Charakternamen (2–16 Zeichen).",
+                "message": "⚠️ Der Charaktername darf keine eckigen Klammern [ ] enthalten!",
             }
 
-        # 3. STRIKTE DOPPELTE-NAMEN-PRÜFUNG
+        # 2. Team-Ränge komplett im Charaktermenü sperren
+        team_tag = get_team_rank_tag(req_name)
+        if team_tag:
+            return {
+                "ok": False,
+                "reason": "forbidden_rank",
+                "message": f"⚠️ Team-Ränge wie [{team_tag}] dürfen nicht im Charakter-Menü erstellt werden!",
+            }
+
+        # 3. Namensformat & Länge prüfen (2-16 Zeichen, a-zA-Z0-9äöüÄÖÜß_-)
+        if not re.match(r"^[a-zA-Z0-9äöüÄÖÜß_-]{2,16}$", req_name):
+            return {
+                "ok": False,
+                "reason": "invalid_name",
+                "message": "⚠️ Bitte wähle einen gültigen Charakternamen (2–16 Zeichen, ohne Sonderzeichen).",
+            }
+
+        # 4. Strikte Prüfung auf doppelte Namen
         if DB.is_character_name_taken(req_name, exclude_player_id=new_pid):
             return {
                 "ok": False,
@@ -589,46 +607,26 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                 "message": f"⚠️ Der Spielername „{req_name}“ ist auf dem Server bereits vergeben! Bitte wähle einen anderen Namen.",
             }
 
-        # 4. Rollen- und Statuszuweisung
-        is_sa_char = bool(is_team_account and team_tag == "SA")
-        is_team_char = bool(is_team_account and team_tag)
+        # 5. Neu erstellte Charaktere sind IMMER normale Spieler (kein SA, kein GM, kein Serverleitung-Tag)
+        char_obj["name"] = req_name
+        char_obj["isSA"] = False
+        char_obj["isGM"] = False
+        char_obj["role"] = "player"
+        if char_obj.get("guild") == "Serverleitung":
+            char_obj["guild"] = ""
+        if isinstance(payload.get("characters"), list):
+            for c_slot in payload["characters"]:
+                if isinstance(c_slot, dict) and str(c_slot.get("playerId") or "").strip() == new_pid:
+                    c_slot["name"] = req_name
+                    c_slot["isSA"] = False
+                    c_slot["isGM"] = False
+                    c_slot["role"] = "player"
+                    if c_slot.get("guild") == "Serverleitung":
+                        c_slot["guild"] = ""
 
-        if is_team_char:
-            req_name = f"[{team_tag}]{base_name}"
-            guild_name = "Serverleitung" if team_tag in ("SA", "SGA", "GA") else f"{TEAM_RANKS.get(team_tag, 'Team')}"
-            char_obj["name"] = req_name
-            char_obj["isSA"] = is_sa_char
-            char_obj["isGM"] = True
-            char_obj["role"] = team_tag
-            char_obj["guild"] = guild_name
-            if isinstance(payload.get("characters"), list):
-                for c_slot in payload["characters"]:
-                    if isinstance(c_slot, dict) and str(c_slot.get("playerId") or "").strip() == new_pid:
-                        c_slot["name"] = req_name
-                        c_slot["isSA"] = is_sa_char
-                        c_slot["isGM"] = True
-                        c_slot["role"] = team_tag
-                        c_slot["guild"] = guild_name
-        else:
-            char_obj["name"] = req_name
-            char_obj["isSA"] = False
-            char_obj["isGM"] = False
-            char_obj["role"] = "player"
-            if char_obj.get("guild") == "Serverleitung":
-                char_obj["guild"] = ""
-            if isinstance(payload.get("characters"), list):
-                for c_slot in payload["characters"]:
-                    if isinstance(c_slot, dict) and str(c_slot.get("playerId") or "").strip() == new_pid:
-                        c_slot["name"] = req_name
-                        c_slot["isSA"] = False
-                        c_slot["isGM"] = False
-                        c_slot["role"] = "player"
-                        if c_slot.get("guild") == "Serverleitung":
-                            c_slot["guild"] = ""
-
-        # 5. Charakter in der Datenbank anlegen
+        # 6. Charakter in der Datenbank anlegen
         try:
-            DB.load_or_create_player(new_pid, req_name, cls_id, empire=emp, is_sa=is_sa_char)
+            DB.load_or_create_player(new_pid, req_name, cls_id, empire=emp, is_sa=False)
         except ValueError:
             return {
                 "ok": False,
@@ -644,11 +642,11 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             return {
                 "ok": True,
                 "name": req_name,
-                "isSA": is_sa_char,
-                "message": f"👑 Team-Charakter {req_name} ({TEAM_RANKS.get(team_tag, 'Team')}) erschaffen!" if is_team_char else f"✨ {req_name} erfolgreich erschaffen!",
+                "isSA": False,
+                "message": f"✨ {req_name} erfolgreich erschaffen!",
                 "characters": clean_chars,
             }
-        return {"ok": True, "name": req_name, "isSA": is_sa_char, "message": f"✨ {req_name} erfolgreich erschaffen!"}
+        return {"ok": True, "name": req_name, "isSA": False, "message": f"✨ {req_name} erfolgreich erschaffen!"}
 
     if action == "delete_character":
         del_pid = str(payload.get("targetPlayerId") or player_id or "").strip()

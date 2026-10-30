@@ -7,6 +7,7 @@ und persistente Offlineshops mit atomarer Item-Reservierung.
 
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -267,9 +268,9 @@ class GameDatabase:
         return raw[:28]
 
     def _cleanup_unintended_sa_characters_conn(self, conn: sqlite3.Connection):
-        """Bereinigt Charaktere auf Admin-Accounts, die durch frühere Bugs versehentlich [SA] erhalten haben."""
+        """Bereinigt alle unautorisierten Charaktere mit eckigen Klammern [ ] oder Team-Tags (z.B. [GM]Test)."""
         legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
-        for acc_row in conn.execute("SELECT username_key, characters_json FROM accounts WHERE username_key IN ('admin', 'blackzimple')").fetchall():
+        for acc_row in conn.execute("SELECT username_key, characters_json FROM accounts").fetchall():
             ukey = acc_row["username_key"]
             try:
                 chars = json.loads(acc_row["characters_json"] or "[]")
@@ -283,36 +284,63 @@ class GameDatabase:
                     continue
                 cname = str(ch.get("name") or "").strip()
                 cpid = str(ch.get("playerId") or "").strip()
-                if cname.upper().startswith("[SA]") and cname.lower() not in legitimate_sa_names and cpid != "hero_admin_sa":
-                    base_name = cname[4:].strip()
-                    if base_name:
+                # Wenn der Name eckige Klammern enthält und kein autorisierter SA-Charakter ist:
+                if ("[" in cname or "]" in cname) and cname.lower() not in legitimate_sa_names and cpid != "hero_admin_sa":
+                    base_name = re.sub(r'\[.*?\]', '', cname).strip()
+                    base_name = re.sub(r'[\[\]]', '', base_name).strip()
+                    if not base_name:
+                        base_name = f"Held_{cpid[-4:]}"
+                    if self._is_character_name_taken_conn(conn, base_name, exclude_player_id=cpid):
+                        base_name = f"{base_name}2"[:28]
                         if self._is_character_name_taken_conn(conn, base_name, exclude_player_id=cpid):
-                            base_name = f"{base_name}2"[:28]
-                            if self._is_character_name_taken_conn(conn, base_name, exclude_player_id=cpid):
-                                base_name = f"{base_name[:22]}_{cpid[-5:]}"
-                        ch["name"] = base_name
-                        ch["isSA"] = False
-                        ch["isGM"] = False
-                        ch["role"] = "player"
-                        if ch.get("guild") == "Serverleitung":
-                            ch["guild"] = ""
-                        dirty = True
-                        if cpid:
-                            conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (base_name, cpid))
-                            prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
-                            if prow:
-                                try:
-                                    q = json.loads(prow["quests_json"] or "{}")
-                                    if isinstance(q, dict) and "__is_sa__" in q:
-                                        q.pop("__is_sa__", None)
-                                        conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
-                                except Exception:
-                                    pass
+                            base_name = f"{base_name[:20]}_{cpid[-5:]}"
+                    ch["name"] = base_name
+                    ch["isSA"] = False
+                    ch["isGM"] = False
+                    ch["role"] = "player"
+                    if ch.get("guild") == "Serverleitung":
+                        ch["guild"] = ""
+                    dirty = True
+                    if cpid:
+                        conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (base_name, cpid))
+                        prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
+                        if prow:
+                            try:
+                                q = json.loads(prow["quests_json"] or "{}")
+                                if isinstance(q, dict) and "__is_sa__" in q:
+                                    q.pop("__is_sa__", None)
+                                    conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
+                            except Exception:
+                                pass
             if dirty:
                 conn.execute(
                     "UPDATE accounts SET characters_json = ?, updated_at = ? WHERE username_key = ?",
                     (json.dumps(chars, ensure_ascii=False), time.time(), ukey),
                 )
+
+        # Bereinige auch alle Einträge in der Tabelle 'players' direkt (außer Bots und autorisierte SAs)
+        for prow in conn.execute("SELECT player_id, name, quests_json FROM players").fetchall():
+            pid = str(prow["player_id"] or "").strip()
+            pname = str(prow["name"] or "").strip()
+            if not pid or pid.startswith("bot_") or pid == "hero_admin_sa":
+                continue
+            if pname.lower() in legitimate_sa_names:
+                continue
+            if "[" in pname or "]" in pname:
+                base_name = re.sub(r'\[.*?\]', '', pname).strip()
+                base_name = re.sub(r'[\[\]]', '', base_name).strip()
+                if not base_name:
+                    base_name = f"Held_{pid[-4:]}"
+                if self._is_character_name_taken_conn(conn, base_name, exclude_player_id=pid):
+                    base_name = f"{base_name[:20]}_{pid[-5:]}"
+                conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (base_name, pid))
+                try:
+                    q = json.loads(prow["quests_json"] or "{}")
+                    if isinstance(q, dict) and "__is_sa__" in q:
+                        q.pop("__is_sa__", None)
+                        conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), pid))
+                except Exception:
+                    pass
 
     def _ensure_sa_blackzimple_account_conn(self, conn: sqlite3.Connection):
         """Sichert die SA/GM-Rechte f?r den Account 'blackzimple' und Charakter '[SA]Nemesis'."""
@@ -402,7 +430,8 @@ class GameDatabase:
                 continue
             cpid = str(ch.get("playerId") or "").strip()
             cname = str(ch.get("name") or "").strip()
-            if cname.upper().startswith("[SA]"):
+            legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+            if cname.upper().startswith("[SA]") and (cname.lower() in legitimate_sa_names or cpid == "hero_admin_sa"):
                 cname = self._normalize_sa_char_name(cname)
                 ch["name"] = cname
                 ch["isSA"] = True
@@ -422,6 +451,14 @@ class GameDatabase:
                     ch["role"] = "player"
                 if ch.get("guild") == "Serverleitung":
                     ch["guild"] = ""
+                if "[" in cname or "]" in cname:
+                    clean_n = re.sub(r'\[.*?\]', '', cname).strip()
+                    clean_n = re.sub(r'[\[\]]', '', clean_n).strip()
+                    if not clean_n:
+                        clean_n = f"Held_{cpid[-4:]}"
+                    ch["name"] = clean_n
+                    if cpid:
+                        conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (clean_n, cpid))
                 if cpid:
                     prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
                     if prow:
@@ -972,14 +1009,19 @@ class GameDatabase:
             empire = bot_prof["empire"]
         clean_empire = "kaeryu" if str(empire or "").lower() == "kaeryu" else "seiryu"
         clean_name = (name or "AeryndorHeld").strip()[:28] or "AeryndorHeld"
-        # Nur Charaktere mit [SA] im Namen (oder interne Admin-IDs) gelten als SA-Charaktere
+        legitimate_sa = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
         is_sa_char = bool(
-            clean_name.upper().startswith("[SA]")
-            or str(player_id or "").lower().startswith("hero_admin")
-            or str(player_id or "").lower().startswith("char_admin")
+            (clean_name.lower() in legitimate_sa or str(player_id or "").lower() in ("hero_admin_sa", "char_admin_sa"))
+            and not bot_prof
         )
         if is_sa_char and not bot_prof:
             clean_name = self._normalize_sa_char_name(clean_name)
+        elif not bot_prof:
+            if "[" in clean_name or "]" in clean_name:
+                clean_name = re.sub(r'\[.*?\]', '', clean_name).strip()
+                clean_name = re.sub(r'[\[\]]', '', clean_name).strip()
+                if not clean_name:
+                    clean_name = f"Held_{str(player_id)[-4:]}"
         with DB_LOCK:
             conn = self._connect()
             try:
@@ -2448,13 +2490,20 @@ class GameDatabase:
                         if not isinstance(ch, dict):
                             continue
                         cname = str(ch.get("name") or "").strip()
-                        if ukey in ("admin", "blackzimple") and cname and cname.upper().startswith("[SA]"):
+                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+                        if ukey in ("admin", "blackzimple") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                             cname = self._normalize_sa_char_name(cname)
                             ch["isSA"] = True
                             ch["isGM"] = True
                             ch["role"] = "SA"
                             ch["guild"] = "Serverleitung"
                         else:
+                            if "[" in cname or "]" in cname:
+                                cname = re.sub(r'\[.*?\]', '', cname).strip()
+                                cname = re.sub(r'[\[\]]', '', cname).strip()
+                                if not cname:
+                                    cname = f"Held_{cpid[-4:]}"
+                                ch["name"] = cname
                             ch["isSA"] = False
                             ch["isGM"] = False
                             if ch.get("role") in ("SA", "sa"):
@@ -2481,7 +2530,8 @@ class GameDatabase:
                 dirty_chars = False
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
-                        if ukey in ("admin", "blackzimple") and str(ch.get("name") or "").upper().startswith("[SA]"):
+                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+                        if ukey in ("admin", "blackzimple") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
                             norm_n = self._normalize_sa_char_name(ch.get("name") or "Admin")
                             if ch.get("name") != norm_n or not ch.get("isSA"):
                                 ch["name"] = norm_n
@@ -2490,7 +2540,7 @@ class GameDatabase:
                                 ch["role"] = "SA"
                                 ch["guild"] = "Serverleitung"
                                 dirty_chars = True
-                        elif ch.get("isSA") and not str(ch.get("name") or "").upper().startswith("[SA]"):
+                        elif ch.get("isSA") and (not str(ch.get("name") or "").upper().startswith("[SA]") or str(ch.get("name") or "").lower() not in legitimate_sa_names):
                             ch["isSA"] = False
                             ch["isGM"] = False
                             ch["role"] = "player"
@@ -2574,14 +2624,21 @@ class GameDatabase:
                     cname = str(ch.get("name") or "").strip()[:28]
                     if not cpid or not cname:
                         continue
-                    if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]"):
+                    legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+                    if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                         cname = self._normalize_sa_char_name(cname)
                         ch["isSA"] = True
                         ch["isGM"] = True
                         ch["role"] = "SA"
                         if not ch.get("guild") or ch.get("guild") == "Keine Gilde":
                             ch["guild"] = "Serverleitung"
-                    elif not cname.upper().startswith("[SA]"):
+                    elif not cname.upper().startswith("[SA]") or cname.lower() not in legitimate_sa_names:
+                        if "[" in cname or "]" in cname:
+                            cname = re.sub(r'\[.*?\]', '', cname).strip()
+                            cname = re.sub(r'[\[\]]', '', cname).strip()
+                            if not cname:
+                                cname = f"Held_{cpid[-4:]}"
+                            ch["name"] = cname
                         ch["isSA"] = False
                         ch["isGM"] = False
                         if ch.get("role") in ("SA", "sa"):

@@ -1566,11 +1566,11 @@ class AeryndorMMOApp {
                 if (!ch || typeof ch !== 'object') return null;
                 let rawCleanName = String(ch.name || '').trim();
                 const legitimateSaNames = ['[sa]nemesis', '[sa]admin', '[sa]serverleitung'];
-                if (rawCleanName.toUpperCase().startsWith('[SA]') && !legitimateSaNames.includes(rawCleanName.toLowerCase()) && ch.playerId !== 'hero_admin_sa') {
-                  const base = rawCleanName.slice(4).trim();
-                  if (base) rawCleanName = base;
+                if (!legitimateSaNames.includes(rawCleanName.toLowerCase()) && ch.playerId !== 'hero_admin_sa') {
+                  rawCleanName = rawCleanName.replace(/\[.*?\]/g, '').replace(/[\[\]]/g, '').trim();
+                  if (!rawCleanName) rawCleanName = `Held_${String(ch.playerId || '').slice(-4)}`;
                 }
-                const isCharSa = rawCleanName.toUpperCase().startsWith('[SA]');
+                const isCharSa = legitimateSaNames.includes(rawCleanName.toLowerCase()) || (rawCleanName.toUpperCase().startsWith('[SA]') && ch.playerId === 'hero_admin_sa');
                 const cleanName = rawCleanName;
                 const cleanPid = String(ch.playerId || '').trim();
                 if (!cleanName || !cleanPid) return null;
@@ -3241,31 +3241,46 @@ class AeryndorMMOApp {
       if (!nameInp) return;
       st.name = nameInp.value;
       const trimmed = st.name.trim();
-      const baseTrimmed = trimmed.toUpperCase().startsWith('[SA]') ? trimmed.slice(4).trim() : trimmed;
-      const validFormat = /^[a-zA-Z0-9äöüÄÖÜß_\[\]-]{2,16}$/.test(baseTrimmed);
+
+      // 1. Eckige Klammern [ ] komplett sperren!
+      if (trimmed.includes('[') || trimmed.includes(']')) {
+        if (nameBadge) {
+          nameBadge.textContent = '⚠️ Keine eckigen Klammern [ ] erlaubt!';
+          nameBadge.style.color = '#f87171';
+        }
+        return;
+      }
+
+      // 2. Team-Ränge komplett sperren!
+      const teamRank = this.checkTeamRankTag(trimmed);
+      if (teamRank) {
+        if (nameBadge) {
+          nameBadge.textContent = `⚠️ [${teamRank}] nur für Team! Nicht erlaubt!`;
+          nameBadge.style.color = '#f87171';
+        }
+        return;
+      }
+
+      // 3. Format validieren (2–16 Zeichen, a-zA-Z0-9äöüÄÖÜß_-)
+      const validFormat = /^[a-zA-Z0-9äöüÄÖÜß_-]{2,16}$/.test(trimmed);
       if (!validFormat) {
         if (nameBadge) {
-          nameBadge.textContent = '⚠️ 2–16 Buchstaben/Zahlen';
+          nameBadge.textContent = '⚠️ 2–16 Buchstaben/Zahlen (ohne Klammern)';
           nameBadge.style.color = '#f87171';
         }
         return;
       }
-      const teamRank = this.checkTeamRankTag(trimmed);
-      if (teamRank && !isAdminAcc) {
-        if (nameBadge) {
-          nameBadge.textContent = `⚠️ [${teamRank}] nur für Server-Team!`;
-          nameBadge.style.color = '#f87171';
-        }
-        return;
-      }
-      const checkCandidate = formatSaCandidate(trimmed);
-      if (this.isCharacterNameTakenLocally(checkCandidate)) {
+
+      // 4. Lokale Duplikatsprüfung
+      if (this.isCharacterNameTakenLocally(trimmed)) {
         if (nameBadge) {
           nameBadge.textContent = '⚠️ Name bereits vergeben!';
           nameBadge.style.color = '#f87171';
         }
         return;
       }
+
+      // 5. Server-Prüfung
       if (nameBadge) {
         nameBadge.textContent = '✓ Name verfügbar';
         nameBadge.style.color = '#4ade80';
@@ -3276,18 +3291,28 @@ class AeryndorMMOApp {
           const res = await fetch(`${this.apiBase}/api/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'check_char_name', name: checkCandidate, accountName: this.currentAccount || '' }),
+            body: JSON.stringify({ action: 'check_char_name', name: trimmed, accountName: this.currentAccount || '' }),
           });
           const data = await res.json();
           const result = data?.result || data;
           if (nameInp.value.trim() === trimmed && nameBadge && result) {
             const avail = result.available !== false && result.ok !== false;
-            nameBadge.textContent = avail ? '✓ Name verfügbar' : '⚠️ Name bereits vergeben!';
+            nameBadge.textContent = avail ? '✓ Name verfügbar' : (result.message || '⚠️ Name bereits vergeben!');
             nameBadge.style.color = avail ? '#4ade80' : '#f87171';
           }
         } catch (_) {}
       }, 180);
     };
+
+    nameInp?.addEventListener('keydown', (e) => {
+      if (e.key === '[' || e.key === ']') {
+        e.preventDefault();
+        if (nameBadge) {
+          nameBadge.textContent = '⚠️ Eckige Klammern [ ] sind gesperrt!';
+          nameBadge.style.color = '#f87171';
+        }
+      }
+    });
     nameInp?.addEventListener('input', validateName);
     if (st.name) validateName();
 
@@ -3360,23 +3385,25 @@ class AeryndorMMOApp {
 
     portal.querySelector('#btn-cc-confirm')?.addEventListener('click', async () => {
       const rawInputName = (nameInp?.value || '').trim();
-      if (!/^[a-zA-Z0-9äöüÄÖÜß_\[\]-]{2,16}$/.test(rawInputName)) {
-        this.showToast('⚠️ Bitte wähle einen gültigen, eigenen Spielernamen (2–16 Zeichen).');
+      if (rawInputName.includes('[') || rawInputName.includes(']')) {
+        this.showToast('⚠️ Eckige Klammern [ ] sind im Charakternamen streng verboten!');
         if (nameInp) nameInp.focus();
         return;
       }
-      const isAdminAcc = ['admin', 'blackzimple'].includes(String(this.currentAccount || '').toLowerCase());
       const teamRank = this.checkTeamRankTag(rawInputName);
-      if (teamRank && !isAdminAcc) {
-        this.showToast(`⚠️ Der Team-Rang [${teamRank}] ist ausschließlich dem Server-Team vorbehalten!`);
+      if (teamRank) {
+        this.showToast(`⚠️ Team-Ränge wie [${teamRank}] können nicht im Charaktermenü erstellt werden!`);
         if (nameBadge) {
-          nameBadge.textContent = `⚠️ [${teamRank}] nur für Team!`;
+          nameBadge.textContent = `⚠️ [${teamRank}] nicht erlaubt!`;
           nameBadge.style.color = '#f87171';
         }
         return;
       }
-      const isSA = Boolean(isAdminAcc && teamRank === 'SA');
-      const isTeam = Boolean(isAdminAcc && teamRank);
+      if (!/^[a-zA-Z0-9äöüÄÖÜß_-]{2,16}$/.test(rawInputName)) {
+        this.showToast('⚠️ Bitte wähle einen gültigen Spielernamen (2–16 Zeichen, ohne Sonderzeichen).');
+        if (nameInp) nameInp.focus();
+        return;
+      }
       const finalName = rawInputName;
       if (this.isCharacterNameTakenLocally(finalName)) {
         this.showToast(`⚠️ Der Spielername „${finalName}“ ist bereits vergeben! Jeder Name darf nur einmal existieren.`);
@@ -3386,9 +3413,9 @@ class AeryndorMMOApp {
         }
         return;
       }
-      const newPlayerId = isSA
-        ? `hero_admin_${st.classId}_${Date.now().toString(36).slice(-5)}`
-        : `hero_${st.classId}_${Date.now().toString(36).slice(-5)}`;
+
+      // Neu erstellte Charaktere sind IMMER normale Spieler (kein SA, kein GM)!
+      const newPlayerId = `hero_${st.classId}_${Date.now().toString(36).slice(-5)}`;
       const newCharObj = {
         playerId: newPlayerId,
         name: finalName,
@@ -3400,10 +3427,10 @@ class AeryndorMMOApp {
         level: 1,
         playTimeMin: 1,
         mapName: 'Morgenwacht',
-        guild: isSA ? 'Serverleitung' : 'Keine Gilde',
-        role: isSA ? 'SA' : 'player',
-        isSA: isSA,
-        isGM: isSA,
+        guild: 'Keine Gilde',
+        role: 'player',
+        isSA: false,
+        isGM: false,
         isNewCharSpawn: true,
       };
       const acc = this.getAccountObj();
@@ -3422,7 +3449,7 @@ class AeryndorMMOApp {
             sessionToken: this.getSessionToken(),
             character: newCharObj,
             characters: nextChars,
-            deleteCode: acc.deleteCode || (isAdminAcc ? '123' : '1234'),
+            deleteCode: acc.deleteCode || '1234',
           }),
         });
         const data = await res.json();
@@ -3430,7 +3457,7 @@ class AeryndorMMOApp {
         if (srvRes && srvRes.ok === false) {
           this.showToast(srvRes.message || `⚠️ Der Spielername „${finalName}“ ist auf dem Server bereits vergeben!`);
           if (nameBadge) {
-            nameBadge.textContent = '⚠️ Name bereits vergeben!';
+            nameBadge.textContent = srvRes.message || '⚠️ Name nicht verfügbar!';
             nameBadge.style.color = '#f87171';
           }
           return;
@@ -3455,11 +3482,8 @@ class AeryndorMMOApp {
       st.name = '';
       this.saveAccounts();
       this.selectedSlotIdx = targetSlotIdx;
-      this.showToast(
-        isSA
-          ? `👑 Server-Administrator ${newCharObj.name} (${meta.aeryndorName}) mit allen SA-Rechten erschaffen!`
-          : `✨ ${newCharObj.name} (${meta.aeryndorName}) erfolgreich erschaffen!`
-      );
+      const meta = this.archetypeMeta[st.classId] || { aeryndorName: 'Held' };
+      this.showToast(`✨ ${newCharObj.name} (${meta.aeryndorName}) erfolgreich erschaffen!`);
       this.showCharSelectPortal();
     });
   }
