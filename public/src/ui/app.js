@@ -7992,6 +7992,7 @@ class AeryndorMMOApp {
 
   openConversationWith(contactName) {
     if (!contactName) return;
+    this.dismissWhisperScroll(contactName);
     if (this.selfState && contactName.toLowerCase() === String(this.selfState.name || '').toLowerCase()) {
       return;
     }
@@ -8069,7 +8070,7 @@ class AeryndorMMOApp {
     pill.addEventListener('click', (e) => {
       if (e.target.closest('.whisper-scroll-close')) return;
       this.openConversationWith(senderName);
-      this.markWhisperScrollRead(senderName);
+      this.dismissWhisperScroll(senderName);
     });
 
     const closeBtn = pill.querySelector('.whisper-scroll-close');
@@ -8126,13 +8127,13 @@ class AeryndorMMOApp {
 
     for (const [senderName, count] of Object.entries(unreadMap)) {
       if (Number(count) > 0) {
-        if (this._dismissedWhisperScrolls.has(String(senderName).toLowerCase())) {
+        const isCurrentlyActiveInOpenWindow = isFriendsOpen && (this.activeConversation || '').toLowerCase() === senderName.toLowerCase();
+        if (isCurrentlyActiveInOpenWindow || this._dismissedWhisperScrolls.has(String(senderName).toLowerCase())) {
           continue;
         }
         const msgs = Array.isArray(conversations[senderName]) ? conversations[senderName] : [];
         const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].text : 'Neue Nachricht';
-        const isCurrentlyActiveInOpenWindow = isFriendsOpen && (this.activeConversation || '').toLowerCase() === senderName.toLowerCase();
-        this.showWhisperScroll(senderName, lastMsg, !isCurrentlyActiveInOpenWindow);
+        this.showWhisperScroll(senderName, lastMsg, true);
       }
     }
   }
@@ -18320,7 +18321,7 @@ class AeryndorMMOApp {
     if (activeContact && unreadMap[activeContact.name] > 0) {
       delete unreadMap[activeContact.name];
       this.sendAction('social', { subAction: 'mark_read', name: activeContact.name });
-      this.markWhisperScrollRead(activeContact.name);
+      this.dismissWhisperScroll(activeContact.name);
     }
 
     const convMessages = activeContact ? conversations[activeContact.name] || [] : [];
