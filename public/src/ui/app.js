@@ -1564,7 +1564,12 @@ class AeryndorMMOApp {
             if (Array.isArray(acc.characters)) {
               acc.characters = acc.characters.map((ch) => {
                 if (!ch || typeof ch !== 'object') return null;
-                const rawCleanName = String(ch.name || '').trim();
+                let rawCleanName = String(ch.name || '').trim();
+                const legitimateSaNames = ['[sa]nemesis', '[sa]admin', '[sa]serverleitung'];
+                if (rawCleanName.toUpperCase().startsWith('[SA]') && !legitimateSaNames.includes(rawCleanName.toLowerCase()) && ch.playerId !== 'hero_admin_sa') {
+                  const base = rawCleanName.slice(4).trim();
+                  if (base) rawCleanName = base;
+                }
                 const isCharSa = rawCleanName.toUpperCase().startsWith('[SA]');
                 const cleanName = rawCleanName;
                 const cleanPid = String(ch.playerId || '').trim();
