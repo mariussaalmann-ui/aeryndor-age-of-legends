@@ -4423,6 +4423,9 @@ class WorldAuthority:
         if not candidates:
             p["autoFarmTargetId"] = None
             p["autoFarmNextTargetId"] = None
+            if isinstance(p.get("townErrand"), dict):
+                # Stadtrundgang / NPC-Gang steuert die Bewegung selbst (_tick_bot_town_errand) -> keine Doppelsteuerung
+                return
             nav_ax = af.get("anchorX")
             nav_az = af.get("anchorZ")
             nav_lbl = "Jagdgebiet"

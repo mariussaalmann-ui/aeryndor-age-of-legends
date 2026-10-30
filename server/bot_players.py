@@ -3353,6 +3353,11 @@ def _live_bot_autonomous_maintenance(
     fighting_monolith_or_boss = any(
         kw in status_str for kw in ("Rissmonolith", "Instabil", "Erwacht", "Weltboss", "Elite", "Monolithensplitter", "Risskern")
     )
+    # Waehrend eines Stadtrundgangs / NPC-Quest-Gangs darf der Bot-Prozess das Ziel NICHT ueberschreiben,
+    # sonst pendelt der Bot zwischen NPC (Stadt) und Jagdgebiet hin und her (haengt z.B. an Haeusern fest).
+    on_town_errand = bool(p_state.get("townErrand")) or any(
+        kw in status_str for kw in ("Stadtrundgang", "Gehe zu", "NPC-Quest", "Schmiede", "Veredele", "Verkaufe Beute")
+    )
     wrong_area_for_map2 = bool(
         not fighting_monolith_or_boss
         and lvl >= 18
@@ -3368,6 +3373,7 @@ def _live_bot_autonomous_maintenance(
     if (
         not in_human_party
         and not fighting_monolith_or_boss
+        and not on_town_errand
         and (force_sector_sync or (new_sec_idx != cur_sec_idx and (tick_idx - mem.get("lastZoneSwitchTick", 0)) >= 6))
     ):
         mem["_initialSectorSynced"] = True
