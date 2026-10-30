@@ -282,24 +282,42 @@ class GameDatabase:
             if not isinstance(ch, dict):
                 continue
             cpid = str(ch.get("playerId") or "").strip()
-            ch["name"] = "[SA]Nemesis"
-            ch["isSA"] = True
-            ch["isGM"] = True
-            ch["role"] = "SA"
-            ch["guild"] = "Serverleitung"
-            if cpid:
-                conn.execute("UPDATE players SET name = ? WHERE player_id = ?", ("[SA]Nemesis", cpid))
-                prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
-                if prow:
-                    try:
-                        q = json.loads(prow["quests_json"] or "{}")
-                        if not isinstance(q, dict):
+            cname = str(ch.get("name") or "").strip()
+            if cname.upper().startswith("[SA]"):
+                ch["isSA"] = True
+                ch["isGM"] = True
+                ch["role"] = "SA"
+                ch["guild"] = "Serverleitung"
+                if cpid:
+                    prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
+                    if prow:
+                        try:
+                            q = json.loads(prow["quests_json"] or "{}")
+                            if not isinstance(q, dict):
+                                q = {}
+                        except Exception:
                             q = {}
-                    except Exception:
-                        q = {}
-                    q["__is_sa__"] = True
-                    q["__guild_name__"] = "Serverleitung"
-                    conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
+                        q["__is_sa__"] = True
+                        q["__guild_name__"] = "Serverleitung"
+                        conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
+            else:
+                # Normaler Charakter auf Admin-Account: Definitiv KEINE SA/GM-Rechte!
+                ch["isSA"] = False
+                ch["isGM"] = False
+                if ch.get("role") in ("SA", "sa"):
+                    ch["role"] = "player"
+                if ch.get("guild") == "Serverleitung":
+                    ch["guild"] = ""
+                if cpid:
+                    prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
+                    if prow:
+                        try:
+                            q = json.loads(prow["quests_json"] or "{}")
+                            if isinstance(q, dict) and "__is_sa__" in q:
+                                q.pop("__is_sa__", None)
+                                conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
+                        except Exception:
+                            pass
         conn.execute(
             """
             UPDATE accounts
@@ -334,18 +352,37 @@ class GameDatabase:
             if not isinstance(ch, dict):
                 continue
             cpid = str(ch.get("playerId") or "").strip()
-            cname = self._normalize_sa_char_name(ch.get("name") or "Admin")
-            ch["name"] = cname
-            ch["isSA"] = True
-            ch["isGM"] = True
-            ch["role"] = "SA"
-            if not ch.get("guild") or ch.get("guild") == "Keine Gilde":
-                ch["guild"] = "Serverleitung"
-            if cpid:
-                conn.execute(
-                    "UPDATE players SET name = ? WHERE player_id = ?",
-                    (cname, cpid),
-                )
+            cname = str(ch.get("name") or "").strip()
+            if cname.upper().startswith("[SA]"):
+                cname = self._normalize_sa_char_name(cname)
+                ch["name"] = cname
+                ch["isSA"] = True
+                ch["isGM"] = True
+                ch["role"] = "SA"
+                if not ch.get("guild") or ch.get("guild") == "Keine Gilde":
+                    ch["guild"] = "Serverleitung"
+                if cpid:
+                    conn.execute(
+                        "UPDATE players SET name = ? WHERE player_id = ?",
+                        (cname, cpid),
+                    )
+            else:
+                ch["isSA"] = False
+                ch["isGM"] = False
+                if ch.get("role") in ("SA", "sa"):
+                    ch["role"] = "player"
+                if ch.get("guild") == "Serverleitung":
+                    ch["guild"] = ""
+                if cpid:
+                    prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
+                    if prow:
+                        try:
+                            q = json.loads(prow["quests_json"] or "{}")
+                            if isinstance(q, dict) and "__is_sa__" in q:
+                                q.pop("__is_sa__", None)
+                                conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
+                        except Exception:
+                            pass
         conn.execute(
             """
             UPDATE accounts
@@ -888,9 +925,9 @@ class GameDatabase:
             empire = bot_prof["empire"]
         clean_empire = "kaeryu" if str(empire or "").lower() == "kaeryu" else "seiryu"
         clean_name = (name or "AeryndorHeld").strip()[:28] or "AeryndorHeld"
+        # Nur Charaktere mit [SA] im Namen (oder interne Admin-IDs) gelten als SA-Charaktere
         is_sa_char = bool(
-            is_sa
-            or clean_name.upper().startswith("[SA]")
+            clean_name.upper().startswith("[SA]")
             or str(player_id or "").lower().startswith("hero_admin")
             or str(player_id or "").lower().startswith("char_admin")
         )
@@ -2255,12 +2292,15 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey in ("admin", "blackzimple") and cname:
+                            if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]"):
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
                                 ch["role"] = "SA"
                                 ch["guild"] = "Serverleitung"
+                            else:
+                                ch["isSA"] = False
+                                ch["isGM"] = False
                             cpid = str(ch.get("playerId") or "").strip()
                             if not cname or not cpid or cname.lower() in seen_local:
                                 continue
@@ -2296,12 +2336,15 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey in ("admin", "blackzimple") and cname:
+                            if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]"):
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
                                 ch["role"] = "SA"
                                 ch["guild"] = "Serverleitung"
+                            else:
+                                ch["isSA"] = False
+                                ch["isGM"] = False
                             cpid = str(ch.get("playerId") or "").strip()
                             if not cname or not cpid or cname.lower() in seen_local:
                                 continue
@@ -2377,7 +2420,7 @@ class GameDatabase:
                 dirty_chars = False
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
-                        if ukey in ("admin", "blackzimple"):
+                        if ukey in ("admin", "blackzimple") and str(ch.get("name") or "").upper().startswith("[SA]"):
                             norm_n = self._normalize_sa_char_name(ch.get("name") or "Admin")
                             if ch.get("name") != norm_n or not ch.get("isSA"):
                                 ch["name"] = norm_n
@@ -2386,6 +2429,13 @@ class GameDatabase:
                                 ch["role"] = "SA"
                                 ch["guild"] = "Serverleitung"
                                 dirty_chars = True
+                        elif ch.get("isSA") and not str(ch.get("name") or "").upper().startswith("[SA]"):
+                            ch["isSA"] = False
+                            ch["isGM"] = False
+                            ch["role"] = "player"
+                            if ch.get("guild") == "Serverleitung":
+                                ch["guild"] = ""
+                            dirty_chars = True
                         prow = conn.execute(
                             "SELECT level, map_id, name, class_id FROM players WHERE player_id = ?",
                             (ch["playerId"],),
@@ -2463,13 +2513,20 @@ class GameDatabase:
                     cname = str(ch.get("name") or "").strip()[:28]
                     if not cpid or not cname:
                         continue
-                    if ukey in ("admin", "blackzimple"):
+                    if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]"):
                         cname = self._normalize_sa_char_name(cname)
                         ch["isSA"] = True
                         ch["isGM"] = True
                         ch["role"] = "SA"
                         if not ch.get("guild") or ch.get("guild") == "Keine Gilde":
                             ch["guild"] = "Serverleitung"
+                    elif not cname.upper().startswith("[SA]"):
+                        ch["isSA"] = False
+                        ch["isGM"] = False
+                        if ch.get("role") in ("SA", "sa"):
+                            ch["role"] = "player"
+                        if ch.get("guild") == "Serverleitung":
+                            ch["guild"] = ""
                     nkey = cname.lower()
                     if nkey in seen_names or self._is_character_name_taken_conn(conn, cname, exclude_player_id=cpid):
                         conflict_msg = f"⚠️ Der Spielername „{cname}“ ist auf dem Server bereits vergeben!"

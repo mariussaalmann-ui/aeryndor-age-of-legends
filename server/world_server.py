@@ -10751,17 +10751,22 @@ class WorldAuthority:
     def _is_sa_player(self, p: dict, player_id: str = "") -> bool:
         if not p:
             return False
-        name = str(p.get("name", ""))
-        acc = str(p.get("accountName") or p.get("account") or "").lower()
+        name = str(p.get("name", "")).strip()
         pid = str(player_id or p.get("player_id") or p.get("id") or "").lower()
+        
+        # Ein Charakter ist NUR ein SA-Spieler, wenn sein Name mit [SA] beginnt (oder interne Admin-ID)
+        is_name_sa = name.upper().startswith("[SA]") or pid.startswith("char_admin") or pid.startswith("hero_admin") or pid == "admin"
+        if not is_name_sa:
+            return False
+
+        acc = str(p.get("accountName") or p.get("account") or "").lower()
         role = str(p.get("role", "")).lower()
         quests_sa = bool((p.get("quests") or {}).get("__is_sa__")) if isinstance(p.get("quests"), dict) else False
-        return (
-            name.upper().startswith("[SA]")
-            or acc in ("admin", "blackzimple")
-            or bool(p.get("isSA"))
-            or role == "sa"
+        return bool(
+            p.get("isSA")
+            or role in ("sa", "admin")
             or quests_sa
+            or acc in ("admin", "blackzimple")
             or pid.startswith("char_admin")
             or pid.startswith("hero_admin")
             or pid == "admin"

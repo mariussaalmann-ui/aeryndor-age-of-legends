@@ -248,6 +248,9 @@ def apply_drop_filter_update(af: dict, df_patch: dict) -> dict:
 
 def execute_sa_command(p: dict, raw_cmd: str) -> bool:
     """Führt Server-Administrator (SA / GM) Befehle autoritativ aus."""
+    pid = str(p.get("player_id") or "")
+    if not WORLD._is_sa_player(p, pid):
+        return False
     parts = raw_cmd.strip().split()
     if not parts:
         return False
@@ -499,8 +502,19 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
 
     if action == "check_char_name":
         req_name = str(payload.get("name") or "").strip()
-        # [SA]-Prefix nur normalisieren wenn der Name bereits mit [SA] beginnt
-        if req_name.upper().startswith("[SA]"):
+        is_staff_prefix = (
+            req_name.upper().startswith("[SA]")
+            or req_name.upper().startswith("[GA]")
+            or req_name.upper().startswith("[GM]")
+        )
+        if is_staff_prefix and account_key not in ("admin", "blackzimple"):
+            return {
+                "ok": False,
+                "available": False,
+                "normalizedName": req_name,
+                "message": "⚠️ Das Präfix [SA], [GA] oder [GM] ist dem Server-Team vorbehalten!",
+            }
+        if req_name.upper().startswith("[SA]") and account_key in ("admin", "blackzimple"):
             req_name = DB._normalize_sa_char_name(req_name)
         excl_pid = str(payload.get("excludePlayerId") or "").strip() or None
         taken = DB.is_character_name_taken(req_name, exclude_player_id=excl_pid)
@@ -517,9 +531,23 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         new_pid = str(char_obj.get("playerId") or player_id or "").strip()
         cls_id = str(char_obj.get("classId") or payload.get("classId") or "warrior").strip()
         emp = str(char_obj.get("empire") or payload.get("empire") or "seiryu").strip()
-        # SA-Status NUR wenn der Name explizit mit [SA] beginnt – NICHT automatisch per Account
-        is_sa_create = req_name.upper().startswith("[SA]")
-        base_name = req_name[4:].strip() if is_sa_create else req_name
+        # Admin-Präfixe ([SA], [GA], [GM]) dürfen NUR von autorisierten Accounts verwendet werden
+        is_sa_account = account_key in ("admin", "blackzimple")
+        is_staff_prefix = (
+            req_name.upper().startswith("[SA]")
+            or req_name.upper().startswith("[GA]")
+            or req_name.upper().startswith("[GM]")
+        )
+        if is_staff_prefix and not is_sa_account:
+            return {
+                "ok": False,
+                "reason": "forbidden_name",
+                "message": "⚠️ Das Präfix [SA], [GA] oder [GM] ist dem Server-Team vorbehalten!",
+            }
+
+        # SA-Status NUR wenn der Name explizit mit [SA] beginnt UND der Account berechtigt ist
+        is_sa_create = is_sa_account and req_name.upper().startswith("[SA]")
+        base_name = req_name[4:].strip() if req_name.upper().startswith("[SA]") else req_name
         if len(base_name) < 2 or len(base_name) > 16:
             return {
                 "ok": False,
@@ -541,6 +569,23 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                         c_slot["isGM"] = True
                         c_slot["role"] = "SA"
                         c_slot["guild"] = "Serverleitung"
+        else:
+            # Normaler Charakter: Definitiv keine GM/SA-Rechte
+            char_obj["name"] = req_name
+            char_obj["isSA"] = False
+            char_obj["isGM"] = False
+            char_obj["role"] = "player"
+            if char_obj.get("guild") == "Serverleitung":
+                char_obj["guild"] = ""
+            if isinstance(payload.get("characters"), list):
+                for c_slot in payload["characters"]:
+                    if isinstance(c_slot, dict) and str(c_slot.get("playerId") or "").strip() == new_pid:
+                        c_slot["name"] = req_name
+                        c_slot["isSA"] = False
+                        c_slot["isGM"] = False
+                        c_slot["role"] = "player"
+                        if c_slot.get("guild") == "Serverleitung":
+                            c_slot["guild"] = ""
         if DB.is_character_name_taken(req_name, exclude_player_id=new_pid):
             return {
                 "ok": False,
@@ -638,18 +683,18 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         p["lastSeen"] = time.time() if in_world_flag else 0.0
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
-            # [SA]-Prefix nur normalisieren wenn der Name bereits [SA] hat
-            if req_name.upper().startswith("[SA]"):
+            # [SA]-Prefix nur normalisieren wenn der Name bereits [SA] hat und Account berechtigt ist
+            if req_name.upper().startswith("[SA]") and (account_key in ("admin", "blackzimple") or player_id == "hero_admin_sa"):
                 req_name = DB._normalize_sa_char_name(req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
-        # SA-Status nur anhand des Namens [SA] oder gespeichertem isSA/role – NICHT per Account-Key
-        is_sa_join = bool(
-            str(p.get("name") or "").upper().startswith("[SA]")
-            or p.get("isSA")
-            or p.get("role") in ("sa", "SA")
-            or player_id == "hero_admin_sa"
-        )
+        # SA-Status beim Betreten der Welt:
+        # NUR wenn der Charaktername explizit mit [SA] beginnt (oder Admin-Hero-ID)
+        # UND der Account autorisiert ist!
+        char_name = str(p.get("name") or "").strip()
+        is_name_sa = char_name.upper().startswith("[SA]") or player_id == "hero_admin_sa"
+        is_account_authorized = account_key in ("admin", "blackzimple") or player_id == "hero_admin_sa"
+        is_sa_join = is_name_sa and is_account_authorized
         if is_sa_join:
             p["name"] = DB._normalize_sa_char_name(p.get("name") or "Admin")
             p["isSA"] = True
@@ -657,6 +702,16 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             p["role"] = "sa"
             p["guildName"] = "Serverleitung"
             p.setdefault("quests", {})["__is_sa__"] = True
+        else:
+            # Normaler Charakter: Bereinige jegliche SA/GM-Flags
+            p["isSA"] = False
+            p["isGM"] = False
+            if p.get("role") in ("sa", "SA"):
+                p["role"] = "player"
+            if p.get("guildName") == "Serverleitung":
+                p["guildName"] = ""
+            if isinstance(p.get("quests"), dict) and "__is_sa__" in p["quests"]:
+                p["quests"].pop("__is_sa__", None)
         if payload.get("classId") in CHARACTER_CLASSES:
             p["class_id"] = payload["classId"]
         if payload.get("empire"):
@@ -1309,17 +1364,12 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
 
     if action == "chat":
         txt = (payload.get("text") or "").strip()
-        is_sa = (
-            WORLD._is_sa_player(p, player_id)
-            or account_key in ("admin", "blackzimple")
-            or p.get("name", "").startswith("[SA]")
-            or p.get("name", "").startswith("[GA]")
-            or p.get("role") == "sa"
-            or p.get("player_id") == "hero_admin_sa"
-        )
+        # Nur echte SA-Spieler (mit [SA] im Namen und autorisiertem Account) gelten als SA!
+        is_sa = WORLD._is_sa_player(p, player_id)
         if txt.startswith("/"):
             parts_cmd = txt.split()
             cmd_name = parts_cmd[0].lower() if parts_cmd else ""
+            # Big Notice: NUR für autorisierte [SA]-Spieler
             if cmd_name in ("/bignotice", "/big_notice", "/b"):
                 if not is_sa:
                     print(f"SECURITY ALERT: Unberechtigter Big-Notice-Versuch von Spieler '{p.get('name')}' (PID: {player_id})")
