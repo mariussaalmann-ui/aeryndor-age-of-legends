@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261030_v601';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261030_v602';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -24504,13 +24504,7 @@ class AeryndorMMOApp {
                   </span>
                   <input type="checkbox" data-cs-check="showTeamEmblems" ${cs.showTeamEmblems !== false ? 'checked' : ''} />
                 </label>
-                <label class="iw-check-row">
-                  <span class="iw-opt-row-label">
-                    <span class="iw-opt-ico" style="color:#38bdf8;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="7" y1="12" x2="17" y2="12"/></svg></span>
-                    <span>Team-Rangbanner ([SA], [GM])</span>
-                  </span>
-                  <input type="checkbox" data-cs-check="showTeamRankLabels" ${cs.showTeamRankLabels !== false ? 'checked' : ''} />
-                </label>
+
                 <label class="iw-check-row">
                   <span class="iw-opt-row-label">
                     <span class="iw-opt-ico" style="color:#22d3ee;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>

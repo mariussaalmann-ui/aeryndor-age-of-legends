@@ -14,7 +14,7 @@ import * as THREE from '../../vendor/three.module.js';
 import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261026_v521';
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
-import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v601';
+import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v602';
 
 // Wiederverwendbarer Farb-Ringpuffer für Per-Frame-Berechnungen (vermeidet GC-Spitzen durch
 // dutzende `new THREE.Color()` pro Frame). Nur für kurzlebige Zwischenwerte innerhalb eines Aufrufs!
@@ -22241,27 +22241,20 @@ export class OpenWorld3DEngine {
 
       // 3D-Team-Wappen (GameMaster & Team-Insignie)
       const teamRank = cfg.teamRank || this.localTeamRank || null;
-      const showRankLabel = this.showTeamRankLabels !== false;
       if (teamRank && this.teamEmblemSystem) {
-        if (
-          !this.localTeamEmblemGroup ||
-          this._currentLocalTeamRank !== teamRank ||
-          this._lastLocalShowRankLabel !== showRankLabel
-        ) {
+        if (!this.localTeamEmblemGroup || this._currentLocalTeamRank !== teamRank) {
           if (this.localTeamEmblemGroup) {
             this.teamEmblemSystem.destroyEmblemGroup(this.localTeamEmblemGroup);
           }
           this.localTeamEmblemGroup = this.teamEmblemSystem.createEmblemGroup(teamRank, {
-            showRankLabel,
             isLocal: true,
           });
           this.localPlayerActor.root.add(this.localTeamEmblemGroup);
           this._currentLocalTeamRank = teamRank;
-          this._lastLocalShowRankLabel = showRankLabel;
         }
         if (this.localTeamEmblemGroup) {
           const isMounted = Boolean(this.localPlayerActor.mountGroup?.visible);
-          this.localTeamEmblemGroup.userData.baseY = isMounted ? 4.46 : 3.82;
+          this.localTeamEmblemGroup.userData.baseY = isMounted ? 4.38 : 3.75;
           this.localTeamEmblemGroup.visible = this.showTeamEmblems !== false;
         }
       } else if (this.localTeamEmblemGroup) {
@@ -25611,7 +25604,7 @@ export class OpenWorld3DEngine {
       this.localPlayerLabel.position.y = isNowMounted ? 3.48 : 2.84;
     }
     if (this.localTeamEmblemGroup) {
-      this.localTeamEmblemGroup.userData.baseY = isNowMounted ? 4.46 : 3.82;
+      this.localTeamEmblemGroup.userData.baseY = isNowMounted ? 4.38 : 3.75;
       this.localTeamEmblemGroup.visible = this.showTeamEmblems !== false;
     }
     const hadPetVisible = Boolean(this.localPlayerActor.petGroup.visible);
@@ -25728,20 +25721,17 @@ export class OpenWorld3DEngine {
       }
       // 3D-Team-Wappen für andere autorisierte Team-Mitglieder
       const opTeamRank = op.teamRank || (op.isSA ? 'SA' : (op.isGM ? 'GM' : null));
-      const opShowRankLabel = this.showTeamRankLabels !== false;
       if (opTeamRank && this.teamEmblemSystem) {
-        if (!mesh.teamEmblemGroup || mesh.teamRank !== opTeamRank || mesh._lastShowRankLabel !== opShowRankLabel) {
+        if (!mesh.teamEmblemGroup || mesh.teamRank !== opTeamRank) {
           if (mesh.teamEmblemGroup) this.teamEmblemSystem.destroyEmblemGroup(mesh.teamEmblemGroup);
           mesh.teamEmblemGroup = this.teamEmblemSystem.createEmblemGroup(opTeamRank, {
-            showRankLabel: opShowRankLabel,
             isLocal: false,
           });
           mesh.root.add(mesh.teamEmblemGroup);
           mesh.teamRank = opTeamRank;
-          mesh._lastShowRankLabel = opShowRankLabel;
         }
         if (mesh.teamEmblemGroup) {
-          mesh.teamEmblemGroup.userData.baseY = op.activeMount ? 4.46 : 3.82;
+          mesh.teamEmblemGroup.userData.baseY = op.activeMount ? 4.38 : 3.75;
           mesh.teamEmblemGroup.visible = this.showTeamEmblems !== false && !mesh._isDistanceCulled;
         }
       } else if (mesh.teamEmblemGroup) {

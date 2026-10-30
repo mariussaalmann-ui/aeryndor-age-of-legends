@@ -150,9 +150,9 @@ export class TeamEmblemSystem {
   }
 
   // Erzeugt oder liefert die gecachte CanvasTexture für einen Rang
-  getOrCreateTexture(rank, showRankLabel = true) {
+  getOrCreateTexture(rank) {
     const meta = this.getRankMeta(rank);
-    const cacheKey = `${meta.tag}_${showRankLabel ? 'lbl' : 'nolbl'}`;
+    const cacheKey = `${meta.tag}_emblem`;
     if (this.textureCache.has(cacheKey)) {
       return this.textureCache.get(cacheKey);
     }
@@ -163,7 +163,7 @@ export class TeamEmblemSystem {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    this.drawEmblem(ctx, meta, showRankLabel);
+    this.drawEmblem(ctx, meta);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
@@ -174,17 +174,17 @@ export class TeamEmblemSystem {
     return texture;
   }
 
-  // Zeichnet das vollständige hochauflösende 2D-Canvas-Wappen
-  drawEmblem(ctx, meta, showRankLabel) {
+  // Zeichnet das vollständige hochauflösende 2D-Canvas-Wappen (zentriert ohne Banner)
+  drawEmblem(ctx, meta) {
     const cx = 256;
-    const cy = showRankLabel ? 190 : 256;
+    const cy = 256;
 
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
     // 1. Sanfter radialer Hintergrund-Aura-Glow
-    const auraRadius = showRankLabel ? 210 : 230;
+    const auraRadius = 230;
     const auraGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, auraRadius);
     auraGrad.addColorStop(0, meta.glowColor);
     auraGrad.addColorStop(0.45, meta.glowColor.replace(/[\d\.]+\)$/, '0.35)'));
@@ -247,11 +247,6 @@ export class TeamEmblemSystem {
       default:
         this.drawGameMasterEmblem(ctx, cx, cy, 'GM');
         break;
-    }
-
-    // 4. Untere Rangbezeichnung (Plaque-Banner)
-    if (showRankLabel) {
-      this.drawRankBadgeBanner(ctx, cx, 435, meta);
     }
 
     ctx.restore();
@@ -1105,8 +1100,7 @@ export class TeamEmblemSystem {
   // Erzeugt das gesamte 3D-Emblem-Objekt (Sprite + optionale Orbit-Partikel)
   createEmblemGroup(rank, opts = {}) {
     const meta = this.getRankMeta(rank);
-    const showRankLabel = opts.showRankLabel !== false;
-    const texture = this.getOrCreateTexture(meta.tag, showRankLabel);
+    const texture = this.getOrCreateTexture(meta.tag);
 
     const group = new THREE.Group();
     group.name = `teamEmblem_${meta.tag}`;
@@ -1157,9 +1151,8 @@ export class TeamEmblemSystem {
 
     group.userData = {
       rank: meta.tag,
-      showRankLabel,
       isLocal: Boolean(opts.isLocal),
-      baseY: 3.82,
+      baseY: 3.75,
       seed: Math.random() * Math.PI * 2,
       sprite,
       particleGroup,
