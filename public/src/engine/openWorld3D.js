@@ -14,7 +14,7 @@ import * as THREE from '../../vendor/three.module.js';
 import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261026_v521';
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
-import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v602';
+import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
 
 // Wiederverwendbarer Farb-Ringpuffer für Per-Frame-Berechnungen (vermeidet GC-Spitzen durch
 // dutzende `new THREE.Color()` pro Frame). Nur für kurzlebige Zwischenwerte innerhalb eines Aufrufs!
