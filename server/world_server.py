@@ -5680,6 +5680,14 @@ class WorldAuthority:
 
         tx, tz, npc_label = npcs[stage]
         af = bot.setdefault("autofarm", {})
+        if now - float(errand.get("startedAt", now) or now) > 180.0:
+            bot["_lastTownErrandCompletedAt"] = now
+            bot.pop("townErrand", None)
+            ix, iz = self._get_ideal_bot_hunting_anchor(bot)
+            af["anchorX"] = ix
+            af["anchorZ"] = iz
+            bot["autoFarmStatus"] = f"✅ Stadtrundgang ({town_name}) beendet -> Reite ins Jagdgebiet!"
+            return False
         af["anchorX"] = tx
         af["anchorZ"] = tz
         bot["targetId"] = None
@@ -5772,7 +5780,12 @@ class WorldAuthority:
                     cur_sc = self._score_bot_equipment_item(bot, cur_eq) if cur_eq else -1.0
                     if cand_sc <= cur_sc and int(it.get("plusLevel", 0)) < 5 and it.get("uid"):
                         val = max(180, int(tpl.get("sellPrice", 150)))
-                        if self.db.remove_inventory_item_by_uid(bot["player_id"], it["uid"]):
+                        _rm_fn = getattr(self.db, "remove_inventory_item_by_uid", None) or getattr(self.db, "delete_item", None)
+                        try:
+                            _removed = bool(_rm_fn and _rm_fn(bot["player_id"], it["uid"]))
+                        except Exception:
+                            _removed = False
+                        if _removed:
                             sold_cnt += 1
                             sold_yang += val
             if sold_yang > 0:
