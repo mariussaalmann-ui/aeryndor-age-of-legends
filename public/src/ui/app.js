@@ -9200,10 +9200,8 @@ class AeryndorMMOApp {
       this.toggleChatBox();
     });
 
-    document.getElementById('btn-chat-open-friends')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this.toggleWindow('friends');
-    });
+    // Messenger-Button (#btn-chat-open-friends) wird bereits ueber den allgemeinen [data-open-win]-Handler geoeffnet.
+    // Ein zweiter Handler hat das Fenster sofort wieder geschlossen (doppeltes toggleWindow) -> entfernt.
 
     document.getElementById('btn-chat-minimize')?.addEventListener('click', (ev) => {
       ev.stopPropagation();
