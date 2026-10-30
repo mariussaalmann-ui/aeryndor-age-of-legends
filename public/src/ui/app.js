@@ -4394,6 +4394,7 @@ class AeryndorMMOApp {
         const wText = snap.whisperNotice.text;
         const wId = snap.whisperNotice.id;
         this.showToast(`💬 Nachricht von ${wFrom}: "${wText}"`);
+        this.showWhisperScroll(wFrom, wText);
         if (this.selfState && wFrom) {
           const soc = (this.selfState.social = this.selfState.social || {});
           const convs = (soc.conversations = soc.conversations || {});
@@ -8024,6 +8025,62 @@ class AeryndorMMOApp {
     setTimeout(() => {
       document.getElementById('friends-msg-input')?.focus();
     }, 40);
+  }
+
+  // ==========================================================================
+  // METIN2-STYLE WHISPER-ZETTEL (Pergament-Scroll rechts am Bildschirmrand)
+  // ==========================================================================
+  showWhisperScroll(senderName, previewText) {
+    const stack = document.getElementById('whisper-scroll-stack');
+    if (!stack) return;
+    // Keine doppelten Zettel fuer denselben Absender
+    const existing = stack.querySelector(`[data-ws-sender="${CSS.escape(senderName)}"]`);
+    if (existing) {
+      const prev = existing.querySelector('.whisper-scroll-preview');
+      if (prev) prev.textContent = previewText || '';
+      const icon = existing.querySelector('.whisper-scroll-icon');
+      if (icon) { icon.style.animation = 'none'; void icon.offsetWidth; icon.style.animation = ''; }
+      return;
+    }
+    const pill = document.createElement('div');
+    pill.className = 'whisper-scroll-pill';
+    pill.setAttribute('data-ws-sender', senderName);
+    pill.innerHTML = `
+      <div class="whisper-scroll-icon">
+        \u{1F4DC}
+        <span class="ws-unread-dot"></span>
+      </div>
+      <div class="whisper-scroll-body">
+        <div class="whisper-scroll-sender">\u2709\uFE0F ${this.escapeHtml(senderName)}</div>
+        <div class="whisper-scroll-preview">${this.escapeHtml(previewText || '')}</div>
+      </div>
+      <button type="button" class="whisper-scroll-close" title="Schlie\u00dfen">\u2715</button>
+    `;
+    pill.addEventListener('click', (e) => {
+      if (e.target.closest('.whisper-scroll-close')) return;
+      this.openConversationWith(senderName);
+      this.dismissWhisperScroll(senderName);
+    });
+    pill.querySelector('.whisper-scroll-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.dismissWhisperScroll(senderName);
+    });
+    stack.appendChild(pill);
+    while (stack.children.length > 5) {
+      stack.removeChild(stack.firstElementChild);
+    }
+    pill._wsTimeout = setTimeout(() => this.dismissWhisperScroll(senderName), 30000);
+  }
+
+  dismissWhisperScroll(senderName) {
+    const stack = document.getElementById('whisper-scroll-stack');
+    if (!stack) return;
+    const pill = stack.querySelector(`[data-ws-sender="${CSS.escape(senderName)}"]`);
+    if (!pill) return;
+    if (pill._wsTimeout) clearTimeout(pill._wsTimeout);
+    pill.classList.add('removing');
+    pill.addEventListener('animationend', () => pill.remove(), { once: true });
+    setTimeout(() => { if (pill.parentNode) pill.remove(); }, 500);
   }
 
   // ==========================================================================
