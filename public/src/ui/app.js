@@ -1688,6 +1688,23 @@ class AeryndorMMOApp {
     } catch (_) {}
   }
 
+  checkTeamRankTag(name) {
+    const s = String(name || '').trim();
+    const u = s.toUpperCase();
+    const ranks = ['SA', 'SGA', 'GA', 'TM', 'CM', 'SGM', 'GM', 'TGM', 'JGM', 'EM', 'DEV', 'SUP'];
+    ranks.sort((a, b) => b.length - a.length);
+    for (const r of ranks) {
+      for (const [o, c] of [['[', ']'], ['(', ')'], ['{', '}'], ['<', '>']]) {
+        if (u.includes(`${o}${r}${c}`)) return r;
+      }
+      for (const sep of ['_', '-', '.', ' ', ':']) {
+        if (u.startsWith(`${r}${sep}`)) return r;
+      }
+      if (u === r) return r;
+    }
+    return null;
+  }
+
   isCharacterNameTakenLocally(name, excludePlayerId = null) {
     const clean = String(name || '').trim().toLowerCase();
     if (!clean) return true;
@@ -3233,6 +3250,14 @@ class AeryndorMMOApp {
         }
         return;
       }
+      const teamRank = this.checkTeamRankTag(trimmed);
+      if (teamRank && !isAdminAcc) {
+        if (nameBadge) {
+          nameBadge.textContent = `⚠️ [${teamRank}] nur für Server-Team!`;
+          nameBadge.style.color = '#f87171';
+        }
+        return;
+      }
       const checkCandidate = formatSaCandidate(trimmed);
       if (this.isCharacterNameTakenLocally(checkCandidate)) {
         if (nameBadge) {
@@ -3340,9 +3365,18 @@ class AeryndorMMOApp {
         if (nameInp) nameInp.focus();
         return;
       }
-      const isExplicitSa = rawInputName.toUpperCase().startsWith('[SA]');
       const isAdminAcc = ['admin', 'blackzimple'].includes(String(this.currentAccount || '').toLowerCase());
-      const isSA = isAdminAcc && isExplicitSa;
+      const teamRank = this.checkTeamRankTag(rawInputName);
+      if (teamRank && !isAdminAcc) {
+        this.showToast(`⚠️ Der Team-Rang [${teamRank}] ist ausschließlich dem Server-Team vorbehalten!`);
+        if (nameBadge) {
+          nameBadge.textContent = `⚠️ [${teamRank}] nur für Team!`;
+          nameBadge.style.color = '#f87171';
+        }
+        return;
+      }
+      const isSA = Boolean(isAdminAcc && teamRank === 'SA');
+      const isTeam = Boolean(isAdminAcc && teamRank);
       const finalName = rawInputName;
       if (this.isCharacterNameTakenLocally(finalName)) {
         this.showToast(`⚠️ Der Spielername „${finalName}“ ist bereits vergeben! Jeder Name darf nur einmal existieren.`);
@@ -3376,6 +3410,7 @@ class AeryndorMMOApp {
       const nextChars = [...(acc.characters || [null, null, null, null])];
       nextChars[targetSlotIdx] = newCharObj;
 
+      let createSuccess = false;
       try {
         const res = await fetch(`${this.apiBase}/api/action`, {
           method: 'POST',
@@ -3400,10 +3435,21 @@ class AeryndorMMOApp {
           }
           return;
         }
+        if (!srvRes || srvRes.ok !== true) {
+          this.showToast(srvRes?.message || '⚠️ Fehler bei der Charaktererstellung auf dem Server.');
+          return;
+        }
+        createSuccess = true;
         if (srvRes && srvRes.name) {
           newCharObj.name = srvRes.name;
         }
-      } catch (_) {}
+      } catch (err) {
+        console.error('Character create network error:', err);
+        this.showToast('⚠️ Netzwerkfehler bei der Charaktererstellung. Bitte erneut versuchen.');
+        return;
+      }
+
+      if (!createSuccess) return;
 
       acc.characters[targetSlotIdx] = newCharObj;
       st.name = '';

@@ -625,19 +625,17 @@ class GameDatabase:
         nkey = clean_name.lower()
         excl_pid = (exclude_player_id or "").strip()
 
-        if excl_pid:
-            prow = conn.execute(
-                "SELECT player_id FROM players WHERE LOWER(TRIM(name)) = ? AND player_id != ? LIMIT 1",
-                (nkey, excl_pid),
-            ).fetchone()
-        else:
-            prow = conn.execute(
-                "SELECT player_id FROM players WHERE LOWER(TRIM(name)) = ? LIMIT 1",
-                (nkey,),
-            ).fetchone()
-        if prow is not None:
-            return True
+        # 1. Prüfe players-Tabelle mit striktem Unicode-Vergleich (inkl. aller Umlaute)
+        p_rows = conn.execute("SELECT player_id, name FROM players").fetchall()
+        for r in p_rows:
+            r_pid = str(r["player_id"] or "").strip()
+            if excl_pid and r_pid == excl_pid:
+                continue
+            r_name = str(r["name"] or "").strip().lower()
+            if r_name == nkey:
+                return True
 
+        # 2. Prüfe alle Account-Charakterlisten
         for arow in conn.execute("SELECT characters_json FROM accounts").fetchall():
             try:
                 chars = json.loads(arow["characters_json"] or "[]")
@@ -1010,9 +1008,8 @@ class GameDatabase:
                             # Verwaisten Datensatz mit gleichem Namen entfernen, damit kein Duplikat entsteht
                             self._delete_player_cascade_conn(conn, other_pid)
                         else:
-                            # Name gehört bereits einem aktiven Account-Charakter -> eindeutigen Namen erzwingen
-                            suffix = (player_id or uuid.uuid4().hex)[-4:]
-                            clean_name = f"{clean_name[:22]}_{suffix}"
+                            # Name gehört bereits einem aktiven Account-Charakter -> KEIN Duplikat erstellen!
+                            raise ValueError(f"Der Spielername '{clean_name}' ist auf dem Server bereits vergeben!")
                     name = clean_name
                     cdef = CHARACTER_CLASSES.get(class_id, CHARACTER_CLASSES["warrior"])
                     bstats = cdef["baseStats"]

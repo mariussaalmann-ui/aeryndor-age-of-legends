@@ -28,6 +28,40 @@ DB_PATH = os.path.join(DATA_DIR, "aeryndor_mmo.db")
 PATCH_DIR = os.path.join(ROOT_DIR, "patch")
 PACK_DIR = os.path.join(ROOT_DIR, "pack")
 
+TEAM_RANKS = {
+    "SA": "Server Admin",
+    "SGA": "Senior Game Admin",
+    "GA": "Game Admin",
+    "TM": "Team Manager",
+    "CM": "Community Manager",
+    "SGM": "Super Game Master",
+    "GM": "Game Master",
+    "TGM": "Trial Game Master",
+    "JGM": "Junior Game Master",
+    "EM": "Event Manager",
+    "DEV": "Developer",
+    "SUP": "Supporter",
+}
+TEAM_ACCOUNTS = {"admin", "blackzimple"}
+
+def get_team_rank_tag(raw_name: str) -> Optional[str]:
+    """Prüft, ob der Name ein geschütztes Team-Kürzel enthält oder damit beginnt."""
+    s = str(raw_name or "").strip()
+    u = s.upper()
+    sorted_ranks = sorted(TEAM_RANKS.keys(), key=len, reverse=True)
+    for r in sorted_ranks:
+        for b_open, b_close in [("[", "]"), ("(", ")"), ("{", "}"), ("<", ">")]:
+            if f"{b_open}{r}{b_close}" in u:
+                return r
+    for r in sorted_ranks:
+        for sep in ["_", "-", ".", " ", ":"]:
+            if u.startswith(f"{r}{sep}"):
+                return r
+    for r in sorted_ranks:
+        if u == r:
+            return r
+    return None
+
 sys.path.insert(0, SERVER_DIR)
 
 from database import GameDatabase
@@ -502,20 +536,14 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
 
     if action == "check_char_name":
         req_name = str(payload.get("name") or "").strip()
-        is_staff_prefix = (
-            req_name.upper().startswith("[SA]")
-            or req_name.upper().startswith("[GA]")
-            or req_name.upper().startswith("[GM]")
-        )
-        if is_staff_prefix and account_key not in ("admin", "blackzimple"):
+        team_tag = get_team_rank_tag(req_name)
+        if team_tag and account_key not in TEAM_ACCOUNTS:
             return {
                 "ok": False,
                 "available": False,
                 "normalizedName": req_name,
-                "message": "⚠️ Das Präfix [SA], [GA] oder [GM] ist dem Server-Team vorbehalten!",
+                "message": f"⚠️ Der Team-Rang [{team_tag}] ({TEAM_RANKS.get(team_tag, 'Team')}) ist dem Server-Team vorbehalten!",
             }
-        if req_name.upper().startswith("[SA]") and account_key in ("admin", "blackzimple"):
-            req_name = DB._normalize_sa_char_name(req_name)
         excl_pid = str(payload.get("excludePlayerId") or "").strip() or None
         taken = DB.is_character_name_taken(req_name, exclude_player_id=excl_pid)
         return {
@@ -531,46 +559,57 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         new_pid = str(char_obj.get("playerId") or player_id or "").strip()
         cls_id = str(char_obj.get("classId") or payload.get("classId") or "warrior").strip()
         emp = str(char_obj.get("empire") or payload.get("empire") or "seiryu").strip()
-        # Admin-Präfixe ([SA], [GA], [GM]) dürfen NUR von autorisierten Accounts verwendet werden
-        is_sa_account = account_key in ("admin", "blackzimple")
-        is_staff_prefix = (
-            req_name.upper().startswith("[SA]")
-            or req_name.upper().startswith("[GA]")
-            or req_name.upper().startswith("[GM]")
-        )
-        if is_staff_prefix and not is_sa_account:
+
+        # 1. Team-Ränge dürfen NUR von autorisierten Team-Accounts erstellt werden
+        is_team_account = account_key in TEAM_ACCOUNTS
+        team_tag = get_team_rank_tag(req_name)
+        if team_tag and not is_team_account:
             return {
                 "ok": False,
-                "reason": "forbidden_name",
-                "message": "⚠️ Das Präfix [SA], [GA] oder [GM] ist dem Server-Team vorbehalten!",
+                "reason": "forbidden_rank",
+                "message": f"⚠️ Der Team-Rang [{team_tag}] ({TEAM_RANKS.get(team_tag, 'Team')}) ist dem Server-Team vorbehalten!",
             }
 
-        # SA-Status NUR wenn der Name explizit mit [SA] beginnt UND der Account berechtigt ist
-        is_sa_create = is_sa_account and req_name.upper().startswith("[SA]")
-        base_name = req_name[4:].strip() if req_name.upper().startswith("[SA]") else req_name
+        # 2. Namenslänge prüfen
+        base_name = req_name
+        if team_tag and req_name.upper().startswith(f"[{team_tag}]"):
+            base_name = req_name[len(team_tag) + 2:].strip()
         if len(base_name) < 2 or len(base_name) > 16:
             return {
                 "ok": False,
                 "reason": "invalid_name",
                 "message": "⚠️ Bitte wähle einen gültigen Charakternamen (2–16 Zeichen).",
             }
-        if is_sa_create:
-            req_name = DB._normalize_sa_char_name(base_name)
+
+        # 3. STRIKTE DOPPELTE-NAMEN-PRÜFUNG
+        if DB.is_character_name_taken(req_name, exclude_player_id=new_pid):
+            return {
+                "ok": False,
+                "reason": "name_taken",
+                "message": f"⚠️ Der Spielername „{req_name}“ ist auf dem Server bereits vergeben! Bitte wähle einen anderen Namen.",
+            }
+
+        # 4. Rollen- und Statuszuweisung
+        is_sa_char = bool(is_team_account and team_tag == "SA")
+        is_team_char = bool(is_team_account and team_tag)
+
+        if is_team_char:
+            req_name = f"[{team_tag}]{base_name}"
+            guild_name = "Serverleitung" if team_tag in ("SA", "SGA", "GA") else f"{TEAM_RANKS.get(team_tag, 'Team')}"
             char_obj["name"] = req_name
-            char_obj["isSA"] = True
+            char_obj["isSA"] = is_sa_char
             char_obj["isGM"] = True
-            char_obj["role"] = "SA"
-            char_obj["guild"] = "Serverleitung"
+            char_obj["role"] = team_tag
+            char_obj["guild"] = guild_name
             if isinstance(payload.get("characters"), list):
                 for c_slot in payload["characters"]:
                     if isinstance(c_slot, dict) and str(c_slot.get("playerId") or "").strip() == new_pid:
                         c_slot["name"] = req_name
-                        c_slot["isSA"] = True
+                        c_slot["isSA"] = is_sa_char
                         c_slot["isGM"] = True
-                        c_slot["role"] = "SA"
-                        c_slot["guild"] = "Serverleitung"
+                        c_slot["role"] = team_tag
+                        c_slot["guild"] = guild_name
         else:
-            # Normaler Charakter: Definitiv keine GM/SA-Rechte
             char_obj["name"] = req_name
             char_obj["isSA"] = False
             char_obj["isGM"] = False
@@ -586,14 +625,16 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                         c_slot["role"] = "player"
                         if c_slot.get("guild") == "Serverleitung":
                             c_slot["guild"] = ""
-        if DB.is_character_name_taken(req_name, exclude_player_id=new_pid):
+
+        # 5. Charakter in der Datenbank anlegen
+        try:
+            DB.load_or_create_player(new_pid, req_name, cls_id, empire=emp, is_sa=is_sa_char)
+        except ValueError:
             return {
                 "ok": False,
                 "reason": "name_taken",
-                "message": f"⚠️ Der Spielername „{req_name}“ ist auf dem Server bereits vergeben! Bitte wähle einen anderen Namen.",
+                "message": f"⚠️ Der Spielername „{req_name}“ ist auf dem Server bereits vergeben!",
             }
-        # Charakter direkt in der Datenbank anlegen, damit der Name sofort global reserviert ist
-        DB.load_or_create_player(new_pid, req_name, cls_id, empire=emp, is_sa=is_sa_create)
         if account_name and isinstance(payload.get("characters"), list):
             ok_sync, msg_sync, clean_chars = DB.save_account_characters(
                 account_name, payload["characters"], payload.get("deleteCode")
@@ -603,11 +644,11 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             return {
                 "ok": True,
                 "name": req_name,
-                "isSA": is_sa_create,
-                "message": f"👑 Server-Administrator {req_name} mit allen SA-Rechten erschaffen!" if is_sa_create else f"✨ {req_name} erfolgreich erschaffen!",
+                "isSA": is_sa_char,
+                "message": f"👑 Team-Charakter {req_name} ({TEAM_RANKS.get(team_tag, 'Team')}) erschaffen!" if is_team_char else f"✨ {req_name} erfolgreich erschaffen!",
                 "characters": clean_chars,
             }
-        return {"ok": True, "name": req_name, "isSA": is_sa_create, "message": f"✨ {req_name} erfolgreich erschaffen!"}
+        return {"ok": True, "name": req_name, "isSA": is_sa_char, "message": f"✨ {req_name} erfolgreich erschaffen!"}
 
     if action == "delete_character":
         del_pid = str(payload.get("targetPlayerId") or player_id or "").strip()
