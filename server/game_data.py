@@ -18,38 +18,47 @@ RARITIES = {
         "color": "#94a3b8",
         "hex": 0x94A3B8,
         "statMult": 1.0,
-        "maxBonuses": 2,
+        "maxBonuses": 5,
     },
     "rare": {
         "id": "rare",
-        "name": "Selten",
+        "name": "Gut",
         "color": "#38bdf8",
         "hex": 0x38BDF8,
-        "statMult": 1.18,
-        "maxBonuses": 3,
+        "statMult": 1.0,
+        "maxBonuses": 5,
     },
     "epic": {
         "id": "epic",
         "name": "Episch",
         "color": "#a855f7",
         "hex": 0xA855F7,
-        "statMult": 1.40,
-        "maxBonuses": 4,
+        "statMult": 1.0,
+        "maxBonuses": 5,
     },
     "legendary": {
         "id": "legendary",
         "name": "Legendär",
         "color": "#f59e0b",
         "hex": 0xF59E0B,
-        "statMult": 1.72,
+        "statMult": 1.0,
         "maxBonuses": 5,
+    },
+    "instabil": {
+        "id": "instabil",
+        "name": "Instabil",
+        "color": "#22d3ee",
+        "hex": 0x22D3EE,
+        "statMult": 1.0,
+        "maxBonuses": 5,
+        "isMaxRoll": True,
     },
     "mythic": {
         "id": "mythic",
         "name": "Mythisch",
         "color": "#ef4444",
         "hex": 0xEF4444,
-        "statMult": 2.15,
+        "statMult": 1.0,
         "maxBonuses": 5,
     },
 }
@@ -127,7 +136,7 @@ CHARACTER_CLASSES = {
             "accentColor": 0xF59E0B,
             "capeColor": 0x991B1B,
             "helmetType": "horned",
-            "defaultWeapon": "sword_broadsword",
+            "defaultWeapon": "wpn_holz_sword",
             "hasShield": True,
         },
         "skills": [
@@ -265,7 +274,7 @@ CHARACTER_CLASSES = {
             "accentColor": 0x10B981,
             "capeColor": 0x047857,
             "helmetType": "hood",
-            "defaultWeapon": "sword_broadsword",
+            "defaultWeapon": "wpn_holz_sword",
             "hasShield": False,
         },
         "skills": [
@@ -404,7 +413,7 @@ CHARACTER_CLASSES = {
             "accentColor": 0xA855F7,
             "capeColor": 0x581C87,
             "helmetType": "knight",
-            "defaultWeapon": "sword_broadsword",
+            "defaultWeapon": "wpn_holz_sword",
             "hasShield": True,
         },
         "skills": [
@@ -543,7 +552,7 @@ CHARACTER_CLASSES = {
             "accentColor": 0xFDE047,
             "capeColor": 0xB45309,
             "helmetType": "crown",
-            "defaultWeapon": "bell_amber",
+            "defaultWeapon": "wpn_holz_staff",
             "hasShield": False,
         },
         "skills": [
@@ -694,9 +703,9 @@ MAPS = {
         "number": 1,
         "name": "Die Heimatlande & Herbstauen (Morgenwacht)",
         "subtitle": "Nahtlose Open World • 2800x2800m Kontinent • Kaeryu, Seiryu & Bakra • Weol-Denkmal • Map 1 & Map 2 • Dungeon-Portal",
-        "levelRange": "Lv. 1 – 35",
+        "levelRange": "Lv. 1 – 38",
         "minLevel": 1,
-        "maxLevel": 40,
+        "maxLevel": 37,
         "badgeColor": "#22c55e",
         "pinX": 14,
         "pinY": 49,
@@ -705,28 +714,28 @@ MAPS = {
         "safeZone": {"x": 820.0, "z": -780.0, "radius": 145.0, "name": "Kaeryu, Seiryu & Handelsstadt Bakra"},
         "spawnPoint": {"x": 790.0, "z": -740.0},
         "portals": [],
-        "description": "Riesige, nahtlose 2800x2800m Open World: Im Nordwesten thront die Stadt Kaeryu, im Nordosten die Stadt Seiryu und im nördlichen Zentrum das Dungeon-Portal zu den Äther-Katakomben umgeben vom nördlichen Map-1-Levelbereich. Im Süden von Map 1, direkt oberhalb des Silberstroms, erhebt sich das monumentale Weol-Denkmal mit seiner Weißer-Eid-Garnison. Über die 2 äußeren Steinbrücken im Westen und Osten führt der Weg über den Silberstrom in die herbstliche Map 2 bis hinunter zur neutralen Hafenstadt Bakra und dem türkisblauen Südstrand.",
+        "description": "Riesige, nahtlose 2800x2800m Open World: Im Nordwesten thront die Stadt Kaeryu, im Nordosten die Stadt Seiryu und im nördlichen Zentrum das Dungeon-Portal zu den Äther-Katakomben umgeben vom nördlichen Map-1-Levelbereich. Im Süden von Map 1, direkt oberhalb des Silberstroms, erhebt sich das monumentale Weol-Denkmal mit seiner Weißer-Eid-Garnison (Lv. 16–22). Über die 2 äußeren Steinbrücken im Westen und Osten führt der Weg über den Silberstrom in die herbstliche Map 2 (Anfangsgebiet Lv. 23–29, Hauptgebiet Lv. 30–38) bis hinunter zur neutralen Hafenstadt Bakra und dem türkisblauen Südstrand.",
         "zones": [
-            {"id": "town_kaeryu", "name": "Stadt Kaeryu (Nordwesten • Das Tal der Bewahrer)", "x": -820, "z": -780, "spawnX": -790, "spawnZ": -740, "radius": 145, "safe": True, "level": "Sicher", "minLevel": 1},
-            {"id": "town_seiryu", "name": "Stadt Seiryu (Nordosten • Die Wacht der Grenzlande)", "x": 820, "z": -780, "spawnX": 790, "spawnZ": -740, "radius": 145, "safe": True, "level": "Sicher", "minLevel": 1},
+            {"id": "town_kaeryu", "name": "Stadt Kaeryu (Nordwesten • Die Stadt der Wächter)", "x": -820, "z": -780, "spawnX": -790, "spawnZ": -740, "radius": 145, "safe": True, "level": "Sicher", "minLevel": 1},
+            {"id": "town_seiryu", "name": "Stadt Seiryu (Nordosten • Die Stadt des Wissens)", "x": 820, "z": -780, "spawnX": 790, "spawnZ": -740, "radius": 145, "safe": True, "level": "Sicher", "minLevel": 1},
             {"id": "dungeon_aether_catacombs", "name": "Dungeon-Portal: Äther-Katakomben (Nördliches Plateau)", "x": 0, "z": -1020, "spawnX": 0, "spawnZ": -965, "radius": 45, "safe": True, "level": "Dungeon", "minLevel": 1},
             {"id": "wheol_denkmal", "name": "Weol-Denkmal (Süden von Map 1 • Oberhalb des Silberstroms)", "x": 0, "z": -180, "spawnX": 0, "spawnZ": -245, "radius": 48, "safe": True, "level": "Heiligtum", "minLevel": 1},
-            {"id": "town_bakra", "name": "Handelsstadt: Bakra & Hafen (Süden • Neutrale Hafenstadt)", "x": 0, "z": 880, "spawnX": 0, "spawnZ": 835, "radius": 155, "safe": True, "level": "Sicher", "minLevel": 1},
-            {"id": "m1_kaeryu_meadows", "name": "Westliche Kaeryu-Wiesen (Map 1 • Lv. 1–4)", "x": -560, "z": -680, "spawnX": -560, "spawnZ": -680, "radius": 140, "safe": False, "level": "Lv. 1–4", "minLevel": 1},
-            {"id": "m1_seiryu_meadows", "name": "Östliche Seiryu-Wiesen (Map 1 • Lv. 1–4)", "x": 560, "z": -680, "spawnX": 560, "spawnZ": -680, "radius": 140, "safe": False, "level": "Lv. 1–4", "minLevel": 1},
-            {"id": "m1_north_steppe", "name": "Nördlicher Map-1-Levelbereich & Dungeon-Vorfeld (Wölfe, Keiler & Bären • Lv. 3–8)", "x": 0, "z": -760, "spawnX": 0, "spawnZ": -760, "radius": 185, "safe": False, "level": "Lv. 3–8", "minLevel": 1},
-            {"id": "m1_west_grasland", "name": "Großes West-Grasland & Lichtungen (Map 1 • Lv. 4–8)", "x": -620, "z": -360, "radius": 165, "safe": False, "level": "Lv. 4–8", "minLevel": 1},
-            {"id": "m1_central_meadows", "name": "Riesige Zentralwiesen von Map 1 (Wiesen & Haine • Lv. 5–10)", "x": 0, "z": -450, "spawnX": 0, "spawnZ": -450, "radius": 190, "safe": False, "level": "Lv. 5–10", "minLevel": 1},
-            {"id": "m1_east_grasland", "name": "Großes Ost-Grasland & Hügel (Map 1 • Lv. 4–8)", "x": 620, "z": -360, "radius": 165, "safe": False, "level": "Lv. 4–8", "minLevel": 1},
-            {"id": "m1_river_meadows_west", "name": "Nördliche Silberstrom-Auen West (Map 1 • Lv. 7–12)", "x": -560, "z": -150, "radius": 150, "safe": False, "level": "Lv. 7–12", "minLevel": 1},
-            {"id": "m1_river_meadows_center", "name": "Weol-Denkmal & Vorfeld oberhalb des Flusses (Weißer-Eid-Garnison • Lv. 12–18)", "x": 0, "z": -230, "spawnX": 0, "spawnZ": -255, "radius": 175, "safe": False, "level": "Lv. 12–18", "minLevel": 1},
-            {"id": "m1_river_meadows_east", "name": "Nördliche Silberstrom-Auen Ost (Map 1 • Lv. 7–12)", "x": 560, "z": -150, "radius": 150, "safe": False, "level": "Lv. 7–12", "minLevel": 1},
-            {"id": "m2_autumn_north_west", "name": "Nordwestliche Bakra-Herbstwiesen (Schwarzwind-Vorhut • Lv. 19–25)", "x": -520, "z": 185, "spawnX": -520, "spawnZ": 185, "radius": 160, "safe": False, "level": "Lv. 19–25", "minLevel": 1},
-            {"id": "m2_autumn_north_center", "name": "Goldenes Bakra-Herbsttal (Schwarzwind-Soldaten & Schützen • Lv. 20–26)", "x": 0, "z": 195, "spawnX": 0, "spawnZ": 195, "radius": 165, "safe": False, "level": "Lv. 20–26", "minLevel": 1},
-            {"id": "m2_autumn_north_east", "name": "Nordöstliche Bakra-Ahornwälder (Jak-To & Infanteristen • Lv. 20–26)", "x": 520, "z": 185, "spawnX": 520, "spawnZ": 185, "radius": 160, "safe": False, "level": "Lv. 20–26", "minLevel": 1},
-            {"id": "m2_autumn_heart_west", "name": "Westliches Bakra-Hochland (Infanteristen & To-Su Eliten • Lv. 26–32)", "x": -580, "z": 470, "radius": 170, "safe": False, "level": "Lv. 26–32", "minLevel": 1},
-            {"id": "m2_autumn_heart_center", "name": "Zentrale Gelbwiesen vor Bakra (Schwarzwind-Heerlager • Lv. 27–34)", "x": 0, "z": 480, "spawnX": 0, "spawnZ": 480, "radius": 180, "safe": False, "level": "Lv. 27–34", "minLevel": 1},
-            {"id": "m2_autumn_heart_east", "name": "Östliches Bakra-Tal (Wilde Ergebene & Generäle • Lv. 28–35)", "x": 580, "z": 470, "radius": 170, "safe": False, "level": "Lv. 28–35", "minLevel": 1},
+            {"id": "town_bakra", "name": "Handelsstadt: Bakra & Hafen (Süden • Die Stadt des herbstlichen Südens)", "x": 0, "z": 880, "spawnX": 0, "spawnZ": 835, "radius": 155, "safe": True, "level": "Sicher", "minLevel": 1},
+            {"id": "m1_kaeryu_meadows", "name": "Westliche Kaeryu-Wiesen (Map 1 • Lv. 1–8)", "x": -560, "z": -680, "spawnX": -560, "spawnZ": -680, "radius": 140, "safe": False, "level": "Lv. 1–8", "minLevel": 1},
+            {"id": "m1_seiryu_meadows", "name": "Östliche Seiryu-Wiesen (Map 1 • Lv. 1–8)", "x": 560, "z": -680, "spawnX": 560, "spawnZ": -680, "radius": 140, "safe": False, "level": "Lv. 1–8", "minLevel": 1},
+            {"id": "m1_north_steppe", "name": "Nördlicher Map-1-Levelbereich & Dungeon-Vorfeld (Hunde, Keiler & Wölfe • Lv. 1–8)", "x": 0, "z": -760, "spawnX": 0, "spawnZ": -760, "radius": 185, "safe": False, "level": "Lv. 1–8", "minLevel": 1},
+            {"id": "m1_west_grasland", "name": "Großes West-Grasland & Lichtungen (Bären & Tiger • Lv. 9–15)", "x": -620, "z": -360, "radius": 165, "safe": False, "level": "Lv. 9–15", "minLevel": 1},
+            {"id": "m1_central_meadows", "name": "Riesige Zentralwiesen von Map 1 (Bären & Tiger • Lv. 9–15)", "x": 0, "z": -450, "spawnX": 0, "spawnZ": -450, "radius": 190, "safe": False, "level": "Lv. 9–15", "minLevel": 1},
+            {"id": "m1_east_grasland", "name": "Großes Ost-Grasland & Hügel (Bären & Tiger • Lv. 9–15)", "x": 620, "z": -360, "radius": 165, "safe": False, "level": "Lv. 9–15", "minLevel": 1},
+            {"id": "m1_river_meadows_west", "name": "Nördliche Silberstrom-Auen West (Bären & Tiger • Lv. 9–15)", "x": -560, "z": -150, "radius": 150, "safe": False, "level": "Lv. 9–15", "minLevel": 1},
+            {"id": "m1_river_meadows_center", "name": "Weol-Denkmal & Vorfeld oberhalb des Flusses (Eid-Kämpfer • Lv. 16–22)", "x": 0, "z": -230, "spawnX": 0, "spawnZ": -255, "radius": 175, "safe": False, "level": "Lv. 16–22", "minLevel": 1},
+            {"id": "m1_river_meadows_east", "name": "Nördliche Silberstrom-Auen Ost (Bären & Tiger • Lv. 9–15)", "x": 560, "z": -150, "radius": 150, "safe": False, "level": "Lv. 9–15", "minLevel": 1},
+            {"id": "m2_autumn_north_west", "name": "Nordwestliche Bakra-Herbstwiesen (Map-2-Anfangsgebiet • Lv. 23–29)", "x": -520, "z": 185, "spawnX": -520, "spawnZ": 185, "radius": 160, "safe": False, "level": "Lv. 23–29", "minLevel": 1},
+            {"id": "m2_autumn_north_center", "name": "Goldenes Bakra-Herbsttal (Map-2-Anfangsgebiet • Lv. 23–29)", "x": 0, "z": 195, "spawnX": 0, "spawnZ": 195, "radius": 165, "safe": False, "level": "Lv. 23–29", "minLevel": 1},
+            {"id": "m2_autumn_north_east", "name": "Nordöstliche Bakra-Ahornwälder (Map-2-Anfangsgebiet • Lv. 23–29)", "x": 520, "z": 185, "spawnX": 520, "spawnZ": 185, "radius": 160, "safe": False, "level": "Lv. 23–29", "minLevel": 1},
+            {"id": "m2_autumn_heart_west", "name": "Westliches Bakra-Hochland (Map-2-Hauptgebiet • Lv. 30–38)", "x": -580, "z": 470, "radius": 170, "safe": False, "level": "Lv. 30–38", "minLevel": 1},
+            {"id": "m2_autumn_heart_center", "name": "Zentrale Gelbwiesen vor Bakra (Map-2-Hauptgebiet • Lv. 30–38)", "x": 0, "z": 480, "spawnX": 0, "spawnZ": 480, "radius": 180, "safe": False, "level": "Lv. 30–38", "minLevel": 1},
+            {"id": "m2_autumn_heart_east", "name": "Östliches Bakra-Tal (Map-2-Hauptgebiet • Lv. 30–38)", "x": 580, "z": 470, "radius": 170, "safe": False, "level": "Lv. 30–38", "minLevel": 1},
             {"id": "bakra_strand", "name": "Südlicher Sandstrand & Türkisbucht von Bakra", "x": 0, "z": 1060, "spawnX": 0, "spawnZ": 1030, "radius": 150, "safe": True, "level": "Strand", "minLevel": 1},
             {"id": "boss_arena_west", "name": "Westliches Gebirgs-Bossgebiet nahe Kaeryu", "x": -1080, "z": -480, "spawnX": -1010, "spawnZ": -480, "radius": 95, "safe": False, "level": "Boss", "minLevel": 1},
             {"id": "boss_arena_east", "name": "Östliches Gebirgs-Bossgebiet nahe Seiryu", "x": 1080, "z": -480, "spawnX": 1010, "spawnZ": -480, "radius": 95, "safe": False, "level": "Boss", "minLevel": 1},
@@ -740,7 +749,7 @@ MAPS = {
 # ============================================================================
 MONSTER_TEMPLATES = {
     # =========================================================================
-    # MAP 1: MORGENWACHT – GEBIET 1 (STARTGEBIET LV. 1–6 & RISSMONOLITHEN LV. 5, 10)
+    # MAP 1: MORGENWACHT – GEBIET 1 (HUNDE, KEILER & WÖLFE LV. 1–8 -> WOLFSKRALLE)
     # =========================================================================
     "stray_dog": {
         "id": "stray_dog",
@@ -759,8 +768,8 @@ MONSTER_TEMPLATES = {
         "attackInterval": 1.5,
         "respawnSec": 25.0,
         "exp": 48,
-        "yangMin": 35,
-        "yangMax": 78,
+        "yangMin": 16,
+        "yangMax": 34,
         "icon": "wild_dog",
         "modelType": "canine_dog",
         "glbModel": "pewi_stray_dog",
@@ -768,10 +777,11 @@ MONSTER_TEMPLATES = {
         "color": 0x92400E,
         "scale": 0.90,
         "drops": [
-            {"itemId": "potion_hp_small", "chance": 0.45},
-            {"itemId": "mat_wolf_claw", "chance": 0.22},
-            {"itemId": "sword_broadsword", "chance": 0.09},
-            {"itemId": "armor_leather", "chance": 0.09},
+            {"itemId": "potion_hp_small", "chance": 0.35},
+            {"itemId": "mat_wolf_claw", "chance": 0.24},
+            {"itemId": "wpn_holz_sword", "chance": 0.06},
+            {"itemId": "arm_holz_armor", "chance": 0.06},
+            {"itemId": "eq_holz_gloves", "chance": 0.06},
         ],
     },
     "wild_dog": {
@@ -791,8 +801,8 @@ MONSTER_TEMPLATES = {
         "attackInterval": 1.45,
         "respawnSec": 25.0,
         "exp": 68,
-        "yangMin": 48,
-        "yangMax": 98,
+        "yangMin": 20,
+        "yangMax": 42,
         "icon": "wild_dog",
         "modelType": "canine_dog",
         "glbModel": "pewi_stray_dog",
@@ -800,11 +810,11 @@ MONSTER_TEMPLATES = {
         "color": 0x92400E,
         "scale": 0.96,
         "drops": [
-            {"itemId": "potion_hp_small", "chance": 0.42},
+            {"itemId": "potion_hp_small", "chance": 0.34},
             {"itemId": "mat_wolf_claw", "chance": 0.26},
-            {"itemId": "sword_broadsword", "chance": 0.08},
-            {"itemId": "glaive_iron", "chance": 0.08},
-            {"itemId": "armor_leather", "chance": 0.08},
+            {"itemId": "wpn_holz_daggers", "chance": 0.06},
+            {"itemId": "eq_holz_shoes", "chance": 0.06},
+            {"itemId": "eq_holz_belt", "chance": 0.06},
         ],
     },
     "grey_wolf": {
@@ -814,18 +824,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 3,
-        "hp": 720,
-        "atk": 39,
-        "def": 16,
+        "level": 4,
+        "hp": 840,
+        "atk": 44,
+        "def": 19,
         "speed": 4.7,
         "aggroRadius": 0.0,
         "attackRange": 2.4,
         "attackInterval": 1.4,
         "respawnSec": 25.0,
-        "exp": 95,
-        "yangMin": 68,
-        "yangMax": 140,
+        "exp": 115,
+        "yangMin": 28,
+        "yangMax": 58,
         "icon": "grey_wolf",
         "modelType": "canine_wolf",
         "glbModel": "pewi_stray_dog",
@@ -833,12 +843,11 @@ MONSTER_TEMPLATES = {
         "color": 0x64748B,
         "scale": 1.08,
         "drops": [
-            {"itemId": "mat_wolf_claw", "chance": 0.35},
-            {"itemId": "potion_hp_small", "chance": 0.38},
-            {"itemId": "helm_iron", "chance": 0.10},
-            {"itemId": "shield_battle", "chance": 0.10},
-            {"itemId": "shoes_leather", "chance": 0.10},
-            {"itemId": "bow_horn", "chance": 0.08},
+            {"itemId": "mat_wolf_claw", "chance": 0.30},
+            {"itemId": "potion_hp_small", "chance": 0.32},
+            {"itemId": "eq_holz_helmet", "chance": 0.06},
+            {"itemId": "eq_holz_shield", "chance": 0.06},
+            {"itemId": "wpn_holz_bow", "chance": 0.06},
         ],
     },
     "wild_boar": {
@@ -848,18 +857,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 4,
-        "hp": 950,
-        "atk": 50,
-        "def": 21,
+        "level": 6,
+        "hp": 1180,
+        "atk": 58,
+        "def": 25,
         "speed": 4.6,
         "aggroRadius": 0.0,
         "attackRange": 2.5,
         "attackInterval": 1.4,
         "respawnSec": 25.0,
-        "exp": 125,
-        "yangMin": 88,
-        "yangMax": 185,
+        "exp": 165,
+        "yangMin": 38,
+        "yangMax": 76,
         "icon": "mount_war_boar",
         "modelType": "canine_wolf",
         "glbModel": "mr_pewi_boar",
@@ -867,10 +876,11 @@ MONSTER_TEMPLATES = {
         "color": 0x78350F,
         "scale": 1.12,
         "drops": [
-            {"itemId": "mat_wolf_claw", "chance": 0.40},
-            {"itemId": "potion_hp_small", "chance": 0.38},
-            {"itemId": "glaive_iron", "chance": 0.10},
-            {"itemId": "armor_leather", "chance": 0.10},
+            {"itemId": "mat_wolf_claw", "chance": 0.32},
+            {"itemId": "potion_hp_small", "chance": 0.32},
+            {"itemId": "wpn_holz_greatsword", "chance": 0.06},
+            {"itemId": "eq_holz_necklace", "chance": 0.06},
+            {"itemId": "eq_holz_earrings", "chance": 0.06},
         ],
     },
     "alpha_bloodwolf": {
@@ -880,18 +890,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 5,
-        "hp": 1220,
-        "atk": 62,
-        "def": 26,
+        "level": 7,
+        "hp": 1450,
+        "atk": 68,
+        "def": 29,
         "speed": 4.9,
         "aggroRadius": 0.0,
         "attackRange": 2.5,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 165,
-        "yangMin": 115,
-        "yangMax": 235,
+        "exp": 198,
+        "yangMin": 45,
+        "yangMax": 90,
         "icon": "frost_wolf",
         "modelType": "canine_alpha",
         "glbModel": "pewi_stray_dog",
@@ -899,12 +909,10 @@ MONSTER_TEMPLATES = {
         "color": 0x991B1B,
         "scale": 1.18,
         "drops": [
-            {"itemId": "mat_wolf_claw", "chance": 0.48},
-            {"itemId": "sword_silver", "chance": 0.12},
-            {"itemId": "bow_horn", "chance": 0.12},
-            {"itemId": "armor_tiger", "chance": 0.12},
-            {"itemId": "bracelet_silver", "chance": 0.12},
-            {"itemId": "scroll_blessing", "chance": 0.12},
+            {"itemId": "mat_wolf_claw", "chance": 0.35},
+            {"itemId": "wpn_holz_staff", "chance": 0.06},
+            {"itemId": "arm_holz_armor", "chance": 0.06},
+            {"itemId": "eq_holz_bracelet", "chance": 0.06},
         ],
     },
     "red_boar": {
@@ -914,18 +922,18 @@ MONSTER_TEMPLATES = {
         "isElite": True,
         "isBoss": False,
         "isAggressive": False,
-        "level": 6,
-        "hp": 1600,
-        "atk": 75,
-        "def": 32,
+        "level": 8,
+        "hp": 1950,
+        "atk": 80,
+        "def": 35,
         "speed": 4.8,
         "aggroRadius": 0.0,
         "attackRange": 2.6,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 215,
-        "yangMin": 150,
-        "yangMax": 310,
+        "exp": 255,
+        "yangMin": 55,
+        "yangMax": 110,
         "icon": "mount_war_boar",
         "modelType": "canine_alpha",
         "glbModel": "mr_pewi_boar",
@@ -933,14 +941,15 @@ MONSTER_TEMPLATES = {
         "color": 0xB91C1C,
         "scale": 1.24,
         "drops": [
-            {"itemId": "potion_hp_medium", "chance": 0.42},
-            {"itemId": "mat_cursed_iron", "chance": 0.32},
-            {"itemId": "armor_tiger", "chance": 0.14},
-            {"itemId": "scroll_blessing", "chance": 0.15},
+            {"itemId": "potion_hp_medium", "chance": 0.32},
+            {"itemId": "mat_wolf_claw", "chance": 0.42},
+            {"itemId": "wpn_holz_sword", "chance": 0.07},
+            {"itemId": "eq_holz_shield", "chance": 0.07},
+            {"itemId": "eq_holz_belt", "chance": 0.07},
         ],
     },
     # =========================================================================
-    # MAP 1: MORGENWACHT – GEBIET 2 (BÄREN & TIGER LV. 10–18 & RISSMONOLITHEN LV. 15, 20)
+    # MAP 1: MORGENWACHT – GEBIET 2 (BÄREN & TIGER LV. 9–15 -> BÄRENGALLE / TIGERFELL)
     # =========================================================================
     "forest_bear": {
         "id": "forest_bear",
@@ -949,18 +958,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 10,
-        "hp": 2550,
-        "atk": 88,
-        "def": 47,
+        "level": 9,
+        "hp": 2350,
+        "atk": 84,
+        "def": 44,
         "speed": 4.3,
         "aggroRadius": 0.0,
         "attackRange": 2.8,
         "attackInterval": 1.5,
         "respawnSec": 25.0,
-        "exp": 368,
-        "yangMin": 220,
-        "yangMax": 430,
+        "exp": 325,
+        "yangMin": 65,
+        "yangMax": 125,
         "icon": "forest_bear",
         "modelType": "bear",
         "glbModel": "pewi_bear",
@@ -968,10 +977,44 @@ MONSTER_TEMPLATES = {
         "color": 0x5C3A21,
         "scale": 1.34,
         "drops": [
-            {"itemId": "potion_hp_medium", "chance": 0.40},
-            {"itemId": "mat_cursed_iron", "chance": 0.32},
-            {"itemId": "armor_tiger", "chance": 0.12},
-            {"itemId": "necklace_ebony", "chance": 0.11},
+            {"itemId": "potion_hp_medium", "chance": 0.30},
+            {"itemId": "mat_bear_gall", "chance": 0.28},
+            {"itemId": "arm_holz_armor", "chance": 0.06},
+            {"itemId": "eq_holz_helmet", "chance": 0.06},
+            {"itemId": "eq_holz_belt", "chance": 0.06},
+        ],
+    },
+    "striped_tiger": {
+        "id": "striped_tiger",
+        "name": "Streifentiger der Morgenwacht",
+        "kind": "monster",
+        "isElite": False,
+        "isBoss": False,
+        "isAggressive": False,
+        "level": 11,
+        "hp": 2850,
+        "atk": 96,
+        "def": 50,
+        "speed": 5.0,
+        "aggroRadius": 0.0,
+        "attackRange": 2.7,
+        "attackInterval": 1.35,
+        "respawnSec": 25.0,
+        "exp": 410,
+        "yangMin": 78,
+        "yangMax": 150,
+        "icon": "frost_wolf",
+        "modelType": "canine_alpha",
+        "glbModel": "pewi_tiger",
+        "glbTextures": ["pewi_tiger_col1.png"],
+        "color": 0xD97706,
+        "scale": 1.22,
+        "drops": [
+            {"itemId": "potion_hp_medium", "chance": 0.30},
+            {"itemId": "mat_tiger_hide", "chance": 0.28},
+            {"itemId": "wpn_kupfer_daggers", "chance": 0.06},
+            {"itemId": "wpn_kupfer_bow", "chance": 0.06},
+            {"itemId": "eq_kupfer_shoes", "chance": 0.06},
         ],
     },
     "grizzly_bear": {
@@ -981,18 +1024,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 12,
-        "hp": 3100,
-        "atk": 104,
-        "def": 54,
+        "level": 13,
+        "hp": 3350,
+        "atk": 110,
+        "def": 56,
         "speed": 4.4,
         "aggroRadius": 0.0,
         "attackRange": 2.8,
         "attackInterval": 1.45,
         "respawnSec": 25.0,
-        "exp": 455,
-        "yangMin": 270,
-        "yangMax": 520,
+        "exp": 495,
+        "yangMin": 92,
+        "yangMax": 175,
         "icon": "forest_bear",
         "modelType": "bear",
         "glbModel": "pewi_bear",
@@ -1000,42 +1043,11 @@ MONSTER_TEMPLATES = {
         "color": 0x4A3222,
         "scale": 1.40,
         "drops": [
-            {"itemId": "potion_hp_medium", "chance": 0.42},
-            {"itemId": "mat_cursed_iron", "chance": 0.36},
-            {"itemId": "armor_tiger", "chance": 0.14},
-            {"itemId": "scroll_blessing", "chance": 0.15},
-        ],
-    },
-    "white_tiger": {
-        "id": "white_tiger",
-        "name": "Tiger der Morgenwacht",
-        "kind": "monster",
-        "isElite": False,
-        "isBoss": False,
-        "isAggressive": False,
-        "level": 14,
-        "hp": 3680,
-        "atk": 119,
-        "def": 60,
-        "speed": 5.2,
-        "aggroRadius": 0.0,
-        "attackRange": 2.7,
-        "attackInterval": 1.3,
-        "respawnSec": 25.0,
-        "exp": 535,
-        "yangMin": 330,
-        "yangMax": 620,
-        "icon": "frost_wolf",
-        "modelType": "canine_alpha",
-        "glbModel": "pewi_tiger",
-        "glbTextures": ["pewi_tiger_col1.png"],
-        "color": 0xD97706,
-        "scale": 1.28,
-        "drops": [
-            {"itemId": "mat_wolf_claw", "chance": 0.48},
-            {"itemId": "armor_tiger", "chance": 0.16},
-            {"itemId": "sword_silver", "chance": 0.14},
-            {"itemId": "scroll_blessing", "chance": 0.18},
+            {"itemId": "potion_hp_medium", "chance": 0.32},
+            {"itemId": "mat_bear_gall", "chance": 0.30},
+            {"itemId": "wpn_kupfer_greatsword", "chance": 0.06},
+            {"itemId": "arm_kupfer_armor", "chance": 0.06},
+            {"itemId": "eq_kupfer_helmet", "chance": 0.06},
         ],
     },
     "black_bear": {
@@ -1045,18 +1057,18 @@ MONSTER_TEMPLATES = {
         "isElite": True,
         "isBoss": False,
         "isAggressive": False,
-        "level": 16,
-        "hp": 4650,
-        "atk": 152,
-        "def": 72,
+        "level": 14,
+        "hp": 4250,
+        "atk": 136,
+        "def": 66,
         "speed": 4.6,
         "aggroRadius": 0.0,
         "attackRange": 2.9,
         "attackInterval": 1.4,
         "respawnSec": 25.0,
-        "exp": 580,
-        "yangMin": 410,
-        "yangMax": 760,
+        "exp": 565,
+        "yangMin": 105,
+        "yangMax": 195,
         "icon": "forest_bear",
         "modelType": "bear",
         "glbModel": "pewi_bear",
@@ -1064,10 +1076,42 @@ MONSTER_TEMPLATES = {
         "color": 0x1E293B,
         "scale": 1.50,
         "drops": [
-            {"itemId": "mat_cursed_iron", "chance": 0.45},
-            {"itemId": "sword_silver", "chance": 0.16},
-            {"itemId": "armor_tiger", "chance": 0.18},
-            {"itemId": "scroll_blessing", "chance": 0.22},
+            {"itemId": "mat_bear_gall", "chance": 0.38},
+            {"itemId": "eq_kupfer_shield", "chance": 0.07},
+            {"itemId": "eq_kupfer_gloves", "chance": 0.07},
+            {"itemId": "eq_kupfer_belt", "chance": 0.07},
+        ],
+    },
+    "white_tiger": {
+        "id": "white_tiger",
+        "name": "Tiger der Morgenwacht",
+        "kind": "monster",
+        "isElite": False,
+        "isBoss": False,
+        "isAggressive": False,
+        "level": 15,
+        "hp": 3880,
+        "atk": 124,
+        "def": 62,
+        "speed": 5.2,
+        "aggroRadius": 0.0,
+        "attackRange": 2.7,
+        "attackInterval": 1.3,
+        "respawnSec": 25.0,
+        "exp": 575,
+        "yangMin": 110,
+        "yangMax": 205,
+        "icon": "frost_wolf",
+        "modelType": "canine_alpha",
+        "glbModel": "pewi_tiger",
+        "glbTextures": ["pewi_tiger_col1.png"],
+        "color": 0xD97706,
+        "scale": 1.28,
+        "drops": [
+            {"itemId": "mat_tiger_hide", "chance": 0.30},
+            {"itemId": "wpn_kupfer_sword", "chance": 0.06},
+            {"itemId": "wpn_kupfer_staff", "chance": 0.06},
+            {"itemId": "eq_kupfer_necklace", "chance": 0.06},
         ],
     },
     "king_tiger": {
@@ -1077,18 +1121,18 @@ MONSTER_TEMPLATES = {
         "isElite": True,
         "isBoss": False,
         "isAggressive": False,
-        "level": 18,
-        "hp": 5600,
-        "atk": 172,
-        "def": 80,
+        "level": 15,
+        "hp": 4950,
+        "atk": 154,
+        "def": 72,
         "speed": 5.4,
         "aggroRadius": 0.0,
         "attackRange": 2.8,
         "attackInterval": 1.25,
         "respawnSec": 25.0,
-        "exp": 720,
-        "yangMin": 510,
-        "yangMax": 940,
+        "exp": 660,
+        "yangMin": 125,
+        "yangMax": 230,
         "icon": "frost_wolf",
         "modelType": "canine_alpha",
         "glbModel": "pewi_tiger",
@@ -1096,14 +1140,13 @@ MONSTER_TEMPLATES = {
         "color": 0xE2E8F0,
         "scale": 1.40,
         "drops": [
-            {"itemId": "mat_wolf_claw", "chance": 0.55},
-            {"itemId": "sword_msk", "chance": 0.12},
-            {"itemId": "sword_silver", "chance": 0.18},
-            {"itemId": "scroll_blessing", "chance": 0.25},
-            {"itemId": "item_bonus_changer", "chance": 0.18},
+            {"itemId": "mat_tiger_hide", "chance": 0.38},
+            {"itemId": "eq_kupfer_bracelet", "chance": 0.07},
+            {"itemId": "eq_kupfer_earrings", "chance": 0.07},
+            {"itemId": "arm_kupfer_armor", "chance": 0.07},
         ],
     },
-    # --- MAP 1 RISSMONOLITHEN: GEBIET 1 (LV. 5 & 10) + GEBIET 2 (LV. 15 & 20) ---
+    # --- MAP 1 RISSMONOLITHEN: LV. 5, 10, 15, 20 ---
     "metin_sorrow": {
         "id": "metin_sorrow",
         "name": "Rissmonolith des Erwachens",
@@ -1124,20 +1167,18 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 1150,
-        "yangMin": 650,
-        "yangMax": 1250,
+        "yangMin": 280,
+        "yangMax": 520,
         "icon": "monolith_common",
         "modelType": "metin_crystal",
         "color": 0x38BDF8,
         "scale": 1.32,
         "waveMonster": "grey_wolf",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 0.65},
-            {"itemId": "scroll_blessing", "chance": 0.45},
-            {"itemId": "item_bonus_changer", "chance": 0.35},
-            {"itemId": "sword_silver", "chance": 0.25},
-            {"itemId": "bow_horn", "chance": 0.20},
+            {"itemId": "mat_monolith_shard", "chance": 0.20},
+            {"itemId": "wpn_holz_sword", "chance": 0.22},
+            {"itemId": "wpn_holz_bow", "chance": 0.18},
+            {"itemId": "arm_holz_armor", "chance": 0.20},
         ],
     },
     "metin_combat": {
@@ -1160,22 +1201,19 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 1850,
-        "yangMin": 1050,
-        "yangMax": 1950,
+        "yangMin": 450,
+        "yangMax": 820,
         "icon": "monolith_common",
         "modelType": "metin_crystal",
         "color": 0x22C55E,
         "scale": 1.44,
         "waveMonster": "forest_bear",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 0.75},
-            {"itemId": "scroll_blessing", "chance": 0.52},
-            {"itemId": "item_bonus_changer", "chance": 0.42},
-            {"itemId": "sword_silver", "chance": 0.28},
-            {"itemId": "armor_tiger", "chance": 0.24},
-            {"itemId": "staff_jade", "chance": 0.24},
-            {"itemId": "dagger_viper", "chance": 0.24},
+            {"itemId": "mat_monolith_shard", "chance": 0.22},
+            {"itemId": "wpn_kupfer_sword", "chance": 0.22},
+            {"itemId": "arm_kupfer_armor", "chance": 0.22},
+            {"itemId": "wpn_kupfer_staff", "chance": 0.20},
+            {"itemId": "wpn_kupfer_daggers", "chance": 0.20},
         ],
     },
     "metin_battle": {
@@ -1198,22 +1236,18 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 2850,
-        "yangMin": 1650,
-        "yangMax": 2950,
+        "yangMin": 680,
+        "yangMax": 1220,
         "icon": "monolith_corrupted",
         "modelType": "metin_crystal",
         "color": 0xA855F7,
         "scale": 1.56,
         "waveMonster": "white_tiger",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 0.85},
-            {"itemId": "scroll_blessing", "chance": 0.60},
-            {"itemId": "item_bonus_adder", "chance": 0.45},
-            {"itemId": "item_bonus_changer", "chance": 0.50},
-            {"itemId": "sword_msk", "chance": 0.22},
-            {"itemId": "armor_blacksteel", "chance": 0.18},
-            {"itemId": "staff_dragon", "chance": 0.22},
+            {"itemId": "mat_monolith_shard", "chance": 0.24},
+            {"itemId": "wpn_kupfer_sword", "chance": 0.22},
+            {"itemId": "arm_kupfer_armor", "chance": 0.20},
+            {"itemId": "eq_kupfer_belt", "chance": 0.20},
         ],
     },
     "metin_greed": {
@@ -1236,24 +1270,22 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 4600,
-        "yangMin": 2700,
-        "yangMax": 4800,
+        "yangMin": 980,
+        "yangMax": 1750,
         "icon": "monolith_legendary",
         "modelType": "metin_crystal",
         "color": 0xF59E0B,
         "scale": 1.72,
         "waveMonster": "blackice_bandit",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 1.0},
-            {"itemId": "mat_soul_stone", "chance": 0.45},
-            {"itemId": "item_aether_seal", "chance": 0.06},
-            {"itemId": "sword_rsb", "chance": 0.28},
-            {"itemId": "chest_moonlight", "chance": 0.40},
-            {"itemId": "staff_dragon", "chance": 0.22},
+            {"itemId": "mat_monolith_shard", "chance": 0.25},
+            {"itemId": "mat_soul_stone", "chance": 0.18},
+            {"itemId": "wpn_eisen_greatsword", "chance": 0.22},
+            {"itemId": "wpn_eisen_staff", "chance": 0.20},
+            {"itemId": "arm_eisen_armor", "chance": 0.20},
         ],
     },
-    # --- GEBIETSBOSSE (Deutlich schwerer + echte 3D-Modelle, 15 Minuten Respawn = 900s) ---
+    # --- GEBIETSBOSS MAP 1 (15 Minuten Respawn = 900s) ---
     "boss_morgenwacht": {
         "id": "boss_morgenwacht",
         "name": "Lykos der Bestienfürst [Gebietsboss]",
@@ -1272,8 +1304,8 @@ MONSTER_TEMPLATES = {
         "attackInterval": 1.55,
         "respawnSec": 900.0,
         "exp": 7400,
-        "yangMin": 5900,
-        "yangMax": 10800,
+        "yangMin": 2600,
+        "yangMax": 4800,
         "icon": "oberork",
         "modelType": "boss_oberork",
         "glbModel": "asenis_monster_m1_3",
@@ -1282,13 +1314,13 @@ MONSTER_TEMPLATES = {
         "scale": 1.75,
         "drops": [
             {"itemId": "chest_oberork", "chance": 1.0},
-            {"itemId": "sword_msk", "chance": 0.48},
-            {"itemId": "sword_rsb", "chance": 0.48},
-            {"itemId": "mat_soul_stone", "chance": 0.70},
+            {"itemId": "wpn_eisen_sword", "chance": 0.40},
+            {"itemId": "wpn_eisen_greatsword", "chance": 0.40},
+            {"itemId": "mat_soul_stone", "chance": 0.55},
         ],
     },
     # =========================================================================
-    # MAP 1 SÜD: WEOL-DENKMAL & SILBERSTROM-GARNISON (WEISSER-EID-GEBIET LV. 13–18)
+    # MAP 1 SÜD: WEOL-DENKMAL & SILBERSTROM-GARNISON (EID-KÄMPFER LV. 16–22 -> SCHMUCKGEGENSTAND)
     # =========================================================================
     "blackice_bandit": {
         "id": "blackice_bandit",
@@ -1297,18 +1329,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": True,
-        "level": 13,
-        "hp": 2950,
-        "atk": 108,
-        "def": 52,
+        "level": 16,
+        "hp": 4100,
+        "atk": 130,
+        "def": 64,
         "speed": 4.8,
         "aggroRadius": 11.5,
         "attackRange": 2.5,
         "attackInterval": 1.3,
         "respawnSec": 25.0,
-        "exp": 440,
-        "yangMin": 290,
-        "yangMax": 550,
+        "exp": 615,
+        "yangMin": 120,
+        "yangMax": 220,
         "icon": "border_raider",
         "modelType": "humanoid_bandit",
         "glbModel": "bkembryo_pewi",
@@ -1316,12 +1348,10 @@ MONSTER_TEMPLATES = {
         "color": 0xE2E8F0,
         "scale": 1.10,
         "drops": [
-            {"itemId": "mat_cursed_iron", "chance": 0.42},
-            {"itemId": "sword_silver", "chance": 0.14},
-            {"itemId": "bow_crow", "chance": 0.12},
-            {"itemId": "earrings_ebony", "chance": 0.14},
-            {"itemId": "scroll_blessing", "chance": 0.18},
-            {"itemId": "item_bonus_changer", "chance": 0.14},
+            {"itemId": "mat_ornament", "chance": 0.26},
+            {"itemId": "wpn_kupfer_sword", "chance": 0.06},
+            {"itemId": "eq_kupfer_earrings", "chance": 0.06},
+            {"itemId": "eq_kupfer_belt", "chance": 0.06},
         ],
     },
     "white_oath_archer": {
@@ -1331,18 +1361,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": True,
-        "level": 15,
-        "hp": 3350,
-        "atk": 120,
-        "def": 57,
+        "level": 18,
+        "hp": 4550,
+        "atk": 144,
+        "def": 69,
         "speed": 4.9,
         "aggroRadius": 11.5,
         "attackRange": 4.2,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 510,
-        "yangMin": 340,
-        "yangMax": 640,
+        "exp": 710,
+        "yangMin": 138,
+        "yangMax": 250,
         "icon": "border_raider",
         "modelType": "humanoid_bandit",
         "glbModel": "bkseira_pewi",
@@ -1350,10 +1380,10 @@ MONSTER_TEMPLATES = {
         "color": 0xF8FAFC,
         "scale": 1.12,
         "drops": [
-            {"itemId": "bow_horn", "chance": 0.20},
-            {"itemId": "bow_crow", "chance": 0.16},
-            {"itemId": "earrings_ebony", "chance": 0.16},
-            {"itemId": "scroll_blessing", "chance": 0.20},
+            {"itemId": "mat_ornament", "chance": 0.28},
+            {"itemId": "wpn_kupfer_bow", "chance": 0.06},
+            {"itemId": "wpn_kupfer_daggers", "chance": 0.06},
+            {"itemId": "eq_kupfer_necklace", "chance": 0.06},
         ],
     },
     "white_oath_crusher": {
@@ -1363,18 +1393,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": True,
-        "level": 16,
-        "hp": 3750,
-        "atk": 132,
-        "def": 62,
+        "level": 20,
+        "hp": 5050,
+        "atk": 158,
+        "def": 74,
         "speed": 5.0,
         "aggroRadius": 11.5,
         "attackRange": 2.7,
         "attackInterval": 1.3,
         "respawnSec": 25.0,
-        "exp": 575,
-        "yangMin": 390,
-        "yangMax": 720,
+        "exp": 825,
+        "yangMin": 155,
+        "yangMax": 285,
         "icon": "border_raider",
         "modelType": "humanoid_bandit_elite",
         "glbModel": "bktransf_pewi",
@@ -1382,10 +1412,42 @@ MONSTER_TEMPLATES = {
         "color": 0xCBD5E1,
         "scale": 1.16,
         "drops": [
-            {"itemId": "sword_msk", "chance": 0.12},
-            {"itemId": "sword_silver", "chance": 0.16},
-            {"itemId": "scroll_blessing", "chance": 0.22},
-            {"itemId": "item_bonus_changer", "chance": 0.18},
+            {"itemId": "mat_ornament", "chance": 0.30},
+            {"itemId": "wpn_eisen_sword", "chance": 0.06},
+            {"itemId": "arm_eisen_armor", "chance": 0.06},
+            {"itemId": "eq_eisen_helmet", "chance": 0.06},
+        ],
+    },
+    "white_oath_vanguard": {
+        "id": "white_oath_vanguard",
+        "name": "Weißer-Eid-Wächterin",
+        "kind": "monster",
+        "isElite": False,
+        "isBoss": False,
+        "isAggressive": True,
+        "level": 22,
+        "hp": 5550,
+        "atk": 170,
+        "def": 79,
+        "speed": 5.0,
+        "aggroRadius": 11.5,
+        "attackRange": 2.7,
+        "attackInterval": 1.3,
+        "respawnSec": 25.0,
+        "exp": 945,
+        "yangMin": 175,
+        "yangMax": 315,
+        "icon": "border_raider",
+        "modelType": "humanoid_bandit_elite",
+        "glbModel": "bkseira_pewi",
+        "glbTextures": ["bkseira_pewi2.png", "bkseira_pewi3.png"],
+        "color": 0xE2E8F0,
+        "scale": 1.18,
+        "drops": [
+            {"itemId": "mat_ornament", "chance": 0.32},
+            {"itemId": "wpn_eisen_staff", "chance": 0.06},
+            {"itemId": "eq_eisen_shield", "chance": 0.06},
+            {"itemId": "eq_eisen_shoes", "chance": 0.06},
         ],
     },
     "bandit_captain": {
@@ -1395,18 +1457,18 @@ MONSTER_TEMPLATES = {
         "isElite": True,
         "isBoss": False,
         "isAggressive": True,
-        "level": 18,
-        "hp": 4600,
-        "atk": 150,
-        "def": 70,
+        "level": 22,
+        "hp": 6750,
+        "atk": 192,
+        "def": 86,
         "speed": 5.1,
         "aggroRadius": 12.0,
         "attackRange": 2.9,
         "attackInterval": 1.25,
         "respawnSec": 25.0,
-        "exp": 710,
-        "yangMin": 490,
-        "yangMax": 910,
+        "exp": 1120,
+        "yangMin": 200,
+        "yangMax": 360,
         "icon": "forest_looter",
         "modelType": "humanoid_bandit_elite",
         "glbModel": "bktransf_pewi",
@@ -1414,16 +1476,15 @@ MONSTER_TEMPLATES = {
         "color": 0xF59E0B,
         "scale": 1.28,
         "drops": [
-            {"itemId": "sword_msk", "chance": 0.16},
-            {"itemId": "sword_rsb", "chance": 0.14},
-            {"itemId": "bow_crow", "chance": 0.14},
-            {"itemId": "scroll_blessing", "chance": 0.28},
-            {"itemId": "item_bonus_adder", "chance": 0.22},
-            {"itemId": "item_bonus_changer", "chance": 0.22},
+            {"itemId": "mat_ornament", "chance": 0.40},
+            {"itemId": "wpn_eisen_greatsword", "chance": 0.07},
+            {"itemId": "eq_eisen_bracelet", "chance": 0.07},
+            {"itemId": "eq_eisen_belt", "chance": 0.07},
         ],
     },
     # =========================================================================
-    # MAP 2 SÜD: BAKRA-HERBSTAUEN & HEERLAGER (M2 MONSTER LV. 20–35 & RISSMONOLITHEN LV. 25, 30, 35, 40)
+    # MAP 2 SÜD: BAKRA-HERBSTAUEN ANFANGSGEBIET (LV. 23–29) & HAUPTGEBIET (LV. 30–38)
+    # Exklusive Map-2-Uppitems: Stück Edelstein, Schwarze Uniform, Shuriken, Degenklingen
     # =========================================================================
     "blackwind_soldier": {
         "id": "blackwind_soldier",
@@ -1432,18 +1493,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 20,
-        "hp": 4800,
-        "atk": 148,
-        "def": 64,
+        "level": 23,
+        "hp": 5800,
+        "atk": 176,
+        "def": 80,
         "speed": 4.9,
         "aggroRadius": 0.0,
         "attackRange": 2.6,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 980,
-        "yangMin": 620,
-        "yangMax": 1150,
+        "exp": 1120,
+        "yangMin": 195,
+        "yangMax": 355,
         "icon": "border_raider",
         "modelType": "humanoid_bandit",
         "glbModel": "pewi_m2_xieyue",
@@ -1451,9 +1512,10 @@ MONSTER_TEMPLATES = {
         "color": 0x7F1D1D,
         "scale": 1.14,
         "drops": [
-            {"itemId": "mat_cursed_iron", "chance": 0.45},
-            {"itemId": "sword_msk", "chance": 0.14},
-            {"itemId": "scroll_blessing", "chance": 0.22},
+            {"itemId": "mat_black_uniform", "chance": 0.28},
+            {"itemId": "wpn_eisen_sword", "chance": 0.06},
+            {"itemId": "arm_eisen_armor", "chance": 0.06},
+            {"itemId": "eq_eisen_shield", "chance": 0.06},
         ],
     },
     "blackwind_maniac": {
@@ -1463,18 +1525,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 22,
-        "hp": 5350,
-        "atk": 162,
-        "def": 70,
+        "level": 25,
+        "hp": 6350,
+        "atk": 190,
+        "def": 84,
         "speed": 5.1,
         "aggroRadius": 0.0,
         "attackRange": 2.6,
         "attackInterval": 1.3,
         "respawnSec": 25.0,
-        "exp": 1150,
-        "yangMin": 710,
-        "yangMax": 1300,
+        "exp": 1340,
+        "yangMin": 215,
+        "yangMax": 395,
         "icon": "border_raider",
         "modelType": "humanoid_bandit",
         "glbModel": "pewi_m2_dingtou",
@@ -1482,9 +1544,10 @@ MONSTER_TEMPLATES = {
         "color": 0x991B1B,
         "scale": 1.15,
         "drops": [
-            {"itemId": "mat_cursed_iron", "chance": 0.48},
-            {"itemId": "sword_rsb", "chance": 0.14},
-            {"itemId": "item_bonus_changer", "chance": 0.18},
+            {"itemId": "mat_gem_piece", "chance": 0.28},
+            {"itemId": "wpn_eisen_greatsword", "chance": 0.06},
+            {"itemId": "eq_eisen_helmet", "chance": 0.06},
+            {"itemId": "eq_eisen_belt", "chance": 0.06},
         ],
     },
     "blackwind_archer": {
@@ -1494,18 +1557,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 24,
-        "hp": 5850,
-        "atk": 175,
-        "def": 74,
+        "level": 27,
+        "hp": 6950,
+        "atk": 204,
+        "def": 88,
         "speed": 4.9,
         "aggroRadius": 0.0,
         "attackRange": 4.5,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 1320,
-        "yangMin": 800,
-        "yangMax": 1450,
+        "exp": 1560,
+        "yangMin": 235,
+        "yangMax": 430,
         "icon": "border_raider",
         "modelType": "humanoid_bandit",
         "glbModel": "pewi_m2_bowman",
@@ -1513,9 +1576,10 @@ MONSTER_TEMPLATES = {
         "color": 0x78350F,
         "scale": 1.15,
         "drops": [
-            {"itemId": "bow_horn", "chance": 0.22},
-            {"itemId": "bow_crow", "chance": 0.18},
-            {"itemId": "scroll_blessing", "chance": 0.22},
+            {"itemId": "mat_shuriken", "chance": 0.28},
+            {"itemId": "wpn_eisen_bow", "chance": 0.06},
+            {"itemId": "wpn_eisen_daggers", "chance": 0.06},
+            {"itemId": "eq_eisen_shoes", "chance": 0.06},
         ],
     },
     "blackwind_jakto": {
@@ -1525,18 +1589,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 26,
-        "hp": 6500,
-        "atk": 192,
-        "def": 80,
+        "level": 29,
+        "hp": 7600,
+        "atk": 218,
+        "def": 92,
         "speed": 5.0,
         "aggroRadius": 0.0,
         "attackRange": 2.8,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 1540,
-        "yangMin": 920,
-        "yangMax": 1660,
+        "exp": 1820,
+        "yangMin": 260,
+        "yangMax": 470,
         "icon": "bloodleaf_warrior",
         "modelType": "humanoid_bandit_elite",
         "glbModel": "pewi_m2_kunlun",
@@ -1544,40 +1608,10 @@ MONSTER_TEMPLATES = {
         "color": 0x991B1B,
         "scale": 1.20,
         "drops": [
-            {"itemId": "mat_bloodleaf_resin", "chance": 0.45},
-            {"itemId": "sword_msk", "chance": 0.16},
-            {"itemId": "armor_blacksteel", "chance": 0.15},
-        ],
-    },
-    "bloodleaf_warrior": {
-        "id": "bloodleaf_warrior",
-        "name": "Wilder Grenzland-Infanterist",
-        "kind": "monster",
-        "isElite": False,
-        "isBoss": False,
-        "isAggressive": False,
-        "level": 27,
-        "hp": 7100,
-        "atk": 204,
-        "def": 85,
-        "speed": 5.0,
-        "aggroRadius": 0.0,
-        "attackRange": 2.7,
-        "attackInterval": 1.35,
-        "respawnSec": 25.0,
-        "exp": 1720,
-        "yangMin": 1020,
-        "yangMax": 1820,
-        "icon": "bloodleaf_warrior",
-        "modelType": "humanoid_bandit_elite",
-        "glbModel": "pewi_m2_piratedeva",
-        "glbTextures": ["piratedeva_col1.png"],
-        "color": 0x991B1B,
-        "scale": 1.18,
-        "drops": [
-            {"itemId": "mat_bloodleaf_resin", "chance": 0.45},
-            {"itemId": "armor_blacksteel", "chance": 0.16},
-            {"itemId": "sword_msk", "chance": 0.15},
+            {"itemId": "mat_rapier_blade", "chance": 0.28},
+            {"itemId": "wpn_eisen_staff", "chance": 0.06},
+            {"itemId": "eq_eisen_gloves", "chance": 0.06},
+            {"itemId": "eq_eisen_necklace", "chance": 0.06},
         ],
     },
     "blackwind_tosu": {
@@ -1588,17 +1622,17 @@ MONSTER_TEMPLATES = {
         "isBoss": False,
         "isAggressive": False,
         "level": 29,
-        "hp": 8200,
-        "atk": 222,
-        "def": 92,
+        "hp": 8900,
+        "atk": 234,
+        "def": 97,
         "speed": 5.2,
         "aggroRadius": 0.0,
         "attackRange": 2.9,
         "attackInterval": 1.25,
         "respawnSec": 25.0,
-        "exp": 2020,
-        "yangMin": 1180,
-        "yangMax": 2100,
+        "exp": 2120,
+        "yangMin": 290,
+        "yangMax": 520,
         "icon": "forest_looter",
         "modelType": "humanoid_bandit_elite",
         "glbModel": "pewi_m2_ravager",
@@ -1606,40 +1640,42 @@ MONSTER_TEMPLATES = {
         "color": 0x7F1D1D,
         "scale": 1.25,
         "drops": [
-            {"itemId": "sword_msk", "chance": 0.18},
-            {"itemId": "sword_rsb", "chance": 0.16},
-            {"itemId": "item_bonus_adder", "chance": 0.25},
+            {"itemId": "mat_rapier_blade", "chance": 0.36},
+            {"itemId": "eq_eisen_bracelet", "chance": 0.07},
+            {"itemId": "eq_eisen_earrings", "chance": 0.07},
+            {"itemId": "arm_eisen_armor", "chance": 0.07},
         ],
     },
-    "blackwind_guryung": {
-        "id": "blackwind_guryung",
-        "name": "Schwarzwind-Gu-Ryung [Elite]",
+    "bloodleaf_warrior": {
+        "id": "bloodleaf_warrior",
+        "name": "Wilder Grenzland-Infanterist",
         "kind": "monster",
-        "isElite": True,
+        "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 32,
-        "hp": 9200,
-        "atk": 238,
-        "def": 98,
-        "speed": 4.9,
+        "level": 31,
+        "hp": 8350,
+        "atk": 230,
+        "def": 96,
+        "speed": 5.0,
         "aggroRadius": 0.0,
-        "attackRange": 3.0,
+        "attackRange": 2.7,
         "attackInterval": 1.35,
         "respawnSec": 25.0,
-        "exp": 2320,
-        "yangMin": 1320,
-        "yangMax": 2350,
-        "icon": "forest_looter",
+        "exp": 2080,
+        "yangMin": 285,
+        "yangMax": 515,
+        "icon": "bloodleaf_warrior",
         "modelType": "humanoid_bandit_elite",
-        "glbModel": "pewi_m2_pangzi",
-        "glbTextures": ["pangzi_col1.png", "pangzi_weapon_col1.png"],
-        "color": 0x7F1D1D,
-        "scale": 1.30,
+        "glbModel": "pewi_m2_piratedeva",
+        "glbTextures": ["piratedeva_col1.png"],
+        "color": 0x991B1B,
+        "scale": 1.18,
         "drops": [
-            {"itemId": "sword_rsb", "chance": 0.20},
-            {"itemId": "armor_blacksteel", "chance": 0.18},
-            {"itemId": "scroll_blessing", "chance": 0.30},
+            {"itemId": "mat_black_uniform", "chance": 0.28},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.025},
+            {"itemId": "eq_ebenholz_shield", "chance": 0.025},
+            {"itemId": "eq_ebenholz_belt", "chance": 0.025},
         ],
     },
     "savage_minion": {
@@ -1649,18 +1685,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 30,
-        "hp": 8100,
-        "atk": 218,
-        "def": 90,
+        "level": 33,
+        "hp": 9100,
+        "atk": 244,
+        "def": 100,
         "speed": 5.0,
         "aggroRadius": 0.0,
         "attackRange": 2.8,
         "attackInterval": 1.3,
         "respawnSec": 25.0,
-        "exp": 1980,
-        "yangMin": 1150,
-        "yangMax": 2040,
+        "exp": 2360,
+        "yangMin": 310,
+        "yangMax": 560,
         "icon": "bloodleaf_warrior",
         "modelType": "humanoid_bandit_elite",
         "glbModel": "pewi_m2_tuobei",
@@ -1668,8 +1704,41 @@ MONSTER_TEMPLATES = {
         "color": 0x78350F,
         "scale": 1.22,
         "drops": [
-            {"itemId": "mat_bloodleaf_resin", "chance": 0.48},
-            {"itemId": "item_bonus_changer", "chance": 0.24},
+            {"itemId": "mat_gem_piece", "chance": 0.28},
+            {"itemId": "wpn_ebenholz_greatsword", "chance": 0.016},
+            {"itemId": "eq_ebenholz_helmet", "chance": 0.025},
+            {"itemId": "eq_ebenholz_gloves", "chance": 0.025},
+        ],
+    },
+    "blackwind_guryung": {
+        "id": "blackwind_guryung",
+        "name": "Schwarzwind-Gu-Ryung [Elite]",
+        "kind": "monster",
+        "isElite": True,
+        "isBoss": False,
+        "isAggressive": False,
+        "level": 34,
+        "hp": 10400,
+        "atk": 258,
+        "def": 106,
+        "speed": 4.9,
+        "aggroRadius": 0.0,
+        "attackRange": 3.0,
+        "attackInterval": 1.35,
+        "respawnSec": 25.0,
+        "exp": 2650,
+        "yangMin": 335,
+        "yangMax": 600,
+        "icon": "forest_looter",
+        "modelType": "humanoid_bandit_elite",
+        "glbModel": "pewi_m2_pangzi",
+        "glbTextures": ["pangzi_col1.png", "pangzi_weapon_col1.png"],
+        "color": 0x7F1D1D,
+        "scale": 1.30,
+        "drops": [
+            {"itemId": "mat_black_uniform", "chance": 0.36},
+            {"itemId": "wpn_ebenholz_sword", "chance": 0.020},
+            {"itemId": "eq_ebenholz_necklace", "chance": 0.028},
         ],
     },
     "savage_archer": {
@@ -1679,18 +1748,18 @@ MONSTER_TEMPLATES = {
         "isElite": False,
         "isBoss": False,
         "isAggressive": False,
-        "level": 33,
-        "hp": 8800,
-        "atk": 234,
-        "def": 95,
+        "level": 35,
+        "hp": 9850,
+        "atk": 256,
+        "def": 105,
         "speed": 5.0,
         "aggroRadius": 0.0,
         "attackRange": 4.6,
         "attackInterval": 1.3,
         "respawnSec": 25.0,
-        "exp": 2240,
-        "yangMin": 1260,
-        "yangMax": 2240,
+        "exp": 2680,
+        "yangMin": 335,
+        "yangMax": 605,
         "icon": "border_raider",
         "modelType": "humanoid_bandit",
         "glbModel": "pewi_m2_archbarb",
@@ -1698,8 +1767,74 @@ MONSTER_TEMPLATES = {
         "color": 0x78350F,
         "scale": 1.18,
         "drops": [
-            {"itemId": "bow_crow", "chance": 0.22},
-            {"itemId": "scroll_blessing", "chance": 0.25},
+            {"itemId": "mat_shuriken", "chance": 0.28},
+            {"itemId": "wpn_ebenholz_bow", "chance": 0.016},
+            {"itemId": "wpn_ebenholz_daggers", "chance": 0.016},
+            {"itemId": "eq_ebenholz_shoes", "chance": 0.025},
+        ],
+    },
+    "savage_duelist": {
+        "id": "savage_duelist",
+        "name": "Wilder Klingentänzer",
+        "kind": "monster",
+        "isElite": False,
+        "isBoss": False,
+        "isAggressive": False,
+        "level": 37,
+        "hp": 10750,
+        "atk": 270,
+        "def": 110,
+        "speed": 5.1,
+        "aggroRadius": 0.0,
+        "attackRange": 2.9,
+        "attackInterval": 1.3,
+        "respawnSec": 25.0,
+        "exp": 3020,
+        "yangMin": 360,
+        "yangMax": 645,
+        "icon": "bloodleaf_warrior",
+        "modelType": "humanoid_bandit_elite",
+        "glbModel": "pewi_m2_kunlun",
+        "glbTextures": ["kunlun_col1.png", "kunlun_weapon_col1.png"],
+        "color": 0x991B1B,
+        "scale": 1.24,
+        "drops": [
+            {"itemId": "mat_rapier_blade", "chance": 0.28},
+            {"itemId": "wpn_ebenholz_sword", "chance": 0.016},
+            {"itemId": "wpn_ebenholz_staff", "chance": 0.016},
+            {"itemId": "eq_ebenholz_bracelet", "chance": 0.025},
+        ],
+    },
+    "savage_enforcer": {
+        "id": "savage_enforcer",
+        "name": "Wilder Vollstrecker",
+        "kind": "monster",
+        "isElite": False,
+        "isBoss": False,
+        "isAggressive": False,
+        "level": 38,
+        "hp": 11400,
+        "atk": 278,
+        "def": 113,
+        "speed": 5.0,
+        "aggroRadius": 0.0,
+        "attackRange": 2.9,
+        "attackInterval": 1.3,
+        "respawnSec": 25.0,
+        "exp": 3220,
+        "yangMin": 375,
+        "yangMax": 670,
+        "icon": "bloodleaf_warrior",
+        "modelType": "humanoid_bandit_elite",
+        "glbModel": "pewi_m2_ravager",
+        "glbTextures": ["ravager1_col1.png", "ravager2_col1.png"],
+        "color": 0x7F1D1D,
+        "scale": 1.26,
+        "drops": [
+            {"itemId": "mat_gem_piece", "chance": 0.28},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.025},
+            {"itemId": "eq_ebenholz_earrings", "chance": 0.025},
+            {"itemId": "eq_ebenholz_belt", "chance": 0.025},
         ],
     },
     "savage_general": {
@@ -1709,18 +1844,18 @@ MONSTER_TEMPLATES = {
         "isElite": True,
         "isBoss": False,
         "isAggressive": False,
-        "level": 35,
-        "hp": 11200,
-        "atk": 264,
-        "def": 108,
+        "level": 38,
+        "hp": 13200,
+        "atk": 296,
+        "def": 120,
         "speed": 5.1,
         "aggroRadius": 0.0,
         "attackRange": 3.1,
         "attackInterval": 1.3,
         "respawnSec": 25.0,
-        "exp": 2850,
-        "yangMin": 1620,
-        "yangMax": 2880,
+        "exp": 3650,
+        "yangMin": 420,
+        "yangMax": 760,
         "icon": "forest_looter",
         "modelType": "humanoid_bandit_elite",
         "glbModel": "pewi_m2_tongding",
@@ -1728,10 +1863,10 @@ MONSTER_TEMPLATES = {
         "color": 0x991B1B,
         "scale": 1.32,
         "drops": [
-            {"itemId": "sword_msk", "chance": 0.24},
-            {"itemId": "sword_rsb", "chance": 0.24},
-            {"itemId": "armor_blacksteel", "chance": 0.22},
-            {"itemId": "item_bonus_adder", "chance": 0.30},
+            {"itemId": "mat_rapier_blade", "chance": 0.36},
+            {"itemId": "wpn_ebenholz_greatsword", "chance": 0.020},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.028},
+            {"itemId": "eq_ebenholz_shield", "chance": 0.028},
         ],
     },
     "boss_brutal_captain": {
@@ -1752,8 +1887,8 @@ MONSTER_TEMPLATES = {
         "attackInterval": 1.5,
         "respawnSec": 900.0,
         "exp": 12500,
-        "yangMin": 9500,
-        "yangMax": 17000,
+        "yangMin": 4500,
+        "yangMax": 8200,
         "icon": "oberork",
         "modelType": "boss_oberork",
         "glbModel": "pewi_m2_jubi",
@@ -1762,10 +1897,10 @@ MONSTER_TEMPLATES = {
         "scale": 1.65,
         "drops": [
             {"itemId": "chest_oberork", "chance": 1.0},
-            {"itemId": "sword_msk", "chance": 0.55},
-            {"itemId": "sword_rsb", "chance": 0.55},
-            {"itemId": "sword_sternenreisser", "chance": 0.25},
-            {"itemId": "mat_soul_stone", "chance": 0.80},
+            {"itemId": "wpn_ebenholz_sword", "chance": 0.38},
+            {"itemId": "wpn_ebenholz_greatsword", "chance": 0.38},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.32},
+            {"itemId": "mat_soul_stone", "chance": 0.65},
         ],
     },
     # --- REGIONALE DUNGEON-HERRSCHER (Map 2 Boss & deutlich stärker) ---
@@ -1788,8 +1923,8 @@ MONSTER_TEMPLATES = {
         "attackInterval": 1.45,
         "respawnSec": 900.0,
         "exp": 16500,
-        "yangMin": 14500,
-        "yangMax": 26000,
+        "yangMin": 6800,
+        "yangMax": 12500,
         "icon": "oberork",
         "modelType": "boss_oberork",
         "glbModel": "pewi_m2_tongding",
@@ -1798,15 +1933,14 @@ MONSTER_TEMPLATES = {
         "scale": 1.85,
         "drops": [
             {"itemId": "chest_oberork", "chance": 1.0},
-            {"itemId": "sword_msk", "chance": 0.55},
-            {"itemId": "sword_rsb", "chance": 0.55},
-            {"itemId": "sword_sternenreisser", "chance": 0.35},
-            {"itemId": "armor_dragonscale", "chance": 0.35},
-            {"itemId": "mat_soul_stone", "chance": 0.95},
-            {"itemId": "mat_awakened_rift_core", "chance": 0.35},
+            {"itemId": "wpn_ebenholz_sword", "chance": 0.42},
+            {"itemId": "wpn_ebenholz_greatsword", "chance": 0.42},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.38},
+            {"itemId": "mat_soul_stone", "chance": 0.85},
+            {"itemId": "mat_awakened_rift_core", "chance": 0.10},
         ],
     },
-    # --- MAP 2 RISSMONOLITHEN: GEBIET 1 (LV. 25 & 30) + GEBIET 2 (LV. 35 & 40) + HIGHLEVEL (LV. 45–90) ---
+    # --- MAP 2 RISSMONOLITHEN (LV. 25, 30, 35) + NOCH NICHT VERGEBENE HIGHLEVEL-MONOLITHEN (LV. 40–90) ---
     "metin_black": {
         "id": "metin_black",
         "name": "Rissmonolith des Zwielichts",
@@ -1827,21 +1961,18 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 5400,
-        "yangMin": 3400,
-        "yangMax": 5900,
+        "yangMin": 1200,
+        "yangMax": 2100,
         "icon": "monolith_corrupted",
         "modelType": "metin_crystal",
         "color": 0xF59E0B,
         "scale": 1.74,
         "waveMonster": "blackwind_jakto",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 0.90},
-            {"itemId": "scroll_blessing", "chance": 0.65},
-            {"itemId": "item_bonus_adder", "chance": 0.48},
-            {"itemId": "item_bonus_changer", "chance": 0.55},
-            {"itemId": "sword_msk", "chance": 0.25},
-            {"itemId": "sword_rsb", "chance": 0.22},
+            {"itemId": "mat_monolith_shard", "chance": 0.25},
+            {"itemId": "wpn_eisen_sword", "chance": 0.22},
+            {"itemId": "wpn_eisen_greatsword", "chance": 0.20},
+            {"itemId": "arm_eisen_armor", "chance": 0.20},
         ],
     },
     "metin_darkness": {
@@ -1864,20 +1995,19 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 6600,
-        "yangMin": 4100,
-        "yangMax": 7100,
+        "yangMin": 1500,
+        "yangMax": 2650,
         "icon": "monolith_legendary",
         "modelType": "metin_crystal",
         "color": 0xFB923C,
         "scale": 1.80,
         "waveMonster": "bloodleaf_warrior",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 1.0},
-            {"itemId": "mat_soul_stone", "chance": 0.60},
-            {"itemId": "sword_msk", "chance": 0.26},
-            {"itemId": "sword_rsb", "chance": 0.26},
-            {"itemId": "armor_blacksteel", "chance": 0.22},
+            {"itemId": "mat_monolith_shard", "chance": 0.26},
+            {"itemId": "mat_soul_stone", "chance": 0.25},
+            {"itemId": "wpn_ebenholz_sword", "chance": 0.14},
+            {"itemId": "wpn_ebenholz_greatsword", "chance": 0.14},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.18},
         ],
     },
     "metin_bloodleaf": {
@@ -1900,19 +2030,18 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 8000,
-        "yangMin": 4900,
-        "yangMax": 8500,
+        "yangMin": 1850,
+        "yangMax": 3250,
         "icon": "monolith_ancient",
         "modelType": "metin_crystal",
         "color": 0xEF4444,
         "scale": 1.88,
         "waveMonster": "savage_minion",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 1.0},
-            {"itemId": "mat_soul_stone", "chance": 0.75},
-            {"itemId": "sword_sternenreisser", "chance": 0.22},
-            {"itemId": "armor_dragonscale", "chance": 0.24},
+            {"itemId": "mat_monolith_shard", "chance": 0.28},
+            {"itemId": "mat_soul_stone", "chance": 0.32},
+            {"itemId": "wpn_ebenholz_sword", "chance": 0.16},
+            {"itemId": "arm_ebenholz_armor", "chance": 0.20},
         ],
     },
     "metin_abyss": {
@@ -1920,8 +2049,9 @@ MONSTER_TEMPLATES = {
         "name": "Rissmonolith des Abgrunds",
         "loreMeaning": "Ein mächtiger Zugang zu einer gefährlichen fremden Dimension",
         "storyChapter": "Kapitel IV • Die Verderbnis des Südens (Lv. 31–40)",
+        "assignedRegion": "Noch nicht vergeben",
         "kind": "metin",
-        "zoneTier": "advanced",
+        "zoneTier": "highlevel",
         "isElite": False,
         "isBoss": False,
         "rarity": "legendary",
@@ -1935,19 +2065,18 @@ MONSTER_TEMPLATES = {
         "attackInterval": 0.0,
         "respawnSec": 120.0,
         "exp": 9600,
-        "yangMin": 5800,
-        "yangMax": 10200,
+        "yangMin": 2400,
+        "yangMax": 4200,
         "icon": "monolith_ancient",
         "modelType": "metin_crystal",
         "color": 0xDC2626,
         "scale": 1.94,
         "waveMonster": "savage_archer",
         "drops": [
-            {"itemId": "mat_monolith_shard", "chance": 1.0},
-            {"itemId": "book_skill", "chance": 1.0},
-            {"itemId": "mat_soul_stone", "chance": 0.85},
-            {"itemId": "sword_sternenreisser", "chance": 0.28},
-            {"itemId": "armor_dragonscale", "chance": 0.28},
+            {"itemId": "mat_monolith_shard", "chance": 0.28},
+            {"itemId": "mat_soul_stone", "chance": 0.40},
+            {"itemId": "wpn_silber_sword", "chance": 0.20},
+            {"itemId": "arm_silber_armor", "chance": 0.20},
         ],
     },
     "metin_doom": {
@@ -2297,23 +2426,23 @@ MONSTER_TEMPLATES = {
 # 5A. OFFIZIELLER KATALOG DER 18 RISSMONOLITHEN VON AERYNDOR (LEVEL 5 BIS 90)
 # ============================================================================
 RIFT_MONOLITH_CATALOG = [
-    {"index": 1, "level": 5, "templateId": "metin_sorrow", "name": "Rissmonolith des Erwachens", "meaning": "Die ersten Anzeichen der zurückkehrenden Dimensionsenergie", "chapter": "Kapitel I (Lv. 1–10)"},
-    {"index": 2, "level": 10, "templateId": "metin_combat", "name": "Rissmonolith der Wildnis", "meaning": "Die fremde Energie beginnt, die Natur zu beeinflussen", "chapter": "Kapitel II (Lv. 11–20)"},
-    {"index": 3, "level": 15, "templateId": "metin_battle", "name": "Rissmonolith des Blutmondes", "meaning": "Aggressive und zerstörerische Energien treten hervor", "chapter": "Kapitel II (Lv. 11–20)"},
-    {"index": 4, "level": 20, "templateId": "metin_greed", "name": "Rissmonolith der verlorenen Seelen", "meaning": "Die Grenze zwischen Leben, Tod und fremden Dimensionen wird schwächer", "chapter": "Kapitel II (Lv. 11–20)"},
-    {"index": 5, "level": 25, "templateId": "metin_black", "name": "Rissmonolith des Zwielichts", "meaning": "Unterschiedliche Dimensionseinflüsse beginnen sich zu überlagern", "chapter": "Kapitel III (Lv. 21–30)"},
-    {"index": 6, "level": 30, "templateId": "metin_darkness", "name": "Rissmonolith der Verderbnis", "meaning": "Die Energie verändert Kreaturen und ihre Umgebung", "chapter": "Kapitel III (Lv. 21–30)"},
-    {"index": 7, "level": 35, "templateId": "metin_bloodleaf", "name": "Rissmonolith des Chaos", "meaning": "Das Monolithennetzwerk verliert zunehmend seine Stabilität", "chapter": "Kapitel IV (Lv. 31–40)"},
-    {"index": 8, "level": 40, "templateId": "metin_abyss", "name": "Rissmonolith des Abgrunds", "meaning": "Ein mächtiger Zugang zu einer gefährlichen fremden Dimension", "chapter": "Kapitel IV (Lv. 31–40)"},
-    {"index": 9, "level": 45, "templateId": "metin_doom", "name": "Rissmonolith der Verdammnis", "meaning": "Die zerstörerischen Kräfte der alten Katastrophe kehren zurück", "chapter": "Kapitel V (Lv. 41–55)"},
-    {"index": 10, "level": 50, "templateId": "metin_gloom", "name": "Rissmonolith der Finsternis", "meaning": "Schattenenergien beginnen, ganze Regionen zu beeinflussen", "chapter": "Kapitel V (Lv. 41–55)"},
-    {"index": 11, "level": 55, "templateId": "metin_soulstorm", "name": "Rissmonolith des Seelensturms", "meaning": "Mächtige Seelen- und Dimensionsenergien verbinden sich", "chapter": "Kapitel V (Lv. 41–55)"},
-    {"index": 12, "level": 60, "templateId": "metin_eternal_night", "name": "Rissmonolith der ewigen Nacht", "meaning": "Die Energie kann selbst Licht und Atmosphäre verändern", "chapter": "Kapitel VI (Lv. 56–70)"},
-    {"index": 13, "level": 65, "templateId": "metin_destruction", "name": "Rissmonolith der Zerstörung", "meaning": "Gewaltige Kräfte bedrohen die Stabilität der Landschaft", "chapter": "Kapitel VI (Lv. 56–70)"},
-    {"index": 14, "level": 70, "templateId": "metin_dimension_breach", "name": "Rissmonolith des Dimensionsbruchs", "meaning": "Die Grenzen zwischen mehreren Dimensionen zerfallen", "chapter": "Kapitel VI (Lv. 56–70)"},
-    {"index": 15, "level": 75, "templateId": "metin_void", "name": "Rissmonolith der Leere", "meaning": "Eine unbekannte Macht entzieht ihrer Umgebung Energie", "chapter": "Kapitel VII (Lv. 71–85)"},
-    {"index": 16, "level": 80, "templateId": "metin_primordial", "name": "Rissmonolith der Urgewalten", "meaning": "Die ursprünglichen Natur- und Dimensionskräfte treten hervor", "chapter": "Kapitel VII (Lv. 71–85)"},
-    {"index": 17, "level": 85, "templateId": "metin_worldsend", "name": "Rissmonolith des Weltenendes", "meaning": "Die Gefahr eines neuen großen Dimensionsbruchs erreicht ihren Höhepunkt", "chapter": "Kapitel VII (Lv. 71–85)"},
+    {"index": 1, "level": 5, "templateId": "metin_sorrow", "name": "Rissmonolith des Erwachens", "meaning": "Die ersten Anzeichen der zurückkehrenden Dimensionsenergie", "chapter": "Kapitel I (Lv. 1–10)", "region": "Map 1"},
+    {"index": 2, "level": 10, "templateId": "metin_combat", "name": "Rissmonolith der Wildnis", "meaning": "Die fremde Energie beginnt, die Natur zu beeinflussen", "chapter": "Kapitel II (Lv. 11–20)", "region": "Map 1"},
+    {"index": 3, "level": 15, "templateId": "metin_battle", "name": "Rissmonolith des Blutmondes", "meaning": "Aggressive und zerstörerische Energien treten hervor", "chapter": "Kapitel II (Lv. 11–20)", "region": "Map 1"},
+    {"index": 4, "level": 20, "templateId": "metin_greed", "name": "Rissmonolith der verlorenen Seelen", "meaning": "Die Grenze zwischen Leben, Tod und fremden Dimensionen wird schwächer", "chapter": "Kapitel II (Lv. 11–20)", "region": "Map 1"},
+    {"index": 5, "level": 25, "templateId": "metin_black", "name": "Rissmonolith des Zwielichts", "meaning": "Unterschiedliche Dimensionseinflüsse beginnen sich zu überlagern", "chapter": "Kapitel III (Lv. 21–30)", "region": "Map 2"},
+    {"index": 6, "level": 30, "templateId": "metin_darkness", "name": "Rissmonolith der Verderbnis", "meaning": "Die Energie verändert Kreaturen und ihre Umgebung", "chapter": "Kapitel III (Lv. 21–30)", "region": "Map 2"},
+    {"index": 7, "level": 35, "templateId": "metin_bloodleaf", "name": "Rissmonolith des Chaos", "meaning": "Das Monolithennetzwerk verliert zunehmend seine Stabilität", "chapter": "Kapitel IV (Lv. 31–40)", "region": "Map 2"},
+    {"index": 8, "level": 40, "templateId": "metin_abyss", "name": "Rissmonolith des Abgrunds", "meaning": "Ein mächtiger Zugang zu einer gefährlichen fremden Dimension", "chapter": "Kapitel IV (Lv. 31–40)", "region": "Noch nicht vergeben"},
+    {"index": 9, "level": 45, "templateId": "metin_doom", "name": "Rissmonolith der Verdammnis", "meaning": "Die zerstörerischen Kräfte der alten Katastrophe kehren zurück", "chapter": "Kapitel V (Lv. 41–55)", "region": "Noch nicht vergeben"},
+    {"index": 10, "level": 50, "templateId": "metin_gloom", "name": "Rissmonolith der Finsternis", "meaning": "Schattenenergien beginnen, ganze Regionen zu beeinflussen", "chapter": "Kapitel V (Lv. 41–55)", "region": "Noch nicht vergeben"},
+    {"index": 11, "level": 55, "templateId": "metin_soulstorm", "name": "Rissmonolith des Seelensturms", "meaning": "Mächtige Seelen- und Dimensionsenergien verbinden sich", "chapter": "Kapitel V (Lv. 41–55)", "region": "Noch nicht vergeben"},
+    {"index": 12, "level": 60, "templateId": "metin_eternal_night", "name": "Rissmonolith der ewigen Nacht", "meaning": "Die Energie kann selbst Licht und Atmosphäre verändern", "chapter": "Kapitel VI (Lv. 56–70)", "region": "Noch nicht vergeben"},
+    {"index": 13, "level": 65, "templateId": "metin_destruction", "name": "Rissmonolith der Zerstörung", "meaning": "Gewaltige Kräfte bedrohen die Stabilität der Landschaft", "chapter": "Kapitel VI (Lv. 56–70)", "region": "Noch nicht vergeben"},
+    {"index": 14, "level": 70, "templateId": "metin_dimension_breach", "name": "Rissmonolith des Dimensionsbruchs", "meaning": "Die Grenzen zwischen mehreren Dimensionen zerfallen", "chapter": "Kapitel VI (Lv. 56–70)", "region": "Noch nicht vergeben"},
+    {"index": 15, "level": 75, "templateId": "metin_void", "name": "Rissmonolith der Leere", "meaning": "Eine unbekannte Macht entzieht ihrer Umgebung Energie", "chapter": "Kapitel VII (Lv. 71–85)", "region": "Noch nicht vergeben"},
+    {"index": 16, "level": 80, "templateId": "metin_primordial", "name": "Rissmonolith der Urgewalten", "meaning": "Die ursprünglichen Natur- und Dimensionskräfte treten hervor", "chapter": "Kapitel VII (Lv. 71–85)", "region": "Noch nicht vergeben"},
+    {"index": 17, "level": 85, "templateId": "metin_worldsend", "name": "Rissmonolith des Weltenendes", "meaning": "Die Gefahr eines neuen großen Dimensionsbruchs erreicht ihren Höhepunkt", "chapter": "Kapitel VII (Lv. 71–85)", "region": "Noch nicht vergeben"},
     {
         "index": 18,
         "level": 90,
@@ -2321,6 +2450,7 @@ RIFT_MONOLITH_CATALOG = [
         "name": "Rissmonolith des Ursprungsspalts",
         "meaning": "Der mögliche Ursprung des gesamten Monolithennetzwerks",
         "chapter": "Kapitel VIII • Finale (Lv. 86–90)",
+        "region": "Noch nicht vergeben",
         "loreDescription": (
             "Am Ende dieser Entwicklung steht Der Rissmonolith des Ursprungsspalts (Level 90). "
             "Nach den geheimsten Schriften von Seiryu ist dieser Monolith mit dem Ort verbunden, "
@@ -2480,8 +2610,7 @@ MAJOR_RIFT_MONOLITHS = [
     {"majorIndex": 4, "id": "major_monolith_04", "title": "IV. Rissmonolith der verlorenen Seelen", "mapId": "morgenwacht", "templateId": "metin_greed", "x": -220.0, "z": -210.0, "worldBoss": "boss_lykos", "initialState": "schlafend"},
     {"majorIndex": 5, "id": "major_monolith_05", "title": "V. Rissmonolith des Zwielichts", "mapId": "morgenwacht", "templateId": "metin_black", "x": -380.0, "z": 220.0, "worldBoss": "boss_brutal_captain", "initialState": "schlafend"},
     {"majorIndex": 6, "id": "major_monolith_06", "title": "VI. Rissmonolith der Verderbnis", "mapId": "morgenwacht", "templateId": "metin_darkness", "x": 380.0, "z": 220.0, "worldBoss": "boss_brutal_captain", "initialState": "schlafend"},
-    {"majorIndex": 7, "id": "major_monolith_07", "title": "VII. Rissmonolith des Chaos", "mapId": "morgenwacht", "templateId": "metin_bloodleaf", "x": -180.0, "z": 420.0, "worldBoss": "boss_brutal_captain", "initialState": "schlafend"},
-    {"majorIndex": 8, "id": "major_monolith_08", "title": "VIII. Rissmonolith des Abgrunds", "mapId": "morgenwacht", "templateId": "metin_abyss", "x": 180.0, "z": 420.0, "worldBoss": "boss_brutal_captain", "initialState": "schlafend"},
+    {"majorIndex": 7, "id": "major_monolith_07", "title": "VII. Rissmonolith des Chaos", "mapId": "morgenwacht", "templateId": "metin_bloodleaf", "x": 0.0, "z": 420.0, "worldBoss": "boss_brutal_captain", "initialState": "schlafend"},
 ]
 
 
@@ -2489,7 +2618,7 @@ MAJOR_RIFT_MONOLITHS = [
 # 6. ITEMS, WAFFEN, RÜSTUNGEN, SCHMUCK, KOSTÜME & MATERIALIEN (Kap. 9 & 10)
 # ============================================================================
 EQUIPMENT_SLOTS = [
-    # Ausrüstungs-Seite (9 Slots)
+    # Ausrüstungs-Seite (10 Slots inkl. Gürtel 1-Slot)
     {"id": "weapon", "name": "Waffe", "icon": "⚔️"},
     {"id": "armor", "name": "Rüstung", "icon": "🛡️"},
     {"id": "helmet", "name": "Helm", "icon": "🪖"},
@@ -2499,6 +2628,7 @@ EQUIPMENT_SLOTS = [
     {"id": "earrings", "name": "Ohrringe", "icon": "💎"},
     {"id": "shoes", "name": "Schuhe", "icon": "👢"},
     {"id": "gloves", "name": "Handschuhe", "icon": "🧤"},
+    {"id": "belt", "name": "Gürtel", "icon": "🎗️"},
     # Spezial-Seite (6 Slots)
     {"id": "exp_ring", "name": "EXP Ring", "icon": "💍"},
     {"id": "thief_gloves", "name": "Diebeshandschuhe", "icon": "🧤"},
@@ -2515,17 +2645,17 @@ EQUIPMENT_SLOTS = [
 ]
 
 CLASS_STARTER_WEAPON = {
-    "warrior": "sword_broadsword",
-    "ninja": "sword_ninja_starter",
-    "sura": "sword_sura_starter",
-    "shaman": "bell_amber",
+    "warrior": "wpn_holz_sword",
+    "ninja": "wpn_holz_sword",
+    "sura": "wpn_holz_sword",
+    "shaman": "wpn_holz_staff",
 }
 
 CLASS_STARTER_ARMOR = {
-    "warrior": "armor_leather",
-    "ninja": "armor_ninja_starter",
-    "sura": "armor_sura_starter",
-    "shaman": "armor_shaman_starter",
+    "warrior": "arm_holz_armor",
+    "ninja": "arm_holz_armor",
+    "sura": "arm_holz_armor",
+    "shaman": "arm_holz_armor",
 }
 
 ITEM_TEMPLATES = {
@@ -3420,9 +3550,8 @@ ITEM_TEMPLATES = {
         "icon": "mount_seal_horse",
         "customIcon": "./assets/icons/items/mount/mount_seal.png",
         "sellPrice": 450,
-        "buyPrice": 2500,
         "stackable": True,
-        "description": "Ehrwürdige Medaille der Königlichen Reiterei. Wird im Reittier-Fenster [P] benötigt, um dein Pferd von Stufe 1 über das Kampfpferd (Lv. 35) bis zum Militärgaul (Lv. 50) zu steigern.",
+        "description": "Ehrwürdige Medaille der Königlichen Reiterei. Droppt ausschließlich von Affen (werden später hinzugefügt). Wird im Reittier-Fenster [P] benötigt, um dein Pferd von Stufe 1 über das Kampfpferd (Lv. 35) bis zum Militärgaul (Lv. 50) zu steigern.",
     },
     # --- VERBRAUCHSGÜTER, UPGRADE-MATERIALIEN & RUNEN-ITEMS (1 Slot) ---
     "potion_hp_small": {
@@ -3432,11 +3561,12 @@ ITEM_TEMPLATES = {
         "slotSize": 1,
         "rarity": "common",
         "icon": "potion_hp_small",
-        "healHp": 320,
+        "regenHp": 320,
+        "regenDuration": 8.0,
         "sellPrice": 15,
         "buyPrice": 35,
         "stackable": True,
-        "description": "Stellt sofort 320 Lebenspunkte (TP) wieder her. Wird auch vom Auto-Farming genutzt.",
+        "description": "Stellt 320 Lebenspunkte (TP) langsam über 8 Sekunden wieder her. Wird auch vom Auto-Farming genutzt.",
     },
     "potion_hp_medium": {
         "id": "potion_hp_medium",
@@ -3445,11 +3575,26 @@ ITEM_TEMPLATES = {
         "slotSize": 1,
         "rarity": "rare",
         "icon": "potion_hp_medium",
-        "healHp": 750,
+        "regenHp": 750,
+        "regenDuration": 10.0,
         "sellPrice": 40,
         "buyPrice": 90,
         "stackable": True,
-        "description": "Hochkonzentrierter Heiltrank: Stellt sofort 750 TP wieder her.",
+        "description": "Hochkonzentrierter Heiltrank: Stellt 750 TP langsam über 10 Sekunden wieder her.",
+    },
+    "potion_hp_large": {
+        "id": "potion_hp_large",
+        "name": "Roter Heiltrank (G)",
+        "type": "consumable",
+        "slotSize": 1,
+        "rarity": "rare",
+        "icon": "potion_hp_medium",
+        "regenHp": 750,
+        "regenDuration": 10.0,
+        "sellPrice": 40,
+        "buyPrice": 90,
+        "stackable": True,
+        "description": "Hochkonzentrierter Heiltrank: Stellt 750 TP langsam über 10 Sekunden wieder her.",
     },
     "potion_mp_medium": {
         "id": "potion_mp_medium",
@@ -3472,10 +3617,12 @@ ITEM_TEMPLATES = {
         "rarity": "rare",
         "icon": "potion_mp_medium",
         "customIcon": "./assets/icons/items/potion/potion_purple.png",
+        "moveSpeedBonus": 20,
+        "atkSpeedBonus": 15,
         "sellPrice": 60,
         "buyPrice": 150,
         "stackable": True,
-        "description": "Erhöht deine Bewegungsgeschwindigkeit 10 Minuten lang um +20%.",
+        "description": "Erhöht deine Angriffs- und Bewegungsgeschwindigkeit 10 Minuten lang (+15% Angriffs- & +20% Bewegungsgeschwindigkeit).",
     },
     "potion_atk_speed": {
         "id": "potion_atk_speed",
@@ -3485,10 +3632,11 @@ ITEM_TEMPLATES = {
         "rarity": "rare",
         "icon": "potion_mp_medium",
         "customIcon": "./assets/icons/items/potion/potion_green.png",
+        "moveSpeedBonus": 20,
         "sellPrice": 60,
         "buyPrice": 150,
         "stackable": True,
-        "description": "Erhöht deine Angriffsgeschwindigkeit 10 Minuten lang um +15%.",
+        "description": "Erhöht deine Bewegungsgeschwindigkeit 10 Minuten lang um +20%.",
     },
     "cape_bravery": {
         "id": "cape_bravery",
@@ -3578,9 +3726,19 @@ ITEM_TEMPLATES = {
         "rarity": "epic",
         "icon": "blessing_scroll",
         "sellPrice": 400,
-        "buyPrice": 1200,
         "stackable": True,
-        "description": "Schützt beim Schmied vor Zerstörung und erhöht die Erfolgschance um +10%.",
+        "description": "Schützt beim Schmied vor Zerstörung (-1 Stufe statt Zerstörung) und erhöht die Erfolgschance um +10%. Droppt unter Lv. 60 nur von Bossen & Dungeons (ab Lv. 60 auch von Monolithen).",
+    },
+    "item_magic_metal": {
+        "id": "item_magic_metal",
+        "name": "Magisches Metall",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "mythic",
+        "icon": "blessing_scroll",
+        "sellPrice": 2500,
+        "stackable": True,
+        "description": "100% Stufenschutz beim Schmied (+6 bis +9): Verhindert bei einem Fehlschlag sowohl die Zerstörung als auch jeglichen Stufenverlust!",
     },
     "item_bonus_adder": {
         "id": "item_bonus_adder",
@@ -3590,7 +3748,6 @@ ITEM_TEMPLATES = {
         "rarity": "epic",
         "icon": "bonus_adder",
         "sellPrice": 350,
-        "buyPrice": 950,
         "stackable": True,
         "description": "Fügt bei der Runenweberin einem Ausrüstungsteil einen neuen zufälligen Bonus hinzu (bis max. 5).",
     },
@@ -3602,9 +3759,8 @@ ITEM_TEMPLATES = {
         "rarity": "epic",
         "icon": "bonuswandler",
         "sellPrice": 350,
-        "buyPrice": 900,
         "stackable": True,
-        "description": "Würfelt bei der Runenweberin alle nicht fixierten Boni eines Gegenstands neu aus.",
+        "description": "Würfelt bei der Runenweberin alle nicht fixierten Standard-Boni (1.–5.) eines Gegenstands neu aus.",
     },
     "item_aether_seal": {
         "id": "item_aether_seal",
@@ -3614,7 +3770,6 @@ ITEM_TEMPLATES = {
         "rarity": "legendary",
         "icon": "aether_seal",
         "sellPrice": 800,
-        "buyPrice": 2200,
         "stackable": True,
         "description": "Erlaubt das Fixieren eines Wunsch-Bonus bei der Runenweberin. Sehr seltener Exklusiv-Drop nur aus Instabilen (St. 2) und Erweckten (St. 3) Rissmonolithen.",
     },
@@ -3626,9 +3781,8 @@ ITEM_TEMPLATES = {
         "rarity": "mythic",
         "icon": "soul_orb_rainbow",
         "sellPrice": 1200,
-        "buyPrice": 3500,
         "stackable": True,
-        "description": "Erlaubt bei der Runenweberin das Freischalten des seltenen 5. Bonusplatzes auf Waffen und Rüstungen.",
+        "description": "Erlaubt bei der Runenweberin das Freischalten des 5. Bonusplatzes auf Ausrüstung.",
     },
     "mat_monolith_shard": {
         "id": "mat_monolith_shard",
@@ -3638,7 +3792,6 @@ ITEM_TEMPLATES = {
         "rarity": "epic",
         "icon": "soul_fragment",
         "sellPrice": 750,
-        "buyPrice": 2500,
         "stackable": True,
         "description": "[Erweckungs-Item 1: Stufe 1 ➔ Stufe 2] Reiner Äthersplitter eines Rissmonolithen. Erweckt einen Schlafenden Rissmonolithen (Stufe 1) zu einem Instabilen Rissmonolithen (Stufe 2).",
     },
@@ -3650,9 +3803,8 @@ ITEM_TEMPLATES = {
         "rarity": "mythic",
         "icon": "soul_orb_rainbow",
         "sellPrice": 4200,
-        "buyPrice": 14000,
         "stackable": True,
-        "description": "[Erweckungs-Item 2: Stufe 2 ➔ Stufe 3] Komprimierte Riss-Singularität. Erweckt einen Instabilen Rissmonolithen (Stufe 2) zur extrem schweren, epischen 3. Stufe (Erwachter Rissmonolith)!",
+        "description": "[Erweckungs-Item 2: Stufe 2 ➔ Stufe 3] Komprimierte Riss-Singularität. Erweckt einen Instabilen Rissmonolithen (Stufe 2) zur extrem schweren, epischen 3. Stufe (Erwachter Rissmonolith + Gebiets-Worldboss)!",
     },
     "item_soul_fragment": {
         "id": "item_soul_fragment",
@@ -3662,9 +3814,8 @@ ITEM_TEMPLATES = {
         "rarity": "legendary",
         "icon": "soul_fragment",
         "sellPrice": 900,
-        "buyPrice": 4800,
         "stackable": True,
-        "description": "Kostbarer Seelenstein aus Rissmonolithen. Schaltet bei der Runenweberin den 6. und 7. Seelenbonus frei.",
+        "description": "Kostbarer Seelenstein aus Rissmonolithen und Bossen. Schaltet den 6./7. legendären Bonus frei und steigert Fertigkeiten von G1 bis P10.",
     },
     "item_skill_unlock_scroll": {
         "id": "item_skill_unlock_scroll",
@@ -3674,9 +3825,8 @@ ITEM_TEMPLATES = {
         "rarity": "mythic",
         "icon": "blessing_scroll",
         "sellPrice": 4000,
-        "buyPrice": 12000,
         "stackable": True,
-        "description": "Uraltes Siegel der Großmeister. Schaltet klassenübergreifend zuerst die 6. Fertigkeit und bei erneuter Nutzung die 7. Fertigkeit frei!",
+        "description": "Uraltes Siegel der Großmeister. Schaltet klassenübergreifend zuerst die 6. Fertigkeit und bei erneuter Nutzung die 7. Fertigkeit auf Stufe 0 frei!",
     },
     "mat_legendary_soul_stone": {
         "id": "mat_legendary_soul_stone",
@@ -3686,9 +3836,8 @@ ITEM_TEMPLATES = {
         "rarity": "mythic",
         "icon": "soul_orb_rainbow",
         "sellPrice": 6000,
-        "buyPrice": 18000,
         "stackable": True,
-        "description": "Uralter mythischer Kristall. Wertet eine Fertigkeit auf Stufe P10 direkt auf die finale Höchststufe L1 (Legendärer Meister) auf!",
+        "description": "Uralter mythischer Kristall. Wertet eine Fertigkeit auf Stufe P10 mit genau 1x Legendärem Seelenstein direkt auf die finale Maximalstufe L1 auf!",
     },
     "chest_skill_books": {
         "id": "chest_skill_books",
@@ -3698,7 +3847,6 @@ ITEM_TEMPLATES = {
         "rarity": "rare",
         "icon": "fertigkeitsbuch",
         "sellPrice": 1000,
-        "buyPrice": 3000,
         "stackable": True,
         "description": "Enthält ein zufälliges Fertigkeitsbuch einer beliebigen Klasse aus einem Rissmonolithen.",
     },
@@ -3710,9 +3858,8 @@ ITEM_TEMPLATES = {
         "rarity": "rare",
         "icon": "fertigkeitsbuch",
         "sellPrice": 300,
-        "buyPrice": 1200,
         "stackable": True,
-        "description": "Uraltes Lehrbuch aus Monstern & Rissmonolithen. Kann direkt zum Erlernen & Steigern jeder Passiven Fertigkeit (Stufe 0–20) verwendet oder im Inventar geöffnet werden.",
+        "description": "Uraltes Lehrbuch aus Rissmonolithen. Enthält beim Öffnen ein klassenspezifisches Fertigkeitsbuch (M1 bis G1 für aktive Skills).",
     },
     # Krieger Fertigkeitsbücher (M1 bis M10)
     "fb_aura_sword": {
@@ -3895,7 +4042,84 @@ ITEM_TEMPLATES = {
         "icon": "wolf_claw",
         "sellPrice": 45,
         "stackable": True,
-        "description": "Scharfe Kralle aus Morgenwacht. Benötigt für Schmied-Upgrades (+4 bis +6).",
+        "description": "Map-1-Uppmaterial (Hunde, Keiler & Wölfe Lv. 1–8). Benötigt für Schmied-Aufwertungen.",
+    },
+    "mat_bear_gall": {
+        "id": "mat_bear_gall",
+        "name": "Bärengalle",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "common",
+        "icon": "wolf_claw",
+        "sellPrice": 75,
+        "stackable": True,
+        "description": "Map-1-Uppmaterial (Bären Lv. 9–15). Benötigt für Schmied-Aufwertungen von Holz-, Kupfer- und Eisen-Ausrüstung.",
+    },
+    "mat_tiger_hide": {
+        "id": "mat_tiger_hide",
+        "name": "Tigerfell",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "rare",
+        "icon": "wolf_claw",
+        "sellPrice": 115,
+        "stackable": True,
+        "description": "Map-1-Uppmaterial (Tiger Lv. 9–15). Benötigt für höhere Schmied-Aufwertungen von Holz-, Kupfer- und Eisen-Ausrüstung.",
+    },
+    "mat_ornament": {
+        "id": "mat_ornament",
+        "name": "Schmuckgegenstand",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "rare",
+        "icon": "aether_seal",
+        "sellPrice": 165,
+        "stackable": True,
+        "description": "Map-1-Uppmaterial (Eid-Kämpfer Lv. 16–22). Kostbares Zierstück für +7 bis +9 Schmied-Aufwertungen bis Stufe 3.",
+    },
+    "mat_gem_piece": {
+        "id": "mat_gem_piece",
+        "name": "Stück Edelstein",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "rare",
+        "icon": "soul_fragment",
+        "sellPrice": 220,
+        "stackable": True,
+        "description": "Exklusives Map-2-Uppmaterial (Lv. 23–38). Funkelnder Edelsteinsplitter für Mid- und High-Level-Aufwertungen beim Schmied.",
+    },
+    "mat_black_uniform": {
+        "id": "mat_black_uniform",
+        "name": "Schwarze Uniform",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "rare",
+        "icon": "cursed_iron_ore",
+        "sellPrice": 220,
+        "stackable": True,
+        "description": "Exklusives Map-2-Uppmaterial (Lv. 23–38). Gewebte Rüstungsuniform der Schwarzwind-Truppen für Schmied-Aufwertungen.",
+    },
+    "mat_shuriken": {
+        "id": "mat_shuriken",
+        "name": "Shuriken",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "rare",
+        "icon": "wolf_claw",
+        "sellPrice": 230,
+        "stackable": True,
+        "description": "Exklusives Map-2-Uppmaterial (Lv. 23–38). Geschärfter Wurfstern der Schwarzwind-Schützen für Schmied-Aufwertungen.",
+    },
+    "mat_rapier_blade": {
+        "id": "mat_rapier_blade",
+        "name": "Degenklingen",
+        "type": "material",
+        "slotSize": 1,
+        "rarity": "epic",
+        "icon": "cursed_iron_ore",
+        "sellPrice": 260,
+        "stackable": True,
+        "description": "Exklusives Map-2-Uppmaterial (Lv. 23–38). Gehärtete Degenklingen für Schmied-Aufwertungen ab Stufe 4.",
     },
     "mat_cursed_iron": {
         "id": "mat_cursed_iron",
@@ -3906,7 +4130,7 @@ ITEM_TEMPLATES = {
         "icon": "cursed_iron_ore",
         "sellPrice": 110,
         "stackable": True,
-        "description": "Dunkles Erz der Schwarzeis-Banditen. Benötigt für Schmied-Upgrades (+5 bis +8).",
+        "description": "Dunkles Erz aus Aeryndor.",
     },
     "mat_bloodleaf_resin": {
         "id": "mat_bloodleaf_resin",
@@ -3927,9 +4151,8 @@ ITEM_TEMPLATES = {
         "rarity": "legendary",
         "icon": "soul_fragment",
         "sellPrice": 900,
-        "buyPrice": 4800,
         "stackable": True,
-        "description": "Kostbarer Kristall aus starken Rissmonolithen und Bossen. Für +7 bis +9 Upgrades.",
+        "description": "Kostbarer Kristall aus starken Rissmonolithen und Bossen. Steigert Fertigkeiten von G1 bis P10 und würfelt den 6./7. Bonus.",
     },
     "chest_oberork": {
         "id": "chest_oberork",
@@ -4066,22 +4289,65 @@ ITEM_TEMPLATES = {
     },
 }
 
+# Kein Fertigkeitsbuch darf im normalen Shop kaufbar sein (Fairness / SSOT)
+for _tid_fb, _tpl_fb in list(ITEM_TEMPLATES.items()):
+    if isinstance(_tpl_fb, dict) and _tpl_fb.get("type") in ("skill_book", "passive_skill_book"):
+        _tpl_fb.pop("buyPrice", None)
+
+# --- GEISTSTEINE (+0 bis +4) FÜR WAFFEN & RÜSTUNGEN (Rissmonolithen-Spezialdrops) ---
+SPIRIT_STONE_DEFS = [
+    ("monster", "Geiststein der Monster", "weapon", "vsMonsterPct", [2, 3, 5, 6, 8], "% Stark gegen Monster"),
+    ("metin", "Geiststein des Risses", "weapon", "vsMetinPct", [2, 3, 5, 6, 8], "% Stark gegen Rissmonolithen"),
+    ("crit", "Geiststein des Todesstoßes", "weapon", "critChance", [1, 2, 3, 5, 8], "% Kritischer Treffer"),
+    ("pierce", "Geiststein des Durchbruchs", "weapon", "pierceChance", [1, 2, 3, 5, 8], "% Durchbohrender Treffer"),
+    ("cooldown", "Geiststein der Wiederkehr", "weapon", "castSpeedPct", [3, 5, 8, 12, 17], "% Zaubergeschwindigkeit"),
+    ("vitality", "Geiststein der Lebenskraft", "armor", "hp", [100, 180, 280, 400, 600], " Max. TP"),
+    ("defense", "Geiststein des Schutzes", "armor", "def", [4, 7, 11, 16, 25], " Verteidigung"),
+    ("haste", "Geiststein der Hast", "armor", "moveSpeedPct", [3, 5, 8, 11, 15], "% Bewegungsgeschwindigkeit"),
+    ("evasion", "Geiststein des Ausweichens", "armor", "blockChancePct", [2, 3, 5, 6, 8], "% Blocken"),
+]
+SPIRIT_STONE_IDS_BY_GRADE = {0: [], 1: [], 2: [], 3: [], 4: []}
+ALL_SPIRIT_STONE_IDS = []
+_STONE_GRADE_RARITY = {0: "common", 1: "common", 2: "rare", 3: "epic", 4: "legendary"}
+for _s_key, _s_name, _s_slot, _s_stat, _s_vals, _s_label in SPIRIT_STONE_DEFS:
+    for _g in range(5):
+        _sid = f"stone_{_s_key}_{_g}"
+        _sval = _s_vals[_g]
+        _slot_label = "Waffe" if _s_slot == "weapon" else "Rüstung"
+        ITEM_TEMPLATES[_sid] = {
+            "id": _sid,
+            "name": f"{_s_name} +{_g}",
+            "type": "spirit_stone",
+            "targetSlot": _s_slot,
+            "stoneFamily": _s_key,
+            "stoneGrade": _g,
+            "stoneStat": _s_stat,
+            "stoneValue": _sval,
+            "slotSize": 1,
+            "rarity": _STONE_GRADE_RARITY[_g],
+            "icon": "soul_fragment",
+            "sellPrice": 150 * (_g + 1) * (_g + 1),
+            "stackable": True,
+            "description": f"Geiststein +{_g} zum Sockeln in eine ausgerüstete {_slot_label}: +{_sval}{_s_label}. Rechtsklick im Inventar sockelt den Geiststein (max. 3 verschiedene Steine pro {_slot_label}).",
+        }
+        SPIRIT_STONE_IDS_BY_GRADE[_g].append(_sid)
+        ALL_SPIRIT_STONE_IDS.append(_sid)
+
 
 def get_item_slot_size(template_id: str) -> int:
-    """Gibt die vertikale Slot-Größe (1, 2 oder 3 Slots) in Aeryndor zurück:
-    - Zweihandwaffen (2hand) & Stäbe (stab): 3 Slots (1x3 vertikal)
-    - Einhandwaffen (1hand / Schwerter) & Bögen (bogen): 2 Slots (1x2 vertikal)
-    - Rüstungen & Kostüm-Rüstungen (rüstung): 2 Slots (1x2 vertikal)
-    - Dolche (dolch), Helme, Schilde, Handschuhe, Schuhe, Schmuck, Tränke, Materialien: 1 Slot (1x1)
+    """Gibt die vertikale Slot-Größe (1, 2 oder 3 Slots) in Aeryndor zurück (SSOT):
+    - Zweihandwaffen, Bögen & Stäbe: 3 Slots (1x3 vertikal)
+    - Einhandwaffen & Rüstungen: 2 Slots (1x2 vertikal)
+    - Dolche, Helme, Schilde, Handschuhe, Schuhe, Schmuck, Gürtel (1 Slot), Tränke, Materialien: 1 Slot (1x1)
     """
     tpl = ITEM_TEMPLATES.get(template_id, {})
     sub = tpl.get("weaponSubType") or tpl.get("weaponSubtype") or ""
     slot = tpl.get("slot", "")
-    if sub == "dagger" or template_id in ("dagger_shadow", "dagger_viper", "dagger_soulless"):
+    if sub == "dagger" or slot == "belt" or template_id in ("dagger_shadow", "dagger_viper", "dagger_soulless"):
         return 1
-    if sub in ("two_hand", "staff", "bell", "fan") or slot == "costume_weapon" or template_id in ("sword_rsb", "glaive_iron", "sword_grudge", "bell_amber", "staff_jade", "staff_dragon"):
+    if sub in ("two_hand", "bow", "staff", "bell", "fan") or slot == "costume_weapon" or template_id in ("sword_rsb", "glaive_iron", "sword_grudge", "bell_amber", "staff_jade", "staff_dragon"):
         return 3
-    if sub in ("one_hand", "bow") or slot in ("armor", "costume", "costume_armor", "weapon"):
+    if sub == "one_hand" or slot in ("armor", "costume", "costume_armor", "weapon"):
         return 2
     if "slotSize" in tpl:
         return int(tpl["slotSize"])
@@ -4094,6 +4360,7 @@ RARITY_ORDER = {
     "epic": 2,
     "legendary": 3,
     "mythic": 4,
+    "instabil": 5,
 }
 
 
@@ -4149,414 +4416,221 @@ DEFAULT_DROP_FILTER = {
 
 
 # ============================================================================
-# 6B. 10-STUFEN AUSRÜSTUNGS-SYSTEM (Lv. 1 Holz bis Lv. 90 Ätherium — 130 Items)
+# 6B. 10-STUFEN AUSRÜSTUNGS-SYSTEM (SSOT: Lv. 1 Holz bis Lv. 90 Ätherium — 140 Items inkl. Gürtel)
 # ============================================================================
 EQUIPMENT_TIERS_10 = [
     {
-        "tier": 1, "key": "holz", "prefix": "Holz", "levelReq": 1, "rarity": "common",
-        "atk": 18, "def": 12, "hp": 100, "price": 500,
-        "tierBonusDesc": "+5 AW/DEF, +100 Max. TP, +2% Angriffsgeschwindigkeit",
-        "weaponStats": {"atk": 5, "hp": 100, "atkSpeedPct": 2},
-        "armorStats": {"def": 5, "hp": 100},
-        "jewelryStats": {"atk": 3, "hp": 80},
-        "weaponIcon": "🗡️", "armorIcon": "🥋",
+        "tier": 1, "key": "holz", "prefix": "Holz", "levelReq": 1, "rarity": "common", "craftOnly": False,
+        "wpnAtk0": 10, "wpnAtk9": 38, "wpnAs": 3,
+        "armDef0": 12, "armDef9": 42, "armHp0": 300, "armHp9": 1200,
+        "shdDef0": 8, "shdDef9": 32, "hlmDef0": 6, "hlmDef9": 24,
+        "shoDef0": 5, "shoDef9": 18, "shoMs": 5,
+        "glvAtk0": 4, "glvAtk9": 15, "earAtk0": 5, "earAtk9": 18,
+        "bltHp0": 150, "bltHp9": 450,
+        "nckCs0": 4, "nckCs9": 10, "brcAs0": 2, "brcAs9": 6,
+        "price": 500, "weaponIcon": "🗡️", "armorIcon": "🥋",
     },
     {
-        "tier": 2, "key": "kupfer", "prefix": "Kupfer", "levelReq": 10, "rarity": "common",
-        "atk": 38, "def": 26, "hp": 250, "price": 1800,
-        "tierBonusDesc": "+15 AW/DEF, +250 Max. TP, +3% Bewegungsgeschwindigkeit",
-        "weaponStats": {"atk": 15, "hp": 200, "moveSpeedPct": 3},
-        "armorStats": {"def": 14, "hp": 200, "moveSpeedPct": 3},
-        "jewelryStats": {"atk": 8, "hp": 180, "moveSpeedPct": 2},
-        "weaponIcon": "⚔️", "armorIcon": "🦺",
+        "tier": 2, "key": "kupfer", "prefix": "Kupfer", "levelReq": 10, "rarity": "common", "craftOnly": False,
+        "wpnAtk0": 18, "wpnAtk9": 56, "wpnAs": 4,
+        "armDef0": 22, "armDef9": 72, "armHp0": 650, "armHp9": 2100,
+        "shdDef0": 14, "shdDef9": 52, "hlmDef0": 11, "hlmDef9": 40,
+        "shoDef0": 9, "shoDef9": 30, "shoMs": 6,
+        "glvAtk0": 7, "glvAtk9": 25, "earAtk0": 9, "earAtk9": 30,
+        "bltHp0": 280, "bltHp9": 750,
+        "nckCs0": 6, "nckCs9": 12, "brcAs0": 3, "brcAs9": 7,
+        "price": 1800, "weaponIcon": "⚔️", "armorIcon": "🦺",
     },
     {
-        "tier": 3, "key": "eisen", "prefix": "Eisen", "levelReq": 20, "rarity": "common",
-        "atk": 68, "def": 48, "hp": 500, "price": 4500,
-        "tierBonusDesc": "+24 AW/DEF, +380 Max. TP, +2% Krit. Treffer, +2 STR/INT",
-        "weaponStats": {"atk": 28, "hp": 380, "critChance": 3, "str": 2, "int": 2},
-        "armorStats": {"def": 24, "hp": 380, "str": 2, "int": 2},
-        "jewelryStats": {"atk": 12, "hp": 320, "critChance": 2, "str": 1, "int": 1},
-        "weaponIcon": "⚔️", "armorIcon": "🛡️",
+        "tier": 3, "key": "eisen", "prefix": "Eisen", "levelReq": 20, "rarity": "common", "craftOnly": False,
+        "wpnAtk0": 28, "wpnAtk9": 82, "wpnAs": 5,
+        "armDef0": 35, "armDef9": 110, "armHp0": 1100, "armHp9": 3100,
+        "shdDef0": 22, "shdDef9": 78, "hlmDef0": 17, "hlmDef9": 60,
+        "shoDef0": 14, "shoDef9": 45, "shoMs": 8,
+        "glvAtk0": 11, "glvAtk9": 38, "earAtk0": 14, "earAtk9": 45,
+        "bltHp0": 450, "bltHp9": 1100,
+        "nckCs0": 8, "nckCs9": 15, "brcAs0": 4, "brcAs9": 9,
+        "price": 4500, "weaponIcon": "⚔️", "armorIcon": "🛡️",
     },
     {
-        "tier": 4, "key": "ebenholz", "prefix": "Ebenholz", "levelReq": 30, "rarity": "rare",
-        "atk": 115, "def": 80, "hp": 900, "price": 12000,
-        "tierBonusDesc": "+45 AW/DEF, +650 Max. TP, +5% FKS/Angriffsspeed, +4 VIT",
-        "weaponStats": {"atk": 48, "hp": 650, "skillDmgPct": 5, "atkSpeedPct": 5, "vit": 4},
-        "armorStats": {"def": 42, "hp": 650, "skillDmgPct": 4, "atkSpeedPct": 4, "vit": 4},
-        "jewelryStats": {"atk": 18, "hp": 520, "atkSpeedPct": 4, "vit": 3},
-        "weaponIcon": "🗡️", "armorIcon": "🛡️",
+        "tier": 4, "key": "ebenholz", "prefix": "Ebenholz", "levelReq": 30, "rarity": "rare", "craftOnly": False, "hasDssFks": True,
+        "wpnAtk0": 40, "wpnAtk9": 115, "wpnAs": 6,
+        "armDef0": 50, "armDef9": 155, "armHp0": 1650, "armHp9": 4000,
+        "shdDef0": 32, "shdDef9": 108, "hlmDef0": 25, "hlmDef9": 84,
+        "shoDef0": 20, "shoDef9": 62, "shoMs": 10,
+        "glvAtk0": 16, "glvAtk9": 54, "earAtk0": 20, "earAtk9": 62,
+        "bltHp0": 650, "bltHp9": 1500,
+        "nckCs0": 10, "nckCs9": 18, "brcAs0": 5, "brcAs9": 10,
+        "price": 12000, "weaponIcon": "🗡️", "armorIcon": "🛡️",
     },
     {
-        "tier": 5, "key": "silber", "prefix": "Silber", "levelReq": 40, "rarity": "rare",
-        "atk": 165, "def": 120, "hp": 1400, "price": 28000,
-        "tierBonusDesc": "+75 AW/DEF, +1.000 Max. TP, +6% TP-Absaugung, +5% Magie-Widerstand",
-        "weaponStats": {"atk": 78, "hp": 1000, "hpAbsorbPct": 6, "resMagicPct": 5},
-        "armorStats": {"def": 68, "hp": 1000, "hpAbsorbPct": 6, "resMagicPct": 5},
-        "jewelryStats": {"atk": 26, "hp": 850, "hpAbsorbPct": 4, "resMagicPct": 4},
-        "weaponIcon": "⚔️", "armorIcon": "🛡️",
+        "tier": 5, "key": "silber", "prefix": "Silber", "levelReq": 40, "rarity": "rare", "craftOnly": False, "hasDssFks": True,
+        "wpnAtk0": 55, "wpnAtk9": 155, "wpnAs": 7,
+        "armDef0": 70, "armDef9": 210, "armHp0": 2300, "armHp9": 4000,
+        "shdDef0": 44, "shdDef9": 142, "hlmDef0": 34, "hlmDef9": 112,
+        "shoDef0": 27, "shoDef9": 82, "shoMs": 11,
+        "glvAtk0": 22, "glvAtk9": 72, "earAtk0": 28, "earAtk9": 82,
+        "bltHp0": 900, "bltHp9": 1950,
+        "nckCs0": 12, "nckCs9": 20, "brcAs0": 6, "brcAs9": 12,
+        "price": 28000, "weaponIcon": "⚔️", "armorIcon": "🛡️",
     },
     {
-        "tier": 6, "key": "gold", "prefix": "Gold", "levelReq": 50, "rarity": "epic",
-        "atk": 225, "def": 165, "hp": 2000, "price": 65000,
-        "tierBonusDesc": "+180 AW/DEF, +2.000 Max. TP, +12% Stark gg. Monster/Rissmonolythen, +10% Yang-Drop",
-        "weaponStats": {"atk": 180, "hp": 2000, "vsMonsterPct": 12, "vsMetinPct": 12, "yangBonusPct": 10},
-        "armorStats": {"def": 180, "hp": 2000, "vsMonsterPct": 12, "vsMetinPct": 12, "yangBonusPct": 10},
-        "jewelryStats": {"atk": 180, "def": 180, "hp": 2000, "vsMonsterPct": 12, "vsMetinPct": 12, "yangBonusPct": 10},
-        "weaponIcon": "⚜️", "armorIcon": "👑",
+        "tier": 6, "key": "gold", "prefix": "Gold", "levelReq": 50, "rarity": "epic", "craftOnly": False, "hasDssFks": True,
+        "wpnAtk0": 75, "wpnAtk9": 205, "wpnAs": 8,
+        "armDef0": 95, "armDef9": 280, "armHp0": 3000, "armHp9": 4000,
+        "shdDef0": 58, "shdDef9": 180, "hlmDef0": 45, "hlmDef9": 142,
+        "shoDef0": 36, "shoDef9": 104, "shoMs": 13,
+        "glvAtk0": 30, "glvAtk9": 92, "earAtk0": 38, "earAtk9": 104,
+        "bltHp0": 1200, "bltHp9": 2400,
+        "nckCs0": 14, "nckCs9": 22, "brcAs0": 7, "brcAs9": 13,
+        "price": 65000, "weaponIcon": "⚜️", "armorIcon": "👑",
     },
     {
-        "tier": 7, "key": "drachengold", "prefix": "Drachengold", "levelReq": 60, "rarity": "epic",
-        "atk": 310, "def": 225, "hp": 2800, "price": 140000,
-        "tierBonusDesc": "+260 AW/DEF, +2.800 Max. TP, +15% Krit. & Durchbohrend, +10% Stark gg. Bosse",
-        "weaponStats": {"atk": 260, "hp": 2800, "critChance": 15, "pierceChance": 15, "vsBossPct": 10},
-        "armorStats": {"def": 260, "hp": 2800, "critChance": 15, "pierceChance": 15, "vsBossPct": 10},
-        "jewelryStats": {"atk": 260, "def": 260, "hp": 2800, "critChance": 15, "pierceChance": 15, "vsBossPct": 10},
-        "weaponIcon": "🐉", "armorIcon": "🐉",
+        "tier": 7, "key": "drachengold", "prefix": "Drachengold", "levelReq": 60, "rarity": "epic", "craftOnly": False, "hasDssFks": True,
+        "wpnAtk0": 100, "wpnAtk9": 265, "wpnAs": 9,
+        "armDef0": 125, "armDef9": 365, "armHp0": 3600, "armHp9": 4000,
+        "shdDef0": 74, "shdDef9": 220, "hlmDef0": 57, "hlmDef9": 174,
+        "shoDef0": 46, "shoDef9": 126, "shoMs": 15,
+        "glvAtk0": 40, "glvAtk9": 114, "earAtk0": 50, "earAtk9": 126,
+        "bltHp0": 1550, "bltHp9": 2850,
+        "nckCs0": 16, "nckCs9": 24, "brcAs0": 8, "brcAs9": 15,
+        "price": 140000, "weaponIcon": "🐉", "armorIcon": "🐉",
     },
     {
-        "tier": 8, "key": "donnerstahl", "prefix": "Donnerstahl", "levelReq": 70, "rarity": "legendary",
-        "atk": 420, "def": 300, "hp": 3800, "price": 290000,
-        "tierBonusDesc": "+360 AW/DEF, +3.800 Max. TP, +20% Angriffs-/Zauberspeed, +15% Elementar-Widerstand",
-        "weaponStats": {"atk": 360, "hp": 3800, "atkSpeedPct": 20, "castSpeedPct": 20, "resFirePct": 15, "resLightningPct": 15, "resWindPct": 15},
-        "armorStats": {"def": 360, "hp": 3800, "atkSpeedPct": 20, "castSpeedPct": 20, "resFirePct": 15, "resLightningPct": 15, "resWindPct": 15},
-        "jewelryStats": {"atk": 360, "def": 360, "hp": 3800, "atkSpeedPct": 20, "castSpeedPct": 20, "resFirePct": 15, "resLightningPct": 15, "resWindPct": 15},
-        "weaponIcon": "⚡", "armorIcon": "⚡",
+        "tier": 8, "key": "schwarzstahl", "prefix": "Schwarzstahl", "levelReq": 70, "rarity": "legendary", "craftOnly": False, "hasDssFks": True,
+        "wpnAtk0": 135, "wpnAtk9": 345, "wpnAs": 10,
+        "armDef0": 165, "armDef9": 470, "armHp0": 4000, "armHp9": 4000,
+        "shdDef0": 90, "shdDef9": 260, "hlmDef0": 70, "hlmDef9": 206,
+        "shoDef0": 58, "shoDef9": 150, "shoMs": 16,
+        "glvAtk0": 52, "glvAtk9": 136, "earAtk0": 64, "earAtk9": 150,
+        "bltHp0": 1950, "bltHp9": 3250,
+        "nckCs0": 18, "nckCs9": 26, "brcAs0": 9, "brcAs9": 16,
+        "price": 290000, "weaponIcon": "⚡", "armorIcon": "⚡",
     },
     {
-        "tier": 9, "key": "blaustahl", "prefix": "Blaustahl", "levelReq": 80, "rarity": "legendary",
-        "atk": 550, "def": 390, "hp": 5000, "price": 580000,
-        "tierBonusDesc": "+480 AW/DEF, +5.000 Max. TP, +25% Stark gg. PvM, +15% Klassen-PvP-Deff",
-        "weaponStats": {"atk": 480, "hp": 5000, "vsMonsterPct": 25, "defSwordPct": 15, "defTwoHandPct": 15, "defDaggerPct": 15, "defArrowPct": 15, "defStaffPct": 15},
-        "armorStats": {"def": 480, "hp": 5000, "vsMonsterPct": 25, "defSwordPct": 15, "defTwoHandPct": 15, "defDaggerPct": 15, "defArrowPct": 15, "defStaffPct": 15},
-        "jewelryStats": {"atk": 480, "def": 480, "hp": 5000, "vsMonsterPct": 25, "defSwordPct": 15, "defTwoHandPct": 15, "defDaggerPct": 15, "defArrowPct": 15, "defStaffPct": 15},
-        "weaponIcon": "💎", "armorIcon": "💎",
+        "tier": 9, "key": "blaustahl", "prefix": "Blaustahl", "levelReq": 80, "rarity": "legendary", "craftOnly": True, "hasDssFks": True,
+        "wpnAtk0": 180, "wpnAtk9": 445, "wpnAs": 11,
+        "armDef0": 215, "armDef9": 590, "armHp0": 4000, "armHp9": 4000,
+        "shdDef0": 105, "shdDef9": 300, "hlmDef0": 82, "hlmDef9": 238,
+        "shoDef0": 72, "shoDef9": 175, "shoMs": 18,
+        "glvAtk0": 65, "glvAtk9": 158, "earAtk0": 78, "earAtk9": 175,
+        "bltHp0": 2400, "bltHp9": 3650,
+        "nckCs0": 20, "nckCs9": 28, "brcAs0": 10, "brcAs9": 17,
+        "price": 580000, "weaponIcon": "💎", "armorIcon": "💎",
     },
     {
-        "tier": 10, "key": "aetherium", "prefix": "Ätherium", "levelReq": 90, "rarity": "mythic",
-        "atk": 720, "def": 520, "hp": 7500, "price": 1200000,
-        "tierBonusDesc": "+650 AW/DEF, +7.500 Max. TP, +30% Krit & +30% FKS, +20% Stark gg. Monster/Bosse/Rissmonolythen",
-        "weaponStats": {"atk": 650, "hp": 7500, "critChance": 30, "skillDmgPct": 30, "vsMonsterPct": 20, "vsBossPct": 20, "vsMetinPct": 20},
-        "armorStats": {"def": 650, "hp": 7500, "critChance": 30, "skillDmgPct": 30, "vsMonsterPct": 20, "vsBossPct": 20, "vsMetinPct": 20},
-        "jewelryStats": {"atk": 650, "def": 650, "hp": 7500, "critChance": 30, "skillDmgPct": 30, "vsMonsterPct": 20, "vsBossPct": 20, "vsMetinPct": 20},
-        "weaponIcon": "🌌", "armorIcon": "🌌",
+        "tier": 10, "key": "aetherium", "prefix": "Ätherium", "levelReq": 90, "rarity": "mythic", "craftOnly": True, "hasDssFks": True,
+        "wpnAtk0": 240, "wpnAtk9": 560, "wpnAs": 12,
+        "armDef0": 280, "armDef9": 730, "armHp0": 4000, "armHp9": 4000,
+        "shdDef0": 120, "shdDef9": 340, "hlmDef0": 95, "hlmDef9": 270,
+        "shoDef0": 88, "shoDef9": 200, "shoMs": 20,
+        "glvAtk0": 80, "glvAtk9": 180, "earAtk0": 95, "earAtk9": 200,
+        "bltHp0": 2900, "bltHp9": 4000,
+        "nckCs0": 22, "nckCs9": 30, "brcAs0": 11, "brcAs9": 18,
+        "price": 1200000, "weaponIcon": "🌌", "armorIcon": "🌌",
     },
 ]
 
 
 def _register_10_tier_equipment():
+    all_classes = ["warrior", "ninja", "assassin", "sura", "runemage", "shaman"]
     for t in EQUIPMENT_TIERS_10:
         tkey = t["key"]
         pref = t["prefix"]
         lv = t["levelReq"]
         rar = t["rarity"]
-        w_base = dict(t["weaponStats"])
-        a_base = dict(t["armorStats"])
-        j_base = dict(t["jewelryStats"])
         p = t["price"]
+        craft_only = bool(t.get("craftOnly"))
+        has_dss_fks = bool(t.get("hasDssFks"))
+        craft_tag = " [Nur Craftbar]" if craft_only else ""
+        dss_tag = " Besitzt feste DSS- & FKS-Werte!" if has_dss_fks else ""
 
-        all_classes = ["warrior", "ninja", "assassin", "sura", "runemage", "shaman"]
+        def _reg(item_id: str, name: str, slot: str, slot_size: int, classes: list, icon: str,
+                 s0: dict, s9: dict, price_mult: float = 1.0, desc_extra: str = "", w_sub: str = ""):
+            ip = int(round(p * price_mult))
+            full_desc = (
+                f"Stufe {t['tier']} ({pref}, Lv. {lv}){craft_tag} — {desc_extra}".strip(" —")
+            )
+            entry = {
+                "id": item_id,
+                "name": name,
+                "type": "equipment",
+                "slot": slot,
+                "slotSize": slot_size,
+                "classes": classes,
+                "reqLevel": lv,
+                "levelReq": lv,
+                "tier": t["tier"],
+                "tierKey": tkey,
+                "craftOnly": craft_only,
+                "hasDssFks": bool(has_dss_fks and slot == "weapon"),
+                "rarity": rar,
+                "icon": icon,
+                "baseStats": dict(s0),
+                "maxStats9": dict(s9),
+                "price": ip,
+                "sellPrice": max(35, ip // 4),
+                "desc": full_desc,
+                "description": full_desc,
+            }
+            if w_sub:
+                entry["weaponSubType"] = w_sub
+                entry["weaponSubtype"] = w_sub
+            ITEM_TEMPLATES[item_id] = entry
 
-        # 1. Einhand-Schwert (Klingenwächter, Schattenjäger, Runenmagier) - 2 Slots
-        sword_id = f"wpn_{tkey}_sword"
-        sword_stats = dict(w_base)
-        sword_stats["magicAtk"] = int(round(w_base["atk"] * 0.85))
-        ITEM_TEMPLATES[sword_id] = {
-            "id": sword_id,
-            "name": f"{pref}-Schwert",
-            "type": "equipment",
-            "slot": "weapon",
-            "weaponSubType": "one_hand",
-            "weaponSubtype": "one_hand",
-            "slotSize": 2,
-            "classes": ["warrior", "ninja", "assassin", "sura", "runemage"],
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": t["weaponIcon"],
-            "baseStats": sword_stats,
-            "price": p,
-            "sellPrice": max(50, p // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Einhandwaffe für Klingenwächter, Schattenjäger & Runenmagier. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Einhandwaffe für Klingenwächter, Schattenjäger & Runenmagier. Standard-Boni: {t['tierBonusDesc']}.",
-        }
+        w0 = {"atk": t["wpnAtk0"], "atkSpeedPct": t["wpnAs"]}
+        w9 = {"atk": t["wpnAtk9"], "atkSpeedPct": t["wpnAs"]}
+        wm0 = {"atk": t["wpnAtk0"], "magicAtk": t["wpnAtk0"], "atkSpeedPct": t["wpnAs"]}
+        wm9 = {"atk": t["wpnAtk9"], "magicAtk": t["wpnAtk9"], "atkSpeedPct": t["wpnAs"]}
 
-        # 2. Zweihänder (Nur Klingenwächter) - 3 Slots
-        gs_id = f"wpn_{tkey}_greatsword"
-        gs_stats = dict(w_base)
-        gs_stats["atk"] = int(round(w_base["atk"] * 1.25))
-        ITEM_TEMPLATES[gs_id] = {
-            "id": gs_id,
-            "name": f"{pref}-Zweihänder",
-            "type": "equipment",
-            "slot": "weapon",
-            "weaponSubType": "two_hand",
-            "weaponSubtype": "two_hand",
-            "slotSize": 3,
-            "classes": ["warrior"],
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🪓",
-            "baseStats": gs_stats,
-            "price": int(p * 1.15),
-            "sellPrice": max(60, int(p * 1.15) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Zweihandwaffe (exklusiv für Klingenwächter). Massiver Basis-AW, optimal auf Mount & in VWK. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Zweihandwaffe (exklusiv für Klingenwächter). Massiver Basis-AW, optimal auf Mount & in VWK. Standard-Boni: {t['tierBonusDesc']}.",
-        }
+        # 1–5. Waffen: Einhand (2 Slots), Zweihand (3 Slots), Dolche (1 Slot), Bogen (3 Slots), Stab (3 Slots)
+        _reg(f"wpn_{tkey}_sword", f"{pref}-Schwert", "weapon", 2,
+             ["warrior", "ninja", "assassin", "sura", "runemage"], t["weaponIcon"], wm0, wm9, 1.0,
+             f"Einhandwaffe (2 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "one_hand")
+        _reg(f"wpn_{tkey}_greatsword", f"{pref}-Zweihänder", "weapon", 3,
+             ["warrior"], "🪓", w0, w9, 1.15,
+             f"Zweihandwaffe für Klingenwächter (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "two_hand")
+        _reg(f"wpn_{tkey}_daggers", f"{pref}-Dolche", "weapon", 1,
+             ["ninja", "assassin"], "🗡️", w0, w9, 1.0,
+             f"Dolche für Schattenjäger (1 Slot): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "dagger")
+        _reg(f"wpn_{tkey}_bow", f"{pref}-Bogen", "weapon", 3,
+             ["ninja", "assassin"], "🏹", w0, w9, 1.1,
+             f"Fernkampfbogen für Schattenjäger (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "bow")
+        _reg(f"wpn_{tkey}_staff", f"{pref}-Stab", "weapon", 3,
+             ["shaman"], "🪄", wm0, wm9, 1.1,
+             f"Stab für Seelenweber (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "staff")
 
-        # 3. Dolche (Nur Schattenjäger) - 1 Slot
-        dag_id = f"wpn_{tkey}_daggers"
-        dag_stats = dict(w_base)
-        dag_stats["atkSpeedPct"] = dag_stats.get("atkSpeedPct", 0) + 12
-        dag_stats["critChance"] = dag_stats.get("critChance", 0) + 5
-        ITEM_TEMPLATES[dag_id] = {
-            "id": dag_id,
-            "name": f"{pref}-Dolche",
-            "type": "equipment",
-            "slot": "weapon",
-            "weaponSubType": "dagger",
-            "weaponSubtype": "dagger",
-            "slotSize": 1,
-            "classes": ["ninja", "assassin"],
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🗡️",
-            "baseStats": dag_stats,
-            "price": p,
-            "sellPrice": max(50, p // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Zwillingsdolche für Schattenjäger. Doppelschlag pro Angriff & DEX-Skalierung (1 Inventar-Slot). Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Zwillingsdolche für Schattenjäger. Doppelschlag pro Angriff & DEX-Skalierung (1 Inventar-Slot). Standard-Boni: {t['tierBonusDesc']}.",
-        }
+        # 6. Körperrüstung (2 Slots)
+        _reg(f"arm_{tkey}_armor", f"{pref}-Rüstung", "armor", 2, all_classes, t["armorIcon"],
+             {"def": t["armDef0"], "magicDef": int(round(t["armDef0"] * 0.75)), "hp": t["armHp0"]},
+             {"def": t["armDef9"], "magicDef": int(round(t["armDef9"] * 0.75)), "hp": t["armHp9"]}, 1.0,
+             f"Körperrüstung (2 Slots): +{t['armDef0']} DEF / +{t['armHp0']} TP (+0) ➔ +{t['armDef9']} DEF / +{t['armHp9']} TP (+9).")
 
-        # 4. Bogen (Nur Schattenjäger) - 2 Slots
-        bow_id = f"wpn_{tkey}_bow"
-        bow_stats = dict(w_base)
-        bow_stats["atk"] = int(round(w_base["atk"] * 1.20))
-        ITEM_TEMPLATES[bow_id] = {
-            "id": bow_id,
-            "name": f"{pref}-Bogen",
-            "type": "equipment",
-            "slot": "weapon",
-            "weaponSubType": "bow",
-            "weaponSubtype": "bow",
-            "slotSize": 2,
-            "classes": ["ninja", "assassin"],
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🏹",
-            "baseStats": bow_stats,
-            "price": int(p * 1.1),
-            "sellPrice": max(55, int(p * 1.1) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Fernkampfbogen für Schattenjäger (2 Inventar-Slots). Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Fernkampfbogen für Schattenjäger (2 Inventar-Slots). Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 5. Stab (Nur Seelenweber) - 3 Slots
-        staff_id = f"wpn_{tkey}_staff"
-        staff_stats = dict(w_base)
-        staff_stats["magicAtk"] = int(round(w_base["atk"] * 1.22))
-        staff_stats["int"] = staff_stats.get("int", 0) + max(2, t["tier"] * 2)
-        ITEM_TEMPLATES[staff_id] = {
-            "id": staff_id,
-            "name": f"{pref}-Stab",
-            "type": "equipment",
-            "slot": "weapon",
-            "weaponSubType": "staff",
-            "weaponSubtype": "staff",
-            "slotSize": 3,
-            "classes": ["shaman"],
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🪄",
-            "baseStats": staff_stats,
-            "price": int(p * 1.1),
-            "sellPrice": max(55, int(p * 1.1) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Seelenweber-Stab (3 Inventar-Slots). Vereint hohen physischen AW für den Reitkampf mit starker Magie & INT. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Seelenweber-Stab (3 Inventar-Slots). Vereint hohen physischen AW für den Reitkampf mit starker Magie & INT. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 6. Körperrüstung - 2 Slots
-        arm_id = f"arm_{tkey}_armor"
-        arm_stats = dict(a_base)
-        arm_stats["magicDef"] = int(round(a_base["def"] * 0.75))
-        ITEM_TEMPLATES[arm_id] = {
-            "id": arm_id,
-            "name": f"{pref}-Rüstung",
-            "type": "equipment",
-            "slot": "armor",
-            "slotSize": 2,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": t["armorIcon"],
-            "baseStats": arm_stats,
-            "price": p,
-            "sellPrice": max(50, p // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Körperrüstung. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Körperrüstung. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 7. Schild - 1 Slot
-        shd_id = f"eq_{tkey}_shield"
-        shd_stats = dict(a_base)
-        shd_stats["def"] = int(round(a_base["def"] * 0.85))
-        ITEM_TEMPLATES[shd_id] = {
-            "id": shd_id,
-            "name": f"{pref}-Schild",
-            "type": "equipment",
-            "slot": "shield",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🛡️",
-            "baseStats": shd_stats,
-            "price": int(p * 0.85),
-            "sellPrice": max(40, int(p * 0.85) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Kampfschild. Kann beim Switchen Immun gegen Ohnmacht & Nahkampf-Blocken erhalten. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Kampfschild. Kann beim Switchen Immun gegen Ohnmacht & Nahkampf-Blocken erhalten. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 8. Helm - 1 Slot
-        hlm_id = f"eq_{tkey}_helmet"
-        hlm_stats = dict(a_base)
-        hlm_stats["def"] = int(round(a_base["def"] * 0.65))
-        ITEM_TEMPLATES[hlm_id] = {
-            "id": hlm_id,
-            "name": f"{pref}-Helm",
-            "type": "equipment",
-            "slot": "helmet",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🪖",
-            "baseStats": hlm_stats,
-            "price": int(p * 0.8),
-            "sellPrice": max(40, int(p * 0.8) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Kopfschutz. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Kopfschutz. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 9. Handschuhe - 1 Slot
-        glv_id = f"eq_{tkey}_gloves"
-        glv_stats = dict(j_base)
-        glv_stats["atk"] = int(round(j_base.get("atk", 6) * 0.65))
-        glv_stats["def"] = int(round(a_base.get("def", 6) * 0.45))
-        ITEM_TEMPLATES[glv_id] = {
-            "id": glv_id,
-            "name": f"{pref}-Handschuhe",
-            "type": "equipment",
-            "slot": "gloves",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🧤",
-            "baseStats": glv_stats,
-            "price": int(p * 0.75),
-            "sellPrice": max(35, int(p * 0.75) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Panzerhandschuhe. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Panzerhandschuhe. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 10. Schuhe - 1 Slot
-        sho_id = f"eq_{tkey}_shoes"
-        sho_stats = dict(a_base)
-        sho_stats["def"] = int(round(a_base["def"] * 0.6))
-        sho_stats["moveSpeedPct"] = sho_stats.get("moveSpeedPct", 0) + min(15, 2 + t["tier"])
-        ITEM_TEMPLATES[sho_id] = {
-            "id": sho_id,
-            "name": f"{pref}-Schuhe",
-            "type": "equipment",
-            "slot": "shoes",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "🥾",
-            "baseStats": sho_stats,
-            "price": int(p * 0.75),
-            "sellPrice": max(35, int(p * 0.75) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Kampfstiefel. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Kampfstiefel. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 11. Kette - 1 Slot
-        nck_id = f"eq_{tkey}_necklace"
-        nck_stats = dict(j_base)
-        nck_stats["castSpeedPct"] = nck_stats.get("castSpeedPct", 0) + min(20, 2 + t["tier"] * 2)
-        ITEM_TEMPLATES[nck_id] = {
-            "id": nck_id,
-            "name": f"{pref}-Kette",
-            "type": "equipment",
-            "slot": "necklace",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "📿",
-            "baseStats": nck_stats,
-            "price": int(p * 0.85),
-            "sellPrice": max(40, int(p * 0.85) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Halskette. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Halskette. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 12. Armband - 1 Slot
-        brc_id = f"eq_{tkey}_bracelet"
-        brc_stats = dict(j_base)
-        brc_stats["atkSpeedPct"] = brc_stats.get("atkSpeedPct", 0) + min(15, 1 + t["tier"])
-        ITEM_TEMPLATES[brc_id] = {
-            "id": brc_id,
-            "name": f"{pref}-Armband",
-            "type": "equipment",
-            "slot": "bracelet",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "⌚",
-            "baseStats": brc_stats,
-            "price": int(p * 0.85),
-            "sellPrice": max(40, int(p * 0.85) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Armband. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Armband. Standard-Boni: {t['tierBonusDesc']}.",
-        }
-
-        # 13. Ohrringe - 1 Slot
-        ear_id = f"eq_{tkey}_earrings"
-        ear_stats = dict(j_base)
-        ear_stats["str"] = ear_stats.get("str", 0) + min(16, 1 + t["tier"])
-        ITEM_TEMPLATES[ear_id] = {
-            "id": ear_id,
-            "name": f"{pref}-Ohrringe",
-            "type": "equipment",
-            "slot": "earrings",
-            "slotSize": 1,
-            "classes": all_classes,
-            "reqLevel": lv,
-            "levelReq": lv,
-            "rarity": rar,
-            "icon": "💍",
-            "baseStats": ear_stats,
-            "price": int(p * 0.85),
-            "sellPrice": max(40, int(p * 0.85) // 4),
-            "desc": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Ohrringe. Standard-Boni: {t['tierBonusDesc']}.",
-            "description": f"Stufe {t['tier']} ({pref}, Lv. {lv}) Ohrringe. Standard-Boni: {t['tierBonusDesc']}.",
-        }
+        # 7–14. Schild, Helm, Handschuhe, Schuhe, Kette, Armband, Ohrringe, Gürtel (je 1 Slot)
+        _reg(f"eq_{tkey}_shield", f"{pref}-Schild", "shield", 1, all_classes, "🛡️",
+             {"def": t["shdDef0"]}, {"def": t["shdDef9"]}, 0.85,
+             f"Kampfschild: +{t['shdDef0']} DEF (+0) ➔ +{t['shdDef9']} DEF (+9).")
+        _reg(f"eq_{tkey}_helmet", f"{pref}-Helm", "helmet", 1, all_classes, "🪖",
+             {"def": t["hlmDef0"]}, {"def": t["hlmDef9"]}, 0.80,
+             f"Kopfschutz: +{t['hlmDef0']} DEF (+0) ➔ +{t['hlmDef9']} DEF (+9).")
+        _reg(f"eq_{tkey}_gloves", f"{pref}-Handschuhe", "gloves", 1, all_classes, "🧤",
+             {"atk": t["glvAtk0"]}, {"atk": t["glvAtk9"]}, 0.75,
+             f"Panzerhandschuhe: +{t['glvAtk0']} AW (+0) ➔ +{t['glvAtk9']} AW (+9).")
+        _reg(f"eq_{tkey}_shoes", f"{pref}-Schuhe", "shoes", 1, all_classes, "🥾",
+             {"def": t["shoDef0"], "moveSpeedPct": t["shoMs"]}, {"def": t["shoDef9"], "moveSpeedPct": t["shoMs"]}, 0.75,
+             f"Kampfstiefel: +{t['shoDef0']} DEF (+0) ➔ +{t['shoDef9']} DEF (+9), +{t['shoMs']}% Bewegungsgeschw.")
+        _reg(f"eq_{tkey}_necklace", f"{pref}-Kette", "necklace", 1, all_classes, "📿",
+             {"castSpeedPct": t["nckCs0"]}, {"castSpeedPct": t["nckCs9"]}, 0.85,
+             f"Halskette: +{t['nckCs0']}% Zaubergeschw. (+0) ➔ +{t['nckCs9']}% (+9).")
+        _reg(f"eq_{tkey}_bracelet", f"{pref}-Armband", "bracelet", 1, all_classes, "⌚",
+             {"atkSpeedPct": t["brcAs0"]}, {"atkSpeedPct": t["brcAs9"]}, 0.85,
+             f"Armband: +{t['brcAs0']}% Angriffsgeschw. (+0) ➔ +{t['brcAs9']}% (+9).")
+        _reg(f"eq_{tkey}_earrings", f"{pref}-Ohrringe", "earrings", 1, all_classes, "💍",
+             {"atk": t["earAtk0"]}, {"atk": t["earAtk9"]}, 0.85,
+             f"Ohrringe: +{t['earAtk0']} AW (+0) ➔ +{t['earAtk9']} AW (+9).")
+        _reg(f"eq_{tkey}_belt", f"{pref}-Gürtel", "belt", 1, all_classes, "🎗️",
+             {"hp": t["bltHp0"]}, {"hp": t["bltHp9"]}, 0.80,
+             f"Gürtel (1 Slot): +{t['bltHp0']} Max. TP (+0) ➔ +{t['bltHp9']} Max. TP (+9).")
 
 
 _register_10_tier_equipment()
@@ -4565,17 +4639,170 @@ _register_10_tier_equipment()
 # ============================================================================
 # 7. SCHMIED UPGRADE-TABELLE (+0 bis +9) & RUNENWEBERIN-BONI (Kap. 10)
 # ============================================================================
-BLACKSMITH_RATES = {
-    0: {"target": 1, "chance": 0.95, "yang": 200, "matId": None, "matCount": 0, "statMult": 1.10},
-    1: {"target": 2, "chance": 0.90, "yang": 350, "matId": None, "matCount": 0, "statMult": 1.22},
-    2: {"target": 3, "chance": 0.82, "yang": 600, "matId": None, "matCount": 0, "statMult": 1.36},
-    3: {"target": 4, "chance": 0.72, "yang": 1000, "matId": "mat_wolf_claw", "matCount": 1, "statMult": 1.52},
-    4: {"target": 5, "chance": 0.65, "yang": 1600, "matId": "mat_wolf_claw", "matCount": 2, "statMult": 1.70},
-    5: {"target": 6, "chance": 0.55, "yang": 2500, "matId": "mat_cursed_iron", "matCount": 1, "statMult": 1.92},
-    6: {"target": 7, "chance": 0.46, "yang": 4200, "matId": "mat_cursed_iron", "matCount": 2, "statMult": 2.20},
-    7: {"target": 8, "chance": 0.32, "yang": 7000, "matId": "mat_soul_stone", "matCount": 1, "statMult": 2.55},
-    8: {"target": 9, "chance": 0.22, "yang": 12000, "matId": "mat_soul_stone", "matCount": 2, "statMult": 3.00},
+def _mk_tier_rates(rows: list) -> dict:
+    stat_mults = [1.10, 1.22, 1.36, 1.52, 1.70, 1.92, 2.20, 2.55, 3.00]
+    out = {}
+    for idx, (yang, mat_id, mat_cnt, chance) in enumerate(rows):
+        out[idx] = {
+            "target": idx + 1,
+            "chance": chance,
+            "yang": yang,
+            "matId": mat_id,
+            "matCount": mat_cnt,
+            "statMult": stat_mults[idx],
+        }
+    return out
+
+
+MAP2_UPGRADE_MAT_BY_SLOT = {
+    "weapon": "mat_rapier_blade",
+    "armor": "mat_black_uniform",
+    "shield": "mat_black_uniform",
+    "belt": "mat_black_uniform",
+    "helmet": "mat_shuriken",
+    "gloves": "mat_shuriken",
+    "shoes": "mat_shuriken",
+    "necklace": "mat_gem_piece",
+    "bracelet": "mat_gem_piece",
+    "earrings": "mat_gem_piece",
 }
+
+BLACKSMITH_TIER_RATES = {
+    "holz": _mk_tier_rates([
+        (500, None, 0, 1.00),
+        (1000, None, 0, 0.90),
+        (2000, "mat_wolf_claw", 1, 0.80),
+        (4000, "mat_wolf_claw", 2, 0.70),
+        (8000, "mat_bear_gall", 1, 0.60),
+        (15000, "mat_bear_gall", 2, 0.50),
+        (25000, "mat_tiger_hide", 2, 0.40),
+        (40000, "mat_tiger_hide", 3, 0.30),
+        (70000, "mat_ornament", 5, 0.20),
+    ]),
+    "kupfer": _mk_tier_rates([
+        (1500, None, 0, 1.00),
+        (3000, "mat_wolf_claw", 1, 0.90),
+        (6000, "mat_wolf_claw", 2, 0.80),
+        (12000, "mat_bear_gall", 1, 0.70),
+        (22000, "mat_bear_gall", 2, 0.60),
+        (38000, "mat_tiger_hide", 1, 0.50),
+        (60000, "mat_tiger_hide", 2, 0.35),
+        (95000, "mat_ornament", 4, 0.30),
+        (150000, "mat_ornament", 6, 0.20),
+    ]),
+    "eisen": _mk_tier_rates([
+        (3500, "mat_wolf_claw", 1, 1.00),
+        (7000, "mat_wolf_claw", 2, 0.90),
+        (14000, "mat_bear_gall", 1, 0.80),
+        (28000, "mat_bear_gall", 2, 0.70),
+        (50000, "mat_tiger_hide", 1, 0.60),
+        (85000, "mat_tiger_hide", 2, 0.50),
+        (130000, "mat_ornament", 2, 0.40),
+        (200000, "mat_ornament", 4, 0.30),
+        (320000, "mat_ornament", 6, 0.20),
+    ]),
+    "ebenholz": _mk_tier_rates([
+        (6000, None, 0, 0.95),
+        (12000, "map2_slot", 1, 0.88),
+        (22000, "map2_slot", 1, 0.78),
+        (38000, "map2_slot", 1, 0.68),
+        (60000, "map2_slot", 2, 0.58),
+        (88000, "map2_slot", 2, 0.48),
+        (120000, "map2_slot", 2, 0.35),
+        (200000, "map2_slot", 4, 0.25),
+        (350000, "map2_slot", 6, 0.15),
+    ]),
+    "silber": _mk_tier_rates([
+        (10000, None, 0, 0.95),
+        (20000, "map2_slot", 1, 0.86),
+        (35000, "map2_slot", 1, 0.76),
+        (58000, "map2_slot", 2, 0.66),
+        (88000, "map2_slot", 2, 0.56),
+        (125000, "map2_slot", 2, 0.46),
+        (180000, "map2_slot", 2, 0.35),
+        (300000, "map2_slot", 4, 0.25),
+        (520000, "map2_slot", 6, 0.15),
+    ]),
+    "gold": _mk_tier_rates([
+        (15000, "map2_slot", 1, 0.92),
+        (28000, "map2_slot", 1, 0.84),
+        (48000, "map2_slot", 1, 0.74),
+        (78000, "map2_slot", 2, 0.64),
+        (120000, "map2_slot", 2, 0.54),
+        (175000, "map2_slot", 2, 0.45),
+        (250000, "map2_slot", 2, 0.35),
+        (400000, "map2_slot", 4, 0.25),
+        (700000, "map2_slot", 6, 0.15),
+    ]),
+    "drachengold": _mk_tier_rates([
+        (30000, "map2_slot", 1, 0.90),
+        (55000, "map2_slot", 1, 0.82),
+        (95000, "map2_slot", 2, 0.72),
+        (160000, "map2_slot", 2, 0.62),
+        (240000, "map2_slot", 2, 0.52),
+        (350000, "map2_slot", 2, 0.44),
+        (600000, "map2_slot", 2, 0.35),
+        (1200000, "map2_slot", 4, 0.25),
+        (2500000, "map2_slot", 6, 0.15),
+    ]),
+    "schwarzstahl": _mk_tier_rates([
+        (40000, "map2_slot", 1, 0.90),
+        (75000, "map2_slot", 1, 0.80),
+        (125000, "map2_slot", 2, 0.70),
+        (200000, "map2_slot", 2, 0.60),
+        (300000, "map2_slot", 2, 0.50),
+        (420000, "map2_slot", 2, 0.42),
+        (600000, "map2_slot", 2, 0.35),
+        (1200000, "map2_slot", 4, 0.25),
+        (2500000, "map2_slot", 6, 0.15),
+    ]),
+    "blaustahl": _mk_tier_rates([
+        (120000, "map2_slot", 1, 0.85),
+        (240000, "map2_slot", 2, 0.75),
+        (420000, "map2_slot", 2, 0.65),
+        (680000, "map2_slot", 3, 0.55),
+        (1000000, "map2_slot", 3, 0.45),
+        (1500000, "map2_slot", 4, 0.38),
+        (2500000, "map2_slot", 4, 0.30),
+        (5000000, "map2_slot", 7, 0.20),
+        (9000000, "map2_slot", 10, 0.12),
+    ]),
+    "aetherium": _mk_tier_rates([
+        (250000, "map2_slot", 2, 0.80),
+        (500000, "map2_slot", 2, 0.70),
+        (850000, "map2_slot", 3, 0.60),
+        (1350000, "map2_slot", 3, 0.50),
+        (2000000, "map2_slot", 4, 0.40),
+        (3000000, "map2_slot", 4, 0.32),
+        (5000000, "map2_slot", 5, 0.25),
+        (10000000, "map2_slot", 8, 0.15),
+        (20000000, "map2_slot", 12, 0.08),
+    ]),
+}
+
+BLACKSMITH_RATES = BLACKSMITH_TIER_RATES["holz"]
+
+
+def get_blacksmith_upgrade_req(template_id: str, plus_level: int) -> dict:
+    """Gibt die exakten SSOT-Schmiedekosten (Gold, Upp-Material, Erfolgschance) für ein Item +0..+8 zurück."""
+    p = max(0, min(8, int(plus_level or 0)))
+    tpl = ITEM_TEMPLATES.get(template_id) or {}
+    tkey = tpl.get("tierKey")
+    if not tkey:
+        lv = int(tpl.get("levelReq", tpl.get("reqLevel", 1)) or 1)
+        tkey = "holz"
+        for td in EQUIPMENT_TIERS_10:
+            if lv >= td["levelReq"]:
+                tkey = td["key"]
+    tier_table = BLACKSMITH_TIER_RATES.get(tkey, BLACKSMITH_RATES)
+    row = dict(tier_table.get(p, BLACKSMITH_RATES[p]))
+    if row.get("matId") == "map2_slot":
+        slot = tpl.get("slot", "weapon")
+        row["matId"] = MAP2_UPGRADE_MAT_BY_SLOT.get(slot, "mat_gem_piece")
+    mat_tpl = ITEM_TEMPLATES.get(row.get("matId") or "") or {}
+    row["matName"] = mat_tpl.get("name", row.get("matId") or "")
+    row["tierKey"] = tkey
+    return row
 
 RUNE_BONUS_POOL = [
     {"id": "bonus_hp", "name": "Max. TP", "unit": "", "values": [250, 450, 700, 1000, 1400, 1800]},
@@ -4760,6 +4987,17 @@ SLOT_BONUS_SWITCH_POOLS = {
         {"id": "bonus_dex", "tiers": [(4, 25), (8, 10), (12, 3)]},
         {"id": "bonus_int", "tiers": [(4, 25), (8, 10), (12, 3)]},
     ],
+    "belt": [
+        {"id": "bonus_hp", "tiers": [(500, 30), (1000, 15), (2000, 5), (3000, 2)]},
+        {"id": "bonus_vs_monster", "tiers": [(5, 28), (10, 14), (15, 4), (20, 1.5)]},
+        {"id": "bonus_vs_metin", "tiers": [(5, 28), (10, 14), (15, 4), (20, 1.5)]},
+        {"id": "bonus_vs_boss", "tiers": [(5, 22), (10, 10), (15, 3)]},
+        {"id": "bonus_hp_regen", "tiers": [(10, 28), (20, 14), (30, 4)]},
+        {"id": "bonus_mp_regen", "tiers": [(10, 28), (20, 14), (30, 4)]},
+        {"id": "bonus_exp", "tiers": [(10, 22), (15, 10), (20, 3)]},
+        {"id": "bonus_yang", "tiers": [(10, 22), (15, 10), (20, 3)]},
+        {"id": "bonus_res_magic", "tiers": [(5, 20), (10, 8), (15, 2)]},
+    ],
 }
 
 # 6. & 7. Gelbes Endgame-Bonussystem (Spezialisierte PvM- & Defensiv-Endgame-Werte)
@@ -4775,7 +5013,9 @@ RUNE_67_BONUS_POOL = [
 ]
 
 
-def _weighted_choice_tiers(tiers: list) -> int:
+def _weighted_choice_tiers(tiers: list, max_roll: bool = False) -> int:
+    if max_roll and tiers:
+        return max(val for val, _ in tiers)
     total_w = sum(w for _, w in tiers)
     if total_w <= 0:
         return tiers[0][0]
@@ -4788,7 +5028,7 @@ def _weighted_choice_tiers(tiers: list) -> int:
     return tiers[-1][0]
 
 
-def roll_slot_bonus(slot: str, used_ids: set = None) -> dict:
+def roll_slot_bonus(slot: str, used_ids: set = None, max_roll: bool = False) -> dict:
     """Würfelt einen 1.-5. Bonus passend zum Ausrüstungs-Slot anhand der gewichteten Chancen aus."""
     used = used_ids or set()
     slot_key = slot if slot in SLOT_BONUS_SWITCH_POOLS else "weapon"
@@ -4811,28 +5051,32 @@ def roll_slot_bonus(slot: str, used_ids: set = None) -> dict:
                 break
 
     bid = pick_entry["id"]
-    val = _weighted_choice_tiers(pick_entry["tiers"])
+    val = _weighted_choice_tiers(pick_entry["tiers"], max_roll=max_roll)
+    max_val = max(v for v, _ in pick_entry["tiers"])
     meta = RUNE_BONUS_BY_ID.get(bid, {"id": bid, "name": bid, "unit": "%"})
     return {
         "id": bid,
         "name": meta["name"],
         "value": val,
+        "maxValue": max_val,
         "unit": meta["unit"],
     }
 
 
-def roll_67_bonus(used_ids: set = None) -> dict:
+def roll_67_bonus(used_ids: set = None, max_roll: bool = False) -> dict:
     """Würfelt einen gelben 6./7. Endgame-Bonus aus, ohne die ersten 5 Boni zu beeinflussen."""
     used = used_ids or set()
     candidates = [b for b in RUNE_67_BONUS_POOL if b["id"] not in used]
     if not candidates:
         candidates = list(RUNE_67_BONUS_POOL)
     pick = random.choice(candidates)
-    val = _weighted_choice_tiers(pick["tiers"])
+    val = _weighted_choice_tiers(pick["tiers"], max_roll=max_roll)
+    max_val = max(v for v, _ in pick["tiers"])
     return {
         "id": pick["id"],
         "name": pick["name"],
         "value": val,
+        "maxValue": max_val,
         "unit": pick["unit"],
         "isYellow67": True,
     }
@@ -5209,6 +5453,7 @@ PASSIVE_SKILL_DEFS = {
 }
 
 # Registriere für alle 20 Passiven Fertigkeiten eigene droppbare Passiv-Fertigkeitsbücher (fb_passive_<id>)
+# SSOT: Passive Fertigkeitsbücher sind NICHT im NPC-Shop kaufbar – droppen ausschließlich ab Instabilen Rissmonolithen, Bossen & Dungeons!
 for _ps_id, _ps_def in PASSIVE_SKILL_DEFS.items():
     ITEM_TEMPLATES[f"fb_passive_{_ps_id}"] = {
         "id": f"fb_passive_{_ps_id}",
@@ -5222,10 +5467,15 @@ for _ps_id, _ps_def in PASSIVE_SKILL_DEFS.items():
         "skillId": _ps_id,
         "skillName": _ps_def["name"],
         "sellPrice": 600,
-        "buyPrice": 1800,
         "stackable": True,
-        "description": f"Passiv-Fertigkeitsbuch für '{_ps_def['name']}'. Erlernt die passive Fertigkeit (Stufe 0 ➔ 1) und steigert sie weiter bis Stufe 20 ({_ps_def['desc']}).",
+        "description": f"Passiv-Fertigkeitsbuch für '{_ps_def['name']}'. Droppt ausschließlich ab Instabilen Rissmonolithen, Bossen & in Dungeons ({_ps_def['desc']}).",
     }
+
+ACTIVE_SKILL_BOOK_IDS = [
+    tid for tid, tpl in ITEM_TEMPLATES.items()
+    if tpl.get("type") == "skill_book" and tid.startswith("fb_") and not tid.startswith("fb_passive_")
+]
+PASSIVE_SKILL_BOOK_IDS = [f"fb_passive_{pid}" for pid in PASSIVE_SKILL_DEFS.keys()]
 
 
 # ============================================================================
@@ -6443,10 +6693,10 @@ QUEST_TEMPLATES = [
             "bloodleaf_warrior",
         ],
         "required": 8,
-        "rewardYang": 7200,
+        "rewardYang": 4200,
         "rewardExp": 3100,
         "rewardRep": 600,
-        "rewardItems": [{"itemId": "scroll_blessing", "count": 1}, {"itemId": "potion_speed", "count": 3}],
+        "rewardItems": [{"itemId": "potion_speed", "count": 5}, {"itemId": "potion_atk_speed", "count": 5}],
     },
     {
         "id": "story_ch2_03_shadow_general",
@@ -6485,10 +6735,10 @@ QUEST_TEMPLATES = [
             "metin_darkness",
         ],
         "required": 10,
-        "rewardYang": 9200,
+        "rewardYang": 5500,
         "rewardExp": 4200,
         "rewardRep": 780,
-        "rewardItems": [{"itemId": "book_skill", "count": 1}, {"itemId": "item_bonus_changer", "count": 2}],
+        "rewardItems": [{"itemId": "book_skill", "count": 1}, {"itemId": "item_bravery_cape", "count": 5}],
     },
 
     # ========================================================================
@@ -6519,7 +6769,7 @@ QUEST_TEMPLATES = [
             "metin_bloodleaf",
         ],
         "required": 2,
-        "rewardYang": 4800,
+        "rewardYang": 3200,
         "rewardExp": 1950,
         "rewardRep": 500,
         "rewardItems": [{"itemId": "book_skill", "count": 1}],
@@ -6541,7 +6791,7 @@ QUEST_TEMPLATES = [
         "description": "Seltene Direktaufgabe: Ein mächtiger Gebietswächter, dessen Körper von der Energie des Ersten Bruchs durchdrungen ist, bedroht das Tal! Bezwinge einen Gebietsboss (Bestienfürst Lykos oder Brutaler Hauptmann).",
         "targetKinds": ["boss_morgenwacht", "boss_brutal_captain"],
         "required": 1,
-        "rewardYang": 9500,
+        "rewardYang": 6500,
         "rewardExp": 4200,
         "rewardRep": 900,
         "rewardItems": [{"itemId": "chest_moonlight", "count": 1}],
@@ -6577,23 +6827,21 @@ QUEST_TEMPLATES = [
             "metin_bloodleaf",
         ],
         "required": 8,
-        "rewardYang": 8200,
+        "rewardYang": 5400,
         "rewardExp": 3900,
         "rewardRep": 620,
-        "rewardItems": [{"itemId": "item_bonus_changer", "count": 1}, {"itemId": "chest_moonlight", "count": 1}],
+        "rewardItems": [{"itemId": "chest_moonlight", "count": 1}, {"itemId": "potion_speed", "count": 3}],
     },
 ]
 
 
 def exp_needed_for_level(level: int) -> int:
-    """Benötigte EXP für den Aufstieg vom angegebenen Level.
-
-    Zielgerichtete Levelzeit-Kurve (reine Auto-Jagd im passenden Levelgebiet):
-      - Lv. 1 → 20 : insgesamt ca. 45–60 Minuten
-      - Lv. 20 → 30: insgesamt ca. 30–45 Minuten
-      - Lv. 30 → 38: insgesamt ca. 45–60 Minuten
-    Berechnung: Zielminuten(Level) × erwartete EXP/Minute(Level). Die EXP/Minute wird aus den echten
-    Monster-Templates (Median-EXP normaler Monster im Levelbereich) und einer angenommenen Kill-Rate abgeleitet.
+    """Benötigte EXP für den Aufstieg vom angegebenen Level (SSOT Ultimate Edition):
+      - Lv. 1  → 20: exakt 40–60 Minuten (~50 Min)
+      - Lv. 21 → 30: exakt 40–60 Minuten (~50 Min)
+      - Lv. 31 → 35: exakt 40–60 Minuten (~50 Min)
+      - Lv. 35 → 38: exakt 60 Minuten
+      - Ab Lv. 38  : kaum noch EXP in Map 1 & Map 2
     """
     level = max(1, int(level))
     table = _get_level_exp_table()
@@ -6609,14 +6857,16 @@ _LEVEL_EXP_TABLE_CACHE: dict = {}
 
 
 def _target_minutes_for_level(level: int) -> float:
-    """Zielminuten für genau EIN Level-Up (Level → Level+1)."""
+    """Zielminuten für genau EIN Level-Up (Level → Level+1) strikt nach SSOT-Handbuch."""
     if level < 20:
-        return 1.3 + (level - 1) * 0.16      # Summe Lv. 1→20 ≈ 52 Min
+        return 1.73 + (level - 1) * 0.10     # Summe Lv. 1→20 = 49.97 Min (exakt im Fenster 40–60 Min)
     if level < 30:
-        return 3.0 + (level - 20) * 0.17     # Summe Lv. 20→30 ≈ 38 Min
+        return 4.10 + (level - 20) * 0.20    # Summe Lv. 20→30 = 50.00 Min (exakt im Fenster 40–60 Min)
+    if level < 35:
+        return 8.40 + (level - 30) * 0.80    # Summe Lv. 30→35 = 50.00 Min (exakt im Fenster 40–60 Min)
     if level < 38:
-        return 5.6 + (level - 30) * 0.275    # Summe Lv. 30→38 ≈ 52 Min
-    return 7.5 + (level - 38) * 0.6          # danach spürbar langsamer
+        return 18.0 + (level - 35) * 2.0     # Summe Lv. 35→38 = 60.00 Min (exakt 60 Min)
+    return 35.0 + (level - 38) * 4.5         # Ab Lv. 38 steiler + 98% Map-EXP-Dämpfung in Map 1/2
 
 
 def _expected_exp_per_minute(level: int) -> float:
@@ -6658,33 +6908,49 @@ def _get_level_exp_table() -> dict:
 
 
 def calculate_item_effective_stats(template_id: str, plus_level: int = 0, bonuses: list = None) -> dict:
-    """Zentrale serverseitige Berechnung der effektiven Werte eines Gegenstands inkl. +0 bis +9 und Runenboni."""
+    """Zentrale serverseitige Berechnung der effektiven Werte eines Gegenstands inkl. +0 bis +9, Geiststeinen und Runenboni."""
     tpl = ITEM_TEMPLATES.get(template_id)
     if not tpl:
         return {}
     base = dict(tpl.get("baseStats", {}))
-    rarity_info = RARITIES.get(tpl.get("rarity", "common"), RARITIES["common"])
-    plus_mult = 1.0
-    if plus_level > 0:
-        rate_row = BLACKSMITH_RATES.get(min(8, plus_level - 1))
-        if rate_row:
-            plus_mult = rate_row["statMult"]
-
-    eff_rarity_mult = 1.0 + (rarity_info["statMult"] - 1.0) * 0.25
-    eff_plus_mult = 1.0 + (plus_mult - 1.0) * 0.45
-    total_mult = eff_rarity_mult * eff_plus_mult
+    max9 = tpl.get("maxStats9")
+    p_lvl = max(0, min(9, int(plus_level or 0)))
     result = {}
-    for k, v in base.items():
-        if k in ("atk", "magicAtk", "def", "magicDef", "hp"):
-            result[k] = int(round(v * total_mult))
-        elif k in ("critChance", "pierceChance", "vsMonsterPct", "vsMetinPct", "vsBossPct"):
-            result[k] = round(v * 0.65 * (1.0 + plus_level * 0.03), 1)
-        else:
-            result[k] = round(v * (1.0 + plus_level * 0.04), 1)
+
+    if isinstance(max9, dict) and max9:
+        frac = p_lvl / 9.0
+        for k, v0 in base.items():
+            v9 = max9.get(k, v0)
+            val = v0 + (v9 - v0) * frac
+            if isinstance(v0, int) and isinstance(v9, int):
+                result[k] = int(round(val))
+            else:
+                result[k] = round(val, 1)
+    else:
+        plus_mult = 1.0
+        if p_lvl > 0:
+            rate_row = BLACKSMITH_RATES.get(min(8, p_lvl - 1))
+            if rate_row:
+                plus_mult = rate_row["statMult"]
+        eff_plus_mult = 1.0 + (plus_mult - 1.0) * 0.45
+        for k, v in base.items():
+            if k in ("atk", "magicAtk", "def", "magicDef", "hp"):
+                result[k] = int(round(v * eff_plus_mult))
+            else:
+                result[k] = round(v * (1.0 + p_lvl * 0.04), 1)
 
     for b in (bonuses or []):
         bid = b.get("id")
         val = b.get("value", 0)
+        if bid == "socket_stone":
+            st_stat = b.get("stoneStat")
+            if not st_stat and b.get("stoneId"):
+                st_tpl = ITEM_TEMPLATES.get(b.get("stoneId")) or {}
+                st_stat = st_tpl.get("stoneStat")
+                val = val or st_tpl.get("stoneValue", 0)
+            if st_stat:
+                result[st_stat] = result.get(st_stat, 0) + val
+            continue
         if bid == "bonus_hp":
             result["hp"] = result.get("hp", 0) + val
         elif bid == "bonus_atk":
@@ -6769,7 +7035,6 @@ def calculate_item_effective_stats(template_id: str, plus_level: int = 0, bonuse
             result["mpRegenPct"] = result.get("mpRegenPct", 0) + val
         elif bid == "bonus_elem_power":
             result["elemPowerPct"] = result.get("elemPowerPct", 0) + val
-            result["vsMonsterPct"] = result.get("vsMonsterPct", 0) + val
         elif bid == "bonus_res_boss_skill":
             result["resBossSkillPct"] = result.get("resBossSkillPct", 0) + val
         elif bid == "bonus_res_crit":
@@ -6787,8 +7052,8 @@ def calculate_item_effective_stats(template_id: str, plus_level: int = 0, bonuse
 # =============================================================================
 # EINHEITLICHES 10-STUFEN-EQUIPMENT (nur noch komplette Sets alle 10 Level)
 #   Lv. 1 Holz · Lv. 10 Kupfer · Lv. 20 Eisen · Lv. 30 Ebenholz · Lv. 40 Silber
-#   Lv. 50 Gold · Lv. 60 Drachengold · Lv. 70 Donnerstahl · Lv. 80 Blaustahl · Lv. 90 Ätherium
-# Alle alten Einzel-Ausrüstungen (Lv. 2, 5, 8, 12, ...) werden auf das passende Tier-Teil umgeleitet.
+#   Lv. 50 Gold · Lv. 60 Drachengold · Lv. 70 Schwarzstahl · Lv. 80 Blaustahl · Lv. 90 Ätherium
+#   (Stufe 9 Blaustahl & Stufe 10 Ätherium sind NUR CRAFTBAR und droppen niemals!)
 # =============================================================================
 EQUIP_TIERS = [
     (1, "holz"),
@@ -6798,11 +7063,12 @@ EQUIP_TIERS = [
     (40, "silber"),
     (50, "gold"),
     (60, "drachengold"),
-    (70, "donnerstahl"),
+    (70, "schwarzstahl"),
     (80, "blaustahl"),
     (90, "aetherium"),
 ]
 EQUIP_TIER_KEYS = [k for _, k in EQUIP_TIERS]
+DROPPABLE_EQUIP_TIERS = [row for row in EQUIP_TIERS if row[0] <= 70]
 EQUIP_TIER_SLOT_PATTERNS = {
     "sword": "wpn_{t}_sword",
     "greatsword": "wpn_{t}_greatsword",
@@ -6817,8 +7083,9 @@ EQUIP_TIER_SLOT_PATTERNS = {
     "necklace": "eq_{t}_necklace",
     "bracelet": "eq_{t}_bracelet",
     "earrings": "eq_{t}_earrings",
+    "belt": "eq_{t}_belt",
 }
-_TIER_ID_PREFIXES = tuple(f"{p}_{t}_" for t in EQUIP_TIER_KEYS for p in ("wpn", "arm", "eq"))
+_TIER_ID_PREFIXES = tuple(f"{p}_{t}_" for t in (*EQUIP_TIER_KEYS, "donnerstahl") for p in ("wpn", "arm", "eq"))
 
 
 def equip_tier_for_level(level: int) -> str:
@@ -6830,8 +7097,17 @@ def equip_tier_for_level(level: int) -> str:
     return key
 
 
+def equip_tier_for_drop_level(level: int) -> str:
+    """Tier-Schlüssel für Monster-/Monolithen-/Boss-Drops (maximal Lv. 70 Schwarzstahl; Lv. 80/90 sind nur craftbar!)."""
+    key = DROPPABLE_EQUIP_TIERS[0][1]
+    for req, t_key in DROPPABLE_EQUIP_TIERS:
+        if int(level) >= req:
+            key = t_key
+    return key
+
+
 def equip_tier_item_ids(tier_key: str) -> list:
-    """Komplettes Set eines Tiers (alle Waffenarten + Rüstung + Schild + Helm + Handschuhe + Schuhe + Schmuck)."""
+    """Komplettes Set eines Tiers (alle 5 Waffenarten + Rüstung + Schild + Helm + Handschuhe + Schuhe + Schmuck + Gürtel)."""
     return [p.format(t=tier_key) for p in EQUIP_TIER_SLOT_PATTERNS.values() if p.format(t=tier_key) in ITEM_TEMPLATES]
 
 
@@ -6852,45 +7128,81 @@ def _legacy_weapon_kind(tid: str, tpl: dict) -> str:
     return "sword"
 
 
-def _build_legacy_equip_map() -> dict:
-    out = {}
-    for tid, tpl in ITEM_TEMPLATES.items():
-        if tpl.get("type") != "equipment" or is_tier_equipment(tid):
-            continue
-        slot = str(tpl.get("slot") or "")
-        if slot.startswith("costume") or tid.startswith("spec_"):
-            continue
-        tier_key = equip_tier_for_level(int(tpl.get("reqLevel", tpl.get("levelReq", 1)) or 1))
-        kind = _legacy_weapon_kind(tid, tpl) if slot == "weapon" else slot
-        pattern = EQUIP_TIER_SLOT_PATTERNS.get(kind)
-        if not pattern:
-            continue
-        target = pattern.format(t=tier_key)
-        if target in ITEM_TEMPLATES:
-            out[tid] = target
-    return out
+EXPLICIT_LEGACY_EQUIP_MAP = {
+    # Lv. 1 Holz-Equipment
+    "sword_broadsword": "wpn_holz_sword",
+    "glaive_iron": "wpn_holz_greatsword",
+    "bell_amber": "wpn_holz_staff",
+    "dagger_shadow": "wpn_holz_daggers",
+    "sword_ninja_starter": "wpn_holz_sword",
+    "sword_sura_starter": "wpn_holz_sword",
+    "armor_leather": "arm_holz_armor",
+    "armor_ninja_starter": "arm_holz_armor",
+    "armor_sura_starter": "arm_holz_armor",
+    "armor_shaman_starter": "arm_holz_armor",
+    "helm_wood": "eq_holz_helmet",
+    "helm_iron": "eq_holz_helmet",
+    "shield_wood": "eq_holz_shield",
+    "shield_battle": "eq_holz_shield",
+    "shoes_wood": "eq_holz_shoes",
+    "shoes_leather": "eq_holz_shoes",
+    "gloves_wood": "eq_holz_gloves",
+    "gloves_leather": "eq_holz_gloves",
+    "necklace_wood": "eq_holz_necklace",
+    "bracelet_wood": "eq_holz_bracelet",
+    "earrings_wood": "eq_holz_earrings",
+    "bow_horn": "wpn_holz_bow",
+    "staff_jade": "wpn_holz_staff",
+    "dagger_viper": "wpn_holz_daggers",
 
+    # Lv. 10 Kupfer-Equipment
+    "sword_msk": "wpn_kupfer_sword",
+    "bow_crow": "wpn_kupfer_bow",
+    "sword_rsb": "wpn_kupfer_greatsword",
+    "staff_dragon": "wpn_kupfer_staff",
+    "dagger_soulless": "wpn_kupfer_daggers",
+    "armor_tiger": "arm_kupfer_armor",
 
-LEGACY_EQUIP_MAP = _build_legacy_equip_map()
+    # Lv. 20 Eisen-Equipment
+    "gloves_iron": "eq_eisen_gloves",
+
+    # Lv. 30 Ebenholz-Equipment
+    "gloves_ebony": "eq_ebenholz_gloves",
+    "necklace_ebony": "eq_ebenholz_necklace",
+    "earrings_ebony": "eq_ebenholz_earrings",
+    "sword_sternenreisser": "wpn_ebenholz_sword",
+    "armor_dragonscale": "arm_ebenholz_armor",
+    "sword_grudge": "wpn_ebenholz_greatsword",
+    "armor_blacksteel": "arm_ebenholz_armor",
+
+    # Lv. 40 Silber-Equipment
+    "sword_silver": "wpn_silber_sword",
+    "bracelet_silver": "eq_silber_bracelet",
+
+    # Lv. 70 Donnerstahl -> Schwarzstahl Migration (SSOT Stufe 8)
+    **{
+        p.format(t="donnerstahl"): p.format(t="schwarzstahl")
+        for p in EQUIP_TIER_SLOT_PATTERNS.values()
+    },
+}
+
+LEGACY_EQUIP_MAP = dict(EXPLICIT_LEGACY_EQUIP_MAP)
 
 
 def resolve_item_template_id(template_id: str) -> str:
-    """Leitet alte Einzel-Ausrüstung auf das passende Tier-Set-Teil um (alle anderen IDs unverändert)."""
+    """Leitet alte Einzel-Ausrüstung & Donnerstahl auf das passende offizielle 10-Stufen-Equipment um."""
     return LEGACY_EQUIP_MAP.get(template_id, template_id)
 
 
-# Alte Ausrüstung als 'legacy' markieren (bleibt nur für Altdaten/Referenzen erhalten, wird nie mehr vergeben)
-for _legacy_id in LEGACY_EQUIP_MAP:
-    ITEM_TEMPLATES[_legacy_id]["legacy"] = True
-    ITEM_TEMPLATES[_legacy_id]["obtainable"] = False
+for _legacy_id, _target_id in LEGACY_EQUIP_MAP.items():
+    if _target_id in ITEM_TEMPLATES:
+        ITEM_TEMPLATES[_legacy_id] = ITEM_TEMPLATES[_target_id]
 
-# Tier-Teile: Levelanforderung exakt auf die Tier-Stufe setzen (reqLevel & levelReq identisch)
 for _req, _tkey in EQUIP_TIERS:
     for _iid in equip_tier_item_ids(_tkey):
         ITEM_TEMPLATES[_iid]["reqLevel"] = _req
         ITEM_TEMPLATES[_iid]["levelReq"] = _req
 
-# Start-Ausrüstung: komplettes Holz-Set
 CLASS_STARTER_WEAPON.update({
     "warrior": "wpn_holz_sword",
     "ninja": "wpn_holz_sword",
@@ -6903,33 +7215,38 @@ for _cid, _cdef in CHARACTER_CLASSES.items():
         _cdef["defaultWeapon"] = CLASS_STARTER_WEAPON.get(_cid, resolve_item_template_id(_cdef["defaultWeapon"]))
 
 # -----------------------------------------------------------------------------
-# DROP-HYGIENE der Monster-Templates:
-#  - alte Ausrüstung -> Tier-Teil passend zum Monster-Level
-#  - Spezial-Items, Seelensteine & Fertigkeitsbücher nur bei Bossen / Rissmonolithen
-#  - Monolithensplitter nur bei Rissmonolithen
+# DROP-HYGIENE der Monster-Templates (SSOT Ultimate Edition):
+#  - Pferdemedaillen droppen NIRGENDWO (0%, erst wenn Affen hinzugefügt werden!)
+#  - Blaustahl (Lv. 80) & Ätherium (Lv. 90) sind NUR craftbar -> niemals in Drop-Listen
+#  - Segensschriftrollen & Bonus hinzufügen/ändern niemals bei normalen Mobs oder Standard-Monolithen < Lv. 60
 # -----------------------------------------------------------------------------
 BOSS_MONOLITH_ONLY_DROP_IDS = {
     "item_bonus_adder", "item_bonus_changer", "item_blessing_orb", "item_soul_fragment",
     "mat_soul_stone", "item_aether_seal", "book_skill", "item_skill_book", "chest_skill_books",
+    "scroll_blessing", "item_magic_metal", "mat_awakened_rift_core",
+    "item_skill_unlock_scroll", "mat_legendary_soul_stone",
 }
 
 
 def is_boss_monolith_only_drop(template_id: str) -> bool:
     if template_id in BOSS_MONOLITH_ONLY_DROP_IDS:
         return True
-    return (ITEM_TEMPLATES.get(template_id) or {}).get("type") in ("skill_book", "passive_skill_book")
+    return (ITEM_TEMPLATES.get(template_id) or {}).get("type") in ("skill_book", "passive_skill_book", "spirit_stone")
 
 
 for _mtpl in MONSTER_TEMPLATES.values():
     _is_metin = _mtpl.get("kind") == "metin"
     _is_boss = bool(_mtpl.get("isBoss"))
-    _m_tier = equip_tier_for_level(int(_mtpl.get("level", 1) or 1))
+    _mlvl = int(_mtpl.get("level", 1) or 1)
+    _m_tier = equip_tier_for_drop_level(_mlvl)
     _new_drops, _seen = [], set()
     for _d in _mtpl.get("drops", []) or []:
-        _iid = _d.get("itemId")
-        if not _iid:
+        _iid = resolve_item_template_id(_d.get("itemId") or "")
+        if not _iid or _iid == "pferdemedaille":
             continue
         _tpl = ITEM_TEMPLATES.get(_iid) or {}
+        if _tpl.get("craftOnly"):
+            continue
         if _tpl.get("type") == "equipment" and not is_tier_equipment(_iid) and _iid in LEGACY_EQUIP_MAP:
             _slot_tid = LEGACY_EQUIP_MAP[_iid]
             for _old_t in EQUIP_TIER_KEYS:
@@ -6938,6 +7255,8 @@ for _mtpl in MONSTER_TEMPLATES.values():
                     break
             _iid = _slot_tid if _slot_tid in ITEM_TEMPLATES else LEGACY_EQUIP_MAP[_iid]
         if is_boss_monolith_only_drop(_iid) and not (_is_boss or _is_metin):
+            continue
+        if _iid in ("scroll_blessing", "item_bonus_adder", "item_bonus_changer") and _is_metin and not _is_boss and _mlvl < 60:
             continue
         if _iid == "mat_monolith_shard" and not _is_metin:
             continue
@@ -6949,7 +7268,6 @@ for _mtpl in MONSTER_TEMPLATES.values():
         _new_drops.append(_nd)
     _mtpl["drops"] = _new_drops
 
-# Quest-Belohnungen: alte Ausrüstung ebenfalls auf Tier-Teile umleiten
 for _q in QUEST_TEMPLATES:
     for _ri in _q.get("rewardItems", []) or []:
         if _ri.get("itemId") in LEGACY_EQUIP_MAP:
@@ -6957,44 +7275,62 @@ for _q in QUEST_TEMPLATES:
 
 
 # =============================================================================
-# GEDÄCHTNIS / MITTEILUNGEN AN ALLE BOTS (aktuelle Spielregeln) – genutzt von bot_players.py & world_server.py
+# GEDÄCHTNIS / SINGLE SOURCE OF TRUTH AN ALLE 12 TEST- & SPIEL-BOTS
 # =============================================================================
 BOT_GAME_RULES_MEMORY = [
     {
-        "id": "rule_drops_special_v2",
-        "topic": "Spezial-Drops",
-        "note": "Normale Monster & Elite-Monster droppen KEINE Spezial-Items mehr (Bonuswandler/Switcher, Gegenstand verstärken, "
-        "Segenskugel, Seelenstein/-fragment, Äthersiegel). Diese gibt es nur noch bei Bossen & Rissmonolithen. "
-        "Reihenfolge der Chancen: Gebiets-Weltboss (Riss-Weltboss) > Dungeonboss > normale Bosse > Rissmonolithen (am seltensten).",
-        "botAction": "Für Bonus-Items gezielt Riss-Weltbosse, Dungeonbosse und die 3 Gebietsbosse jagen statt normale Monster zu farmen.",
+        "id": "ssot_level_pace_v1",
+        "topic": "1. Leveldauer & XP-Fortschritt",
+        "note": "Lv. 1–20: exakt 40–60 Min | Lv. 21–30: exakt 40–60 Min | Lv. 31–35: exakt 40–60 Min | Lv. 35–38: exakt 60 Min | Ab Lv. 38 kaum noch EXP in Map 1 & Map 2.",
+        "botAction": "Immer verzugsfrei in der exakten Level-Zone jagen und Questreihen parallel abschließen.",
     },
     {
-        "id": "rule_drops_books_v2",
-        "topic": "Fertigkeitsbücher & Seelensteine",
-        "note": "Fertigkeitsbücher (aktiv & passiv) und Seelensteine droppen nur noch bei Bossen & Rissmonolithen. "
-        "Aktive Bücher droppen passend zur eigenen Klasse, passive Bücher bevorzugt für noch nicht maximierte Passive.",
-        "botAction": "Bücher sofort lesen; überschüssige Bücher im Offline-Shop listen oder mit Freunden tauschen.",
+        "id": "ssot_zones_and_transition_v1",
+        "topic": "2. Map-, Mob- & Gebietswechsel",
+        "note": "Map 1: Lv. 1–8 Hunde/Keiler/Wölfe (Wolfskralle), Lv. 9–15 Bären/Tiger (Bärengalle/Tigerfell), Lv. 16–22 Eid-Kämpfer (Schmuckgegenstand). Map 2: Lv. 23–29 Anfangsgebiet, Lv. 30–38 Restgebiet (Stück Edelstein, Schwarze Uniform, Shuriken, Degenklingen).",
+        "botAction": "Exakt ab Level 23 sofort über die Brücken nach Map 2 wechseln und ab Level 30 ins tiefere Map-2-Gebiet vorrücken.",
     },
     {
-        "id": "rule_drops_shards_v2",
-        "topic": "Monolithensplitter",
-        "note": "Monolithensplitter droppen ausschließlich bei Rissmonolithen (nicht mehr bei Wächtern, Elite- oder Weltbossen).",
-        "botAction": "Splitter für die Erweckung nur durch das Zerstören von Rissmonolithen sammeln.",
+        "id": "ssot_drops_and_monoliths_v1",
+        "topic": "3. Drop-, Upp- & Monolithen-Ökonomie",
+        "note": "Monster droppen Equipment +0..+4, Schlafende Monolithen +0..+4, Instabile/Erweckte Monolithen +0..+6, Bosse +4..+6. Rissmonolithen droppen immer garantiert 1x aktives FB + Geiststeine +0..+4. Seltene Items (Segensschriftrollen, Switcher/Adder) niemals von normalen Mobs oder Standard-Monolithen < Lv. 60. Passive FBs nur ab Instabilen Monolithen, Bossen & Dungeons.",
+        "botAction": "Monolithen gezielt für FBs & Geiststeine farmen; Erweckte Monolithen (Worldboss) nur in koordinierter Gruppe bekämpfen.",
     },
     {
-        "id": "rule_equipment_tiers_v2",
-        "topic": "Ausrüstung",
-        "note": "Es gibt nur noch komplette Ausrüstungs-Sets alle 10 Level: Lv. 1 Holz, Lv. 10 Kupfer, Lv. 20 Eisen, Lv. 30 Ebenholz, "
-        "Lv. 40 Silber, Lv. 50 Gold, Lv. 60 Drachengold, Lv. 70 Donnerstahl, Lv. 80 Blaustahl, Lv. 90 Ätherium. "
-        "Jedes Set: Waffe (Schwert/Zweihänder/Dolche/Bogen/Stab), Rüstung, Schild, Helm, Handschuhe, Schuhe, Kette, Armband, Ohrringe. "
-        "Alte Einzelteile (Lv. 2, 5, 8, 12, ...) wurden automatisch in das passende Set-Teil umgewandelt (Plus & Boni bleiben).",
-        "botAction": "Bei Erreichen von Lv. 10/20/30/... sofort das komplette neue Set anlegen; Monster droppen das Set ihres Level-Tiers.",
+        "id": "ssot_fairness_economy_v1",
+        "topic": "4. Fairness-Prinzip & Wirtschaft (Kein Pay-to-Win / Kein Bot-Cheat)",
+        "note": "Keinerlei unlautere Pushes, kein Gratis-Gold, keine Gratis-Upgrades, keine gespawnten Splitter oder Medaillen. Alles wird ausschließlich durch echtes Gameplay erspielt.",
+        "botAction": "Überschüssiges Equipment/Material im NPC- oder Offline-Shop verkaufen, Pots regulär kaufen, an aktiven Server-Events teilnehmen und Spielern im Chat hilfreich antworten.",
     },
     {
-        "id": "rule_level_pace_v2",
-        "topic": "Levelzeit",
-        "note": "Neue EXP-Kurve: Lv. 1–20 ca. 45–60 Minuten, Lv. 21–30 ca. 30–45 Minuten, Lv. 31–38 ca. 45–60 Minuten (jeweils gesamt).",
-        "botAction": "Immer im passenden Levelgebiet jagen, damit die volle EXP greift.",
+        "id": "ssot_quests_v1",
+        "topic": "5. Living Quest System V2",
+        "note": "Quests Lv. 1–99 organisch annehmen (? / !), Jagd-/Sammelziele physisch erfüllen und beim NPC abgeben (turn_in).",
+        "botAction": "Regelmäßig Stadt-NPCs aufsuchen, Quests annehmen und abgeschlossene Quests einlösen.",
+    },
+    {
+        "id": "ssot_movement_combat_qa_v1",
+        "topic": "6. Bewegungs-KI, Ziel-Fokus, Boss-Dodge & Animations-QA",
+        "note": "Kollisionen flüssig umlaufen; strikter Ziel-Fokus bis Tod des Ziels (kein Flattern!); Boss-Telegraphen aktiv per Ausweichrolle meiden; Rote/Blaue/Grüne (+20% MS)/Violette (+15% AS & +20% MS) Tränke, Tapferkeitsumhänge & Truhen intelligent nutzen.",
+        "botAction": "Ziel-Lock strikt halten, vor Boss-AoEs absteigen & ausweichen, und Animationen/Skills der neuen Charaktermodelle live überwachen.",
+    },
+    {
+        "id": "ssot_classes_pets_horse_lock_v1",
+        "topic": "7. Klassen-Builds, Pet-Skills & Pferdemedaillen-Sperre",
+        "note": "Klingenwächter (STR>VIT), Schattenjäger (DEX>VIT), Runenkrieger (INT>STR>VIT), Seelenweber (INT>VIT). WICHTIG: Pferdemedaillen droppen ausschließlich von Affen (noch nicht im Spiel) -> 0% Drop & KEIN Bot darf sein Pferd über Level 1 steigern!",
+        "botAction": "Status- & Pet-Skills strikt nach Klassen-Build verteilen; Reittier nur auf Lv. 1 nutzen und niemals Pferde-Level erhöhen.",
+    },
+    {
+        "id": "ssot_skills_0_to_L1_v1",
+        "topic": "8. Fertigkeiten-Progression (0 bis L1)",
+        "note": "0–20 FK-Punkte (20 = M1) ➔ M1..M10..G1 per spezifischem FB ➔ G1..G10..P1..P10 per Seelenstein ➔ P10..L1 per 1x Legendärem Seelenstein. 6. & 7. Skill per universellem Freischalt-Item.",
+        "botAction": "Primärskill zuerst auf 20 (M1) bringen, passende FBs & Seelensteine lesen.",
+    },
+    {
+        "id": "ssot_equipment_10_tiers_v1",
+        "topic": "9. 10 Equipment-Stufen (+0..+9), Boni & Stark gg. Monster",
+        "note": "10 Tiers (Holz Lv. 1 bis Schwarzstahl Lv. 70 droppbar; Blaustahl Lv. 80 & Ätherium Lv. 90 nur craftbar), je 14 Teile inkl. Gürtel (1 Slot). Boni: 1–5 Weiß/Grün + 6./7. Gold. Seltenheiten: Gewöhnlich, Gut, Episch, Legendär, Instabil (Max-Roll Leuchteffekt). 'Stark gegen Monster' wirkt NUR gegen normale Monster (NICHT gegen Bosse oder Rissmonolithen!).",
+        "botAction": "Ausrüstung regulär mit Gold & Map1/Map2-Upp-Items beim Schmied verbessern (ab +6 mit Segensschriftrolle/Magischem Metall schützen).",
     },
 ]
-BOT_GAME_RULES_MEMORY_VERSION = "2026-10-29_v2"
+BOT_GAME_RULES_MEMORY_VERSION = "2026-10-31_SSOT_ULTIMATE"

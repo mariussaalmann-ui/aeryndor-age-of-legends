@@ -1692,20 +1692,29 @@ html, body {
   color: #fffdf5;
   box-shadow: 0 0 8px rgba(245, 194, 66, 0.35);
 }
+.chat-tab-pill.ch-party  { color: #93c5fd; }
 .chat-tab-pill.ch-global { color: #fde047; }
 .chat-tab-pill.ch-trade  { color: #34d399; }
 .chat-tab-pill.ch-guild  { color: #c084fc; }
 .chat-tab-pill.ch-drops  { color: #38bdf8; border-color: rgba(56, 189, 248, 0.55); background: rgba(14, 34, 52, 0.85); }
+.chat-tab-pill.ch-bots   { color: #5eead4; border-color: rgba(45, 212, 191, 0.55); background: rgba(13, 42, 40, 0.85); }
+.chat-tab-pill.active.ch-party,
 .chat-tab-pill.active.ch-global,
 .chat-tab-pill.active.ch-trade,
 .chat-tab-pill.active.ch-guild,
-.chat-tab-pill.active.ch-drops {
+.chat-tab-pill.active.ch-drops,
+.chat-tab-pill.active.ch-bots {
   color: #fffdf5;
 }
 .chat-tab-pill.active.ch-drops {
   background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
   border-color: #7dd3fc;
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+}
+.chat-tab-pill.active.ch-bots {
+  background: linear-gradient(180deg, #0d9488 0%, #0f766e 100%);
+  border-color: #99f6e4;
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.45);
 }
 
 .chat-tab-msgr-btn {
@@ -1750,10 +1759,12 @@ html, body {
 
 .chat-line,
 .chat-line-normal,
+.chat-line-party,
 .chat-line-global,
 .chat-line-trade,
 .chat-line-guild,
 .chat-line-drops,
+.chat-line-bots,
 .chat-line-system,
 .chat-line-event {
   line-height: 1.36;
@@ -1762,10 +1773,12 @@ html, body {
   border-radius: 2px;
 }
 .chat-line-normal { color: #f8f3e6; }
+.chat-line-party  { color: #bfdbfe; background: rgba(59, 130, 246, 0.06); }
 .chat-line-global { color: #fde047; background: rgba(250, 204, 21, 0.05); }
 .chat-line-trade  { color: #34d399; background: rgba(52, 211, 153, 0.05); }
 .chat-line-guild  { color: #d8b4fe; background: rgba(192, 132, 252, 0.05); }
 .chat-line-drops  { color: #bae6fd; background: rgba(14, 165, 233, 0.09); border-left: 2px solid #38bdf8; font-weight: 600; }
+.chat-line-bots   { color: #ccfbf1; background: rgba(20, 184, 166, 0.08); border-left: 2px solid #2dd4bf; }
 .chat-line-system { color: #fbbf24; font-style: italic; }
 .chat-line-event  { color: #38bdf8; font-weight: 700; }
 .chat-line-mentioned {
@@ -1805,10 +1818,12 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .chat-ch-tag.normal { color: #e2d1b0; background: rgba(255, 255, 255, 0.08); }
+.chat-ch-tag.party  { color: #dbeafe; background: rgba(37, 99, 235, 0.38); border-color: rgba(96, 165, 250, 0.60); }
 .chat-ch-tag.global { color: #fef08a; background: rgba(202, 138, 4, 0.35); border-color: rgba(250, 204, 21, 0.55); }
 .chat-ch-tag.trade  { color: #a7f3d0; background: rgba(5, 150, 105, 0.35); border-color: rgba(52, 211, 153, 0.55); }
 .chat-ch-tag.guild  { color: #e9d5ff; background: rgba(126, 34, 206, 0.35); border-color: rgba(192, 132, 252, 0.55); }
 .chat-ch-tag.drops  { color: #e0f2fe; background: rgba(2, 132, 199, 0.45); border-color: rgba(56, 189, 248, 0.65); }
+.chat-ch-tag.bots   { color: #ccfbf1; background: rgba(13, 148, 136, 0.42); border-color: rgba(45, 212, 191, 0.65); }
 .chat-ch-tag.event  { color: #bae6fd; background: rgba(3, 105, 161, 0.40); border-color: rgba(56, 189, 248, 0.55); }
 .chat-ch-tag.system { color: #fde68a; background: rgba(180, 83, 9, 0.35); }
 
@@ -1858,9 +1873,11 @@ html, body {
   flex-shrink: 0;
 }
 .chat-channel-badge.ch-normal { color: #f8f3e6; border-color: #a89476; }
+.chat-channel-badge.ch-party  { color: #bfdbfe; border-color: #60a5fa; background: rgba(30, 58, 138, 0.55); }
 .chat-channel-badge.ch-global { color: #fde047; border-color: #facc15; background: rgba(113, 63, 18, 0.55); }
 .chat-channel-badge.ch-trade  { color: #34d399; border-color: #10b981; background: rgba(6, 78, 59, 0.55); }
 .chat-channel-badge.ch-guild  { color: #d8b4fe; border-color: #a855f7; background: rgba(88, 28, 135, 0.55); }
+.chat-channel-badge.ch-bots   { color: #99f6e4; border-color: #2dd4bf; background: rgba(19, 78, 74, 0.60); }
 
 .chat-input-row input {
   flex: 1;
@@ -10612,7 +10629,7 @@ html, body {
   right: auto !important;
   top: auto !important;
   transform: none !important;
-  width: 356px !important;
+  width: 392px !important;
   height: 184px !important;
   background: rgba(10, 10, 13, 0.78) !important;
   background-image: none !important;
@@ -10634,11 +10651,16 @@ html, body {
 #hud-chat-box .chat-tabs-bar {
   display: flex !important;
   align-items: center !important;
-  gap: 3px !important;
+  gap: 2.5px !important;
   padding-bottom: 4px !important;
   border-bottom: 1px solid rgba(201, 168, 76, 0.28) !important;
   margin-bottom: 4px !important;
   flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+#hud-chat-box .chat-tabs-bar::-webkit-scrollbar {
+  display: none !important;
 }
 
 #hud-chat-box .chat-tab-pill,
@@ -10650,14 +10672,27 @@ html, body {
   color: #b5afa2 !important;
   font-size: 9.5px !important;
   font-weight: 700 !important;
-  padding: 2px 5px !important;
+  padding: 2px 4.5px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
   cursor: pointer;
+}
+
+#hud-chat-box .chat-tab-pill.ch-bots {
+  color: #5eead4 !important;
+  border-color: rgba(45, 212, 191, 0.38) !important;
 }
 
 #hud-chat-box .chat-tab-pill.active {
   background: linear-gradient(180deg, rgba(168, 129, 44, 0.48) 0%, rgba(88, 64, 18, 0.68) 100%) !important;
   border-color: #e5c467 !important;
   color: #fff6dc !important;
+}
+
+#hud-chat-box .chat-tab-pill.ch-bots.active {
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0.62) 0%, rgba(15, 118, 110, 0.78) 100%) !important;
+  border-color: #5eead4 !important;
+  color: #f0fdfa !important;
 }
 
 #hud-chat-box .chat-tab-min-btn {
@@ -16691,4 +16726,246 @@ div.p2-method-card {
   color: #ffffff !important;
   transform: scale(1.12) !important;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.75) !important;
+}
+
+
+/* ============================================================================
+   AERYNDOR: HOCHWERTIGE QUEST-BELOHNUNGEN MIT ITEM-ICONS & MODERNER STRUKTUR
+   ============================================================================ */
+#npc-quest-dialog-modal .nqm-qcard-desc {
+  font-size: 11.5px !important;
+  color: #cbd5e1 !important;
+  line-height: 1.45 !important;
+  padding: 5px 9px !important;
+  background: rgba(0, 0, 0, 0.28) !important;
+  border-left: 2px solid rgba(212, 168, 72, 0.5) !important;
+  border-radius: 0 4px 4px 0 !important;
+  margin: 3px 0 !important;
+}
+
+#npc-quest-dialog-modal .nqm-qcard-prog-wrap {
+  margin: 4px 0 !important;
+}
+
+#npc-quest-dialog-modal .nqm-qcard-prog-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  margin-bottom: 3px !important;
+}
+
+#npc-quest-dialog-modal .nqm-prog-label b {
+  color: #f1f5f9 !important;
+}
+
+#npc-quest-dialog-modal .nqm-qcard-pct {
+  font-weight: 800 !important;
+  color: #34d399 !important;
+}
+
+#npc-quest-dialog-modal .nqm-qcard-rewards-box {
+  background: rgba(14, 11, 8, 0.72) !important;
+  border: 1px solid rgba(212, 168, 72, 0.35) !important;
+  border-radius: 6px !important;
+  padding: 8px 10px !important;
+  margin: 6px 0 !important;
+  box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.45) !important;
+}
+
+#npc-quest-dialog-modal .nqm-rewards-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+#npc-quest-dialog-modal .nqm-rewards-title {
+  font-family: 'Cinzel', serif !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  color: #fde047 !important;
+  letter-spacing: 0.08em !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-currencies {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-pill {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  background: rgba(16, 12, 9, 0.9) !important;
+  border: 1px solid rgba(212, 168, 72, 0.55) !important;
+  color: #fde68a !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-pill.gold {
+  color: #fde047 !important;
+  border-color: rgba(234, 179, 8, 0.55) !important;
+  background: rgba(30, 20, 8, 0.9) !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-pill.exp {
+  color: #86efac !important;
+  border-color: rgba(74, 222, 128, 0.5) !important;
+  background: rgba(8, 28, 16, 0.9) !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-pill.rep {
+  color: #fef08a !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  background: rgba(28, 22, 10, 0.9) !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-pill.bio {
+  color: #6ee7b7 !important;
+  border-color: rgba(52, 211, 153, 0.6) !important;
+  background: rgba(6, 78, 59, 0.35) !important;
+}
+
+#npc-quest-dialog-modal .nqm-rew-items-grid {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 1px dashed rgba(212, 168, 72, 0.22) !important;
+}
+
+#npc-quest-dialog-modal .nqm-reward-item-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 3px 10px 3px 4px !important;
+  border-radius: 6px !important;
+  background: rgba(12, 18, 30, 0.88) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease !important;
+}
+
+#npc-quest-dialog-modal .nqm-reward-item-chip:hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(56, 189, 248, 0.85) !important;
+  box-shadow: 0 3px 10px rgba(56, 189, 248, 0.3) !important;
+  background: rgba(15, 23, 42, 0.98) !important;
+}
+
+#npc-quest-dialog-modal .nqm-reward-icon-box {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 4px !important;
+  background: rgba(5, 5, 8, 0.85) !important;
+  border: 1px solid rgba(250, 204, 21, 0.4) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.8) !important;
+}
+
+#npc-quest-dialog-modal .nqm-reward-icon-box img,
+#npc-quest-dialog-modal .nqm-reward-icon-box .game-icon-img {
+  width: 24px !important;
+  height: 24px !important;
+  object-fit: contain !important;
+}
+
+#npc-quest-dialog-modal .nqm-reward-item-info {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+#npc-quest-dialog-modal .nqm-item-qty {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  color: #38bdf8 !important;
+}
+
+#npc-quest-dialog-modal .nqm-item-name {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #f1f5f9 !important;
+  white-space: nowrap !important;
+}
+
+#npc-quest-dialog-modal .nqm-qcard-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: 100% !important;
+  margin-top: 6px !important;
+}
+
+.cw-qd-rew-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 3px 8px 3px 4px !important;
+  border-radius: 5px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+}
+
+.cw-qd-rew-icon-wrap {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 4px !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(250, 204, 21, 0.35) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.cw-qd-rew-icon-wrap img,
+.cw-qd-rew-icon-wrap .game-icon-img {
+  width: 22px !important;
+  height: 22px !important;
+  object-fit: contain !important;
+}
+
+/* SSOT Teil II.1: Seltenheitsgrad 'Instabil' (Garantierte Maximalwerte / Max-Roll) */
+@keyframes instabilPulseGlow {
+  0%, 100% {
+    border-color: rgba(34, 211, 238, 0.9) !important;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.55), inset 0 0 8px rgba(34, 211, 238, 0.25) !important;
+  }
+  50% {
+    border-color: rgba(167, 139, 250, 0.95) !important;
+    box-shadow: 0 0 13px rgba(34, 211, 238, 0.8), inset 0 0 12px rgba(167, 139, 250, 0.32) !important;
+  }
+}
+
+.rarity-instabil,
+.inv-slot.rarity-instabil,
+.equip-slot-box.rarity-instabil,
+.trade-item-slot.rarity-instabil,
+.player-eq-item-icon.rarity-instabil {
+  border-color: #22d3ee !important;
+  background: radial-gradient(circle at 50% 35%, rgba(6, 182, 212, 0.26) 0%, rgba(15, 23, 42, 0.92) 85%) !important;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.65), inset 0 0 8px rgba(34, 211, 238, 0.28) !important;
+  animation: instabilPulseGlow 2.4s ease-in-out infinite;
 }

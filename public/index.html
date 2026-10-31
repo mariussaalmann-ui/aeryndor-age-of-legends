@@ -12,9 +12,9 @@
   <link rel="icon" type="image/x-icon" href="./favicon.ico" />
   <link rel="icon" type="image/png" sizes="1024x1024" href="./assets/client_ui/logo/2.png" />
   <link rel="apple-touch-icon" href="./assets/client_ui/logo/2.png" />
-  <link rel="stylesheet" href="./css/main.css?v=20261028_v570" />
+  <link rel="stylesheet" href="./css/main.css?v=20261031_v610" />
   <!-- iOS-inspirierte UI-Schicht (Dynamic Island, Dynamic Sidebar, Chat-Ruhemodus, Optionen, Login, Weltkarte) -->
-  <link rel="stylesheet" href="./css/ios-ui.css?v=20261028_v585" />
+  <link rel="stylesheet" href="./css/ios-ui.css?v=20261031_v607" />
   <script>
     // Aeryndor Client Anti-Tamper: Sperrt Entwicklertools und Rechtsklick im Standalone-Client
     (function() {
@@ -136,7 +136,7 @@
   <!-- Zustand A: Kein Ziel ausgewählt -> Dynamic Island Kompass-Kapsel (inkl. integrierter Weltboss-Anzeige links & rechts) -->
   <section id="hud-compass" class="hud-compass di-island-compass">
     <div class="nw-compass-strip-wrap">
-      <span id="hud-compass-heading" class="di-compass-side-pill left" title="Aktuelle Blickrichtung">0° N</span>
+      <span id="hud-compass-heading" class="di-compass-side-pill left is-quest-wp" title="Questziel – Klicken: Automatisch hinlaufen / Quests öffnen [L]">◆ --</span>
       <button type="button" id="hud-compass-wb-left" class="di-compass-wb-pill left hidden" title="Klicken: Monster-Info Dynamic Island für den aktiven Weltboss öffnen"></button>
       <div class="nw-compass-viewport">
         <div class="nw-compass-center-caret">▼</div>
@@ -317,12 +317,13 @@
   <!-- ==================================================================== -->
   <section id="hud-chat-box" class="hud-chat-box">
     <div class="chat-tabs-bar" id="chat-tabs-bar">
-      <button type="button" class="chat-tab-pill active" data-chat-filter="all">Allgemein</button>
-      <button type="button" class="chat-tab-pill ch-normal" data-chat-filter="normal">Gruppe</button>
-      <button type="button" class="chat-tab-pill ch-guild" data-chat-filter="guild">Gilde</button>
-      <button type="button" class="chat-tab-pill ch-global" data-chat-filter="global">System</button>
-      <button type="button" class="chat-tab-pill ch-trade" data-chat-filter="trade">Handel</button>
+      <button type="button" class="chat-tab-pill ch-normal active" data-chat-filter="normal" title="Allgemeiner Spieler-Chat">Allgemein</button>
+      <button type="button" class="chat-tab-pill ch-party" data-chat-filter="party" title="Gruppen-Chat">Gruppe</button>
+      <button type="button" class="chat-tab-pill ch-guild" data-chat-filter="guild" title="Gilden-Chat">Gilde</button>
+      <button type="button" class="chat-tab-pill ch-global" data-chat-filter="system" title="System- &amp; Event-Meldungen">System</button>
+      <button type="button" class="chat-tab-pill ch-trade" data-chat-filter="trade" title="Handels-Chat">Handel</button>
       <button type="button" class="chat-tab-pill ch-drops" data-chat-filter="drops" title="Beute-Protokoll">Beute</button>
+      <button type="button" class="chat-tab-pill ch-bots" data-chat-filter="bots" title="Bot-Nachrichten &amp; KI-Aktivitäten">Bots</button>
       <button type="button" class="chat-tab-icon-btn" id="btn-chat-open-friends" data-open-win="friends" title="Messenger &amp; Freundesliste öffnen">+</button>
       <button type="button" id="btn-chat-minimize" class="chat-tab-min-btn" title="Chat ein-/ausklappen [Enter]">⚙</button>
     </div>
@@ -823,6 +824,6 @@
   <div id="item-tooltip" class="item-tooltip hidden"></div>
   <div id="toast-banner" class="toast-banner"></div>
 
-  <script type="module" src="./src/ui/app.js?v=v20261030_v603"></script>
+  <script type="module" src="./src/ui/app.js?v=v20261031_v610"></script>
 </body>
 </html>

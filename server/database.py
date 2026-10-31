@@ -19,6 +19,8 @@ from game_data import (
     CLASS_ALLOWED_WEAPONS,
     CLASS_STARTER_ARMOR,
     CLASS_STARTER_WEAPON,
+    EXPLICIT_LEGACY_EQUIP_MAP,
+    resolve_item_template_id,
     DEFAULT_DROP_FILTER,
     ITEM_TEMPLATES,
     MAX_PET_LEVEL,
@@ -26,6 +28,7 @@ from game_data import (
     PASSIVE_SKILL_DEFS,
     PET_SKILL_DEFS,
     QUEST_TEMPLATES,
+    RARITIES,
     calculate_item_effective_stats,
     get_item_slot_size,
     get_required_pet_exp,
@@ -62,7 +65,32 @@ class GameDatabase:
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self._init_db()
+        self.migrate_legacy_equipment_records()
         self._seed_demo_offline_shops()
+
+    def migrate_legacy_equipment_records(self) -> int:
+        """Migriert alle alten Ausrüstungs-IDs (Lv. 2, 3, 5, 8, 12, 15, 18 ...) in inventory_items und offline_shop_listings
+        auf das offizielle 10-Stufen-Equipment (Lv. 1 Holz bis Lv. 90 Ätherium)."""
+        migrated = 0
+        with DB_LOCK:
+            conn = self._connect()
+            try:
+                for old_id, new_id in EXPLICIT_LEGACY_EQUIP_MAP.items():
+                    c1 = conn.execute(
+                        "UPDATE inventory_items SET template_id = ? WHERE template_id = ?",
+                        (new_id, old_id),
+                    ).rowcount
+                    c2 = conn.execute(
+                        "UPDATE offline_shop_listings SET template_id = ? WHERE template_id = ?",
+                        (new_id, old_id),
+                    ).rowcount
+                    migrated += (c1 + c2)
+                conn.commit()
+            except Exception as e:
+                pass
+            finally:
+                conn.close()
+        return migrated
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
@@ -243,6 +271,16 @@ class GameDatabase:
                 )
                 try:
                     conn.execute("ALTER TABLE accounts ADD COLUMN coins INTEGER NOT NULL DEFAULT 250;")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE inventory_items ADD COLUMN rarity TEXT DEFAULT '';")
+                except Exception:
+                    pass
+                try:
+                    conn.execute(
+                        "DELETE FROM inventory_items WHERE player_id LIKE 'bot_%' AND template_id = 'pferdemedaille' AND reserved_shop_id IS NULL;"
+                    )
                 except Exception:
                     pass
                 self._deduplicate_player_names_conn(conn)
@@ -879,10 +917,10 @@ class GameDatabase:
                         "pos_x": 806.0,
                         "pos_z": -758.0,
                         "items": [
-                            ("sword_silver", 6, 1, [{"id": "bonus_atk", "name": "Angriffswert", "value": 28, "unit": ""}, {"id": "bonus_crit", "name": "Kritischer Treffer", "value": 7, "unit": "%"}], 2400),
-                            ("sword_msk", 4, 1, [{"id": "bonus_vs_metin", "name": "Stark gegen Rissmonolithen", "value": 15, "unit": "%"}], 5800),
-                            ("sword_rsb", 5, 1, [{"id": "bonus_vs_monster", "name": "Stark gegen Monster", "value": 15, "unit": "%"}], 7200),
-                            ("bow_horn", 5, 1, [{"id": "bonus_crit", "name": "Kritischer Treffer", "value": 10, "unit": "%"}], 3100),
+                            ("wpn_silber_sword", 6, 1, [{"id": "bonus_atk", "name": "Angriffswert", "value": 28, "unit": ""}, {"id": "bonus_crit", "name": "Kritischer Treffer", "value": 7, "unit": "%"}], 2400),
+                            ("wpn_kupfer_sword", 4, 1, [{"id": "bonus_vs_metin", "name": "Stark gegen Rissmonolithen", "value": 15, "unit": "%"}], 5800),
+                            ("wpn_kupfer_greatsword", 5, 1, [{"id": "bonus_vs_monster", "name": "Stark gegen Monster", "value": 15, "unit": "%"}], 7200),
+                            ("wpn_holz_bow", 5, 1, [{"id": "bonus_crit", "name": "Kritischer Treffer", "value": 10, "unit": "%"}], 3100),
                             ("scroll_blessing", 0, 3, [], 1650),
                             ("mat_wolf_claw", 0, 5, [], 450),
                         ],
@@ -896,7 +934,7 @@ class GameDatabase:
                         "pos_x": 834.0,
                         "pos_z": -758.0,
                         "items": [
-                            ("armor_tiger", 6, 1, [{"id": "bonus_hp", "name": "Max. TP", "value": 800, "unit": ""}], 2900),
+                            ("arm_kupfer_armor", 6, 1, [{"id": "bonus_hp", "name": "Max. TP", "value": 800, "unit": ""}], 2900),
                             ("item_bonus_changer", 0, 3, [], 1400),
                             ("item_bonus_adder", 0, 2, [], 1100),
                             ("chest_moonlight", 0, 1, [], 1950),
@@ -931,19 +969,20 @@ class GameDatabase:
 
     @staticmethod
     def _build_starter_items(class_id: str) -> List[tuple]:
-        w_tpl = CLASS_STARTER_WEAPON.get(class_id, "sword_broadsword")
-        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "armor_leather")
+        w_tpl = CLASS_STARTER_WEAPON.get(class_id, "wpn_holz_sword")
+        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "arm_holz_armor")
         return [
-            # Ausgerüstet (nur das Start-EQ +0, je nach Klasse):
+            # Ausgerüstet (nur das offizielle 10-Stufen-Holz-Start-EQ +0, je nach Klasse):
             (w_tpl, 0, 0, "weapon", 0, 1, []),
             (a_tpl, 0, 0, "armor", 0, 1, []),
-            ("helm_wood", 0, 0, "helmet", 0, 1, []),
-            ("shield_wood", 0, 0, "shield", 0, 1, []),
-            ("shoes_wood", 0, 0, "shoes", 0, 1, []),
-            ("necklace_wood", 0, 0, "necklace", 0, 1, []),
-            ("bracelet_wood", 0, 0, "bracelet", 0, 1, []),
-            ("gloves_wood", 0, 0, "gloves", 0, 1, []),
-            ("earrings_wood", 0, 0, "earrings", 0, 1, []),
+            ("eq_holz_helmet", 0, 0, "helmet", 0, 1, []),
+            ("eq_holz_shield", 0, 0, "shield", 0, 1, []),
+            ("eq_holz_shoes", 0, 0, "shoes", 0, 1, []),
+            ("eq_holz_necklace", 0, 0, "necklace", 0, 1, []),
+            ("eq_holz_bracelet", 0, 0, "bracelet", 0, 1, []),
+            ("eq_holz_gloves", 0, 0, "gloves", 0, 1, []),
+            ("eq_holz_earrings", 0, 0, "earrings", 0, 1, []),
+            ("eq_holz_belt", 0, 0, "belt", 0, 1, []),
             # Im Inventar (nur 25x Rote Pots, 25x Blaue Pots, Pferd-Start-Siegel, Pet-Start-Siegel — keine Spezial-Items, keine Kostüme):
             ("potion_hp_small", 0, 0, None, 0, 25, []),
             ("potion_mp_medium", 0, 1, None, 0, 25, []),
@@ -953,8 +992,8 @@ class GameDatabase:
 
     def ensure_class_starter_equipment(self, player_id: str, class_id: str) -> None:
         """Stellt beim Klassenwechsel sicher, dass Start-Waffe und Start-Rüstung zur Klasse passen."""
-        w_tpl = CLASS_STARTER_WEAPON.get(class_id, "sword_broadsword")
-        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "armor_leather")
+        w_tpl = CLASS_STARTER_WEAPON.get(class_id, "wpn_holz_sword")
+        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "arm_holz_armor")
         starter_weapons = set(CLASS_STARTER_WEAPON.values())
         starter_armors = set(CLASS_STARTER_ARMOR.values())
         with DB_LOCK:
@@ -1059,7 +1098,7 @@ class GameDatabase:
                     if is_sa_char:
                         default_skills = {sk["id"]: 1 for sk in cdef["skills"]}
                     else:
-                        default_skills = {sk["id"]: 1 for sk in cdef["skills"] if not sk.get("special")}
+                        default_skills = {sk["id"]: 0 for sk in cdef["skills"] if not sk.get("special")}
                     default_passives = {ps_id: 0 for ps_id in PASSIVE_SKILL_DEFS}
                     default_quests = {
                         q["id"]: {
@@ -1105,9 +1144,9 @@ class GameDatabase:
                     }
                     now = time.time()
                     start_stat_pts = 90 if is_sa_char else 3
-                    start_skill_pts = 35 if is_sa_char else 2
-                    start_yang = 50000000 if is_sa_char else 3500
-                    start_shards = 5000 if is_sa_char else 5
+                    start_skill_pts = 35 if is_sa_char else 0
+                    start_yang = 50000000 if is_sa_char else 2000
+                    start_shards = 5000 if is_sa_char else 0
                     start_rep = 20000 if is_sa_char else 1450
                     conn.execute(
                         """
@@ -1284,6 +1323,17 @@ class GameDatabase:
         if bot_prof:
             p["empire"] = bot_prof["empire"]
             p["quests"]["__empire__"] = bot_prof["empire"]
+            raw_mp = p["quests"].get("__mount_profile__")
+            if isinstance(raw_mp, dict) and (int(raw_mp.get("level", 1) or 1) > 1 or int(raw_mp.get("statPoints", 0) or 0) > 0):
+                raw_mp["level"] = 1
+                raw_mp["statPoints"] = 0
+                raw_mp["combatStat"] = 0
+                raw_mp["vitalityStat"] = 0
+                p["quests"]["__mount_profile__"] = raw_mp
+                conn.execute(
+                    "UPDATE players SET quests_json = ? WHERE player_id = ?",
+                    (json.dumps(p["quests"]), p["player_id"]),
+                )
         else:
             p["empire"] = p["quests"].get("__empire__") or ("kaeryu" if float(p.get("pos_x", 708.0)) < 0.0 else "seiryu")
         p["isDead"] = bool(p["quests"].get("__is_dead__", False)) or int(p.get("hp", 1)) <= 0
@@ -1448,24 +1498,27 @@ class GameDatabase:
 
     def _format_item_row(self, ir: sqlite3.Row) -> dict:
         d = dict(ir)
-        tpl = ITEM_TEMPLATES.get(d["template_id"], {})
+        tpl_id = resolve_item_template_id(d["template_id"])
+        tpl = ITEM_TEMPLATES.get(tpl_id, {})
         bonuses = json.loads(d.get("bonuses_json", "[]") or "[]")
         for b in bonuses:
             if isinstance(b, dict) and b.get("name") == "Doppel-Yang-Chance":
                 b["name"] = "Doppel-Gold-Chance"
         plus = int(d.get("plus_level", 0))
-        eff_stats = calculate_item_effective_stats(d["template_id"], plus, bonuses)
-        slot_size = get_item_slot_size(d["template_id"])
+        eff_stats = calculate_item_effective_stats(tpl_id, plus, bonuses)
+        slot_size = get_item_slot_size(tpl_id)
+        row_rarity = str(d.get("rarity") or "").strip()
+        eff_rarity = row_rarity if row_rarity in RARITIES else tpl.get("rarity", "common")
         return {
             "uid": d["item_uid"],
-            "templateId": d["template_id"],
-            "name": tpl.get("name", d["template_id"]),
+            "templateId": tpl_id,
+            "name": tpl.get("name", tpl_id),
             "type": tpl.get("type", "material"),
             "slot": tpl.get("slot", None),
             "weaponSubType": tpl.get("weaponSubType", None),
             "classes": tpl.get("classes", None),
             "slotSize": slot_size,
-            "rarity": tpl.get("rarity", "common"),
+            "rarity": eff_rarity,
             "reqLevel": tpl.get("reqLevel", 1),
             "icon": tpl.get("icon", "rusty_sword"),
             "customIcon": tpl.get("customIcon", None),
@@ -1566,13 +1619,15 @@ class GameDatabase:
                 conn.close()
 
     def add_item_to_inventory(
-        self, player_id: str, template_id: str, quantity: int = 1, plus_level: int = 0, bonuses: list = None
+        self, player_id: str, template_id: str, quantity: int = 1, plus_level: int = 0, bonuses: list = None, rarity: str = ""
     ) -> Tuple[bool, str]:
+        template_id = resolve_item_template_id(template_id)
         tpl = ITEM_TEMPLATES.get(template_id)
         if not tpl:
             return False, "Unbekannter Gegenstand."
         cat = get_item_category(template_id)
         size_y = get_item_slot_size(template_id)
+        item_rarity = str(rarity or "").strip() if str(rarity or "").strip() in RARITIES else ""
         with DB_LOCK:
             conn = self._connect()
             try:
@@ -1603,8 +1658,8 @@ class GameDatabase:
                     """
                     INSERT INTO inventory_items (
                         item_uid, player_id, template_id, category, slot_index,
-                        equipped_slot, plus_level, quantity, bonuses_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+                        equipped_slot, plus_level, quantity, bonuses_json, rarity, created_at
+                    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
                     """,
                     (
                         uid,
@@ -1615,6 +1670,7 @@ class GameDatabase:
                         plus_level,
                         quantity,
                         json.dumps(bonuses or [], ensure_ascii=False),
+                        item_rarity,
                         time.time(),
                     ),
                 )

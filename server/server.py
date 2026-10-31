@@ -68,11 +68,13 @@ sys.path.insert(0, SERVER_DIR)
 from database import GameDatabase
 from game_data import (
     BLACKSMITH_RATES,
+    BLACKSMITH_TIER_RATES,
     CHARACTER_CLASSES,
     DEFAULT_DROP_FILTER,
     DUNGEONS,
     EQUIPMENT_SLOTS,
     ITEM_TEMPLATES,
+    MAP2_UPGRADE_MAT_BY_SLOT,
     MAPS,
     MONOLITH_COMBAT_PHASES,
     MONOLITH_RARITIES,
@@ -1083,9 +1085,10 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                     pulled += 1
         return {"ok": True, "message": f"🦸 Mob-Pull ausgeführt: {pulled} Monster im Umkreis angelockt!"}
 
-    if action == "equip_or_use_item":
+    if action in ("equip_or_use_item", "use_item"):
+        item_uid = payload.get("itemUid") or payload.get("uid") or ""
         ok, msg = WORLD.use_or_open_inventory_item(
-            player_id, payload.get("itemUid", ""), target_slot=payload.get("targetSlot")
+            player_id, item_uid, target_slot=payload.get("targetSlot")
         )
         return {"ok": ok, "message": msg}
 
@@ -1268,6 +1271,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             payload.get("itemUid", ""),
             bool(payload.get("useBlessing", False)),
             str(payload.get("method", "")),
+            bool(payload.get("useMagicMetal", False)),
         )
         return {"ok": ok, "message": msg, "upgradeSuccess": up_success}
 
@@ -1433,13 +1437,26 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             "!boss": "hunt_boss",
             "!frei": "free",
         }
+        is_bot_sender = bool(str(player_id).startswith("bot_") or p.get("is_bot"))
         if txt_low in chat_tactic_map and p.get("partyId"):
             res_tac = WORLD.handle_party_action(player_id, "tactic", {"tactic": chat_tactic_map[txt_low]})
-            WORLD.add_chat_message(p["name"], txt, payload.get("channel", "normal"))
+            WORLD.add_chat_message(
+                p["name"],
+                txt,
+                "party",
+                sender_player_id=player_id,
+                is_bot=is_bot_sender,
+            )
             if res_tac.get("message"):
-                WORLD.add_chat_message("Gruppen-Taktik", res_tac["message"], "system")
+                WORLD.add_chat_message("Gruppen-Taktik", res_tac["message"], "party", target_player_id=player_id)
             return res_tac
-        WORLD.add_chat_message(p["name"], txt, payload.get("channel", "normal"))
+        WORLD.add_chat_message(
+            p["name"],
+            txt,
+            payload.get("channel", "normal"),
+            sender_player_id=player_id,
+            is_bot=is_bot_sender,
+        )
         return {"ok": True}
 
     if action == "social":
@@ -1931,339 +1948,11 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
             ),
         }
 
-        if prop_id == "bal_prop_01":
-            CHARACTER_CLASSES["sura"]["baseStats"]["magicAtk"] = 58
-            CHARACTER_CLASSES["sura"]["baseStats"]["atk"] = 55
-        elif prop_id == "bal_prop_02":
-            CHARACTER_CLASSES["ninja"]["baseStats"]["def"] = 30
-            BLACKSMITH_RATES[4]["chance"] = 0.65
-            BLACKSMITH_RATES[5]["chance"] = 0.55
-            BLACKSMITH_RATES[6]["chance"] = 0.46
-        elif prop_id == "bal_prop_03":
-            ITEM_TEMPLATES["sword_broadsword"]["sellPrice"] = 175
-            ITEM_TEMPLATES["sword_sura_starter"]["sellPrice"] = 175
-        elif prop_id == "bal_prop_04":
-            MONSTER_TEMPLATES["forest_bear"]["exp"] = 368
-            MONSTER_TEMPLATES["forest_bear"]["atk"] = 88
-            MONSTER_TEMPLATES["grizzly_bear"]["exp"] = 455
-            MONSTER_TEMPLATES["grizzly_bear"]["atk"] = 104
-            MONSTER_TEMPLATES["white_tiger"]["exp"] = 535
-            MONSTER_TEMPLATES["white_tiger"]["atk"] = 119
-        elif prop_id == "bal_prop_05":
-            mc_d = MONSTER_TEMPLATES.get("metin_combat", {}).setdefault("drops", [])
-            if not any(d.get("itemId") == resolve_item_template_id("staff_jade") for d in mc_d):
-                mc_d.append({"itemId": resolve_item_template_id("staff_jade"), "chance": 0.24})
-            if not any(d.get("itemId") == resolve_item_template_id("dagger_viper") for d in mc_d):
-                mc_d.append({"itemId": resolve_item_template_id("dagger_viper"), "chance": 0.24})
-            for mk in ("metin_battle", "metin_greed"):
-                md_list = MONSTER_TEMPLATES.get(mk, {}).setdefault("drops", [])
-                if not any(d.get("itemId") == resolve_item_template_id("staff_dragon") for d in md_list):
-                    md_list.append({"itemId": resolve_item_template_id("staff_dragon"), "chance": 0.22})
-        elif prop_id == "bal_prop_06":
-            CHARACTER_CLASSES["ninja"]["baseStats"]["hp"] = 890
-            CHARACTER_CLASSES["ninja"]["baseStats"]["def"] = 36
-            CHARACTER_CLASSES["ninja"]["growthPerLevel"]["hp"] = 88
-        elif prop_id == "bal_prop_07":
-            if "metin_sorrow" in MONSTER_TEMPLATES:
-                MONSTER_TEMPLATES["metin_sorrow"]["exp"] = 1150
-            if "metin_combat" in MONSTER_TEMPLATES:
-                MONSTER_TEMPLATES["metin_combat"]["exp"] = 1850
-            if "metin_battle" in MONSTER_TEMPLATES:
-                MONSTER_TEMPLATES["metin_battle"]["exp"] = 2850
-            if "metin_greed" in MONSTER_TEMPLATES:
-                MONSTER_TEMPLATES["metin_greed"]["exp"] = 4600
-        elif prop_id == "bal_prop_08":
-            CHARACTER_CLASSES["warrior"]["baseStats"]["atk"] = 64
-            for sk_w in CHARACTER_CLASSES.get("warrior", {}).get("skills", []):
-                if sk_w.get("id") == "whirlwind":
-                    sk_w["cooldown"] = 6.0
-                elif sk_w.get("id") == "three_way_cut":
-                    sk_w["cooldown"] = 5.0
-        elif prop_id == "bal_prop_09":
-            for bid_p, wp_p in WORLD.players.items():
-                if str(bid_p).startswith("bot_") and int(wp_p.get("level", 1)) < 13 and float(wp_p.get("pos_z", 0.0)) > 0.0:
-                    is_k = wp_p.get("empire") == "kaeryu"
-                    wp_p["pos_x"] = -490.0 if is_k else 490.0
-                    wp_p["pos_z"] = -420.0
-                    af_p = wp_p.get("autofarm")
-                    if isinstance(af_p, dict):
-                        af_p["anchorX"] = wp_p["pos_x"]
-                        af_p["anchorZ"] = wp_p["pos_z"]
-        elif prop_id == "bal_prop_11":
-            if "staff_jade" in ITEM_TEMPLATES:
-                ITEM_TEMPLATES["staff_jade"].setdefault("baseStats", {})["magicAtk"] = 58
-            if "staff_dragon" in ITEM_TEMPLATES:
-                ITEM_TEMPLATES["staff_dragon"].setdefault("baseStats", {})["magicAtk"] = 96
-            for mk_b in ("savage_infantry", "savage_general", "black_wind_soldier"):
-                if mk_b in MONSTER_TEMPLATES:
-                    md_b = MONSTER_TEMPLATES[mk_b].setdefault("drops", [])
-                    if not any(d.get("itemId") == resolve_item_template_id("staff_dragon") for d in md_b):
-                        md_b.append({"itemId": resolve_item_template_id("staff_dragon"), "chance": 0.18})
-            for sh_id in ("bot_aurelia_shaman", "bot_seraphina_shaman"):
-                wp_sh = WORLD.players.get(sh_id)
-                if wp_sh and int(wp_sh.get("level", 1)) >= 16:
-                    eq_sh = wp_sh.setdefault("equipment", {})
-                    if isinstance(eq_sh.get("weapon"), dict):
-                        eq_sh["weapon"]["templateId"] = resolve_item_template_id("staff_dragon")
-                        eq_sh["weapon"]["name"] = ITEM_TEMPLATES.get(resolve_item_template_id("staff_dragon"), {}).get("name", "Stab")
-                        eq_sh["weapon"]["plusLevel"] = 9
-                        WORLD.compute_player_combat_stats(wp_sh)
-        elif prop_id == "bal_prop_12":
-            if "dagger_viper" in ITEM_TEMPLATES:
-                ITEM_TEMPLATES["dagger_viper"].setdefault("baseStats", {})["atk"] = 64
-            for nj_id in ("bot_nachtklinge_ninja", "bot_schattenfalke_ninja"):
-                wp_nj = WORLD.players.get(nj_id)
-                if wp_nj and int(wp_nj.get("level", 1)) >= 8:
-                    eq_nj = wp_nj.setdefault("equipment", {})
-                    if isinstance(eq_nj.get("weapon"), dict):
-                        eq_nj["weapon"]["templateId"] = resolve_item_template_id("dagger_viper")
-                        eq_nj["weapon"]["name"] = ITEM_TEMPLATES.get(resolve_item_template_id("dagger_viper"), {}).get("name", "Dolche")
-                        eq_nj["weapon"]["weaponSubType"] = "dagger"
-                        eq_nj["weapon"]["slotSize"] = 1
-                        eq_nj["weapon"]["plusLevel"] = 9
-                        WORLD.compute_player_combat_stats(wp_nj)
-        elif prop_id == "bal_prop_13":
-            if "halberd_red_iron" in ITEM_TEMPLATES:
-                ITEM_TEMPLATES["halberd_red_iron"].setdefault("baseStats", {})["atk"] = 112
-            for mk_m in ("metin_battle", "metin_greed", "metin_black"):
-                if mk_m in MONSTER_TEMPLATES:
-                    MONSTER_TEMPLATES[mk_m]["exp"] = int(MONSTER_TEMPLATES[mk_m].get("exp", 2500) * 1.35)
-            for mt_id in ("bot_eisensturm_mounted", "bot_donnerkeil_mounted"):
-                wp_mt = WORLD.players.get(mt_id)
-                if wp_mt and int(wp_mt.get("level", 1)) >= 12:
-                    eq_mt = wp_mt.setdefault("equipment", {})
-                    if isinstance(eq_mt.get("weapon"), dict):
-                        eq_mt["weapon"]["templateId"] = "halberd_red_iron"
-                        eq_mt["weapon"]["name"] = "Rotstahlbrecher (REK)"
-                        eq_mt["weapon"]["weaponSubType"] = "two_hand"
-                        eq_mt["weapon"]["slotSize"] = 3
-                        eq_mt["weapon"]["plusLevel"] = 9
-                        WORLD.compute_player_combat_stats(wp_mt)
-        elif prop_id.startswith("bal_prop_"):
-            try:
-                w_idx_p = int(prop_id.replace("bal_prop_", "").strip())
-            except Exception:
-                w_idx_p = 14
-            if not isinstance(matched_pr, dict) or not matched_pr.get("domainKey"):
-                matched_pr = self._build_diverse_wave_proposal(w_idx_p)
-            dom_key = str(matched_pr.get("domainKey") or "class_skill_rotation")
-            t_cls = str(matched_pr.get("targetClass") or "ninja").lower()
-
-            if dom_key == "pet_evolution_synergy":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        p_lv_cur = max(1, int(wp_b.get("level", 1) or 1))
-                        pd = wp_b.setdefault("petData", {})
-                        pd["level"] = min(p_lv_cur + 2, max(1, int(pd.get("level", 1))))
-                        pd["vit"] = min(p_lv_cur, int(pd.get("vit", 4)) + 1)
-                        sk_p = pd.setdefault("skills", {})
-                        for p_sk in ("berserker", "monster_hunter", "vampirism"):
-                            sk_p[p_sk] = min(max(1, 1 + p_lv_cur // 5), int(sk_p.get(p_sk, 1)) + 1)
-                        wp_b["petSynergyBonusPct"] = min(16, int(wp_b.get("petSynergyBonusPct", 6)) + 2)
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "blacksmith_upgrade_pity":
-                for st_pl, cap_ch in ((6, 0.58), (7, 0.48), (8, 0.38)):
-                    if st_pl in BLACKSMITH_RATES:
-                        BLACKSMITH_RATES[st_pl]["chance"] = round(min(cap_ch, float(BLACKSMITH_RATES[st_pl].get("chance", 0.35)) + 0.03), 3)
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        eq_b = wp_b.get("equipment") or {}
-                        for _sl_k, sl_v in eq_b.items():
-                            if isinstance(sl_v, dict) and int(sl_v.get("plusLevel", 0)) < 9:
-                                sl_v["plusLevel"] = min(9, int(sl_v.get("plusLevel", 0)) + 1)
-                                break
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "monolith_resonance_drops":
-                for mk_r in ("metin_sorrow", "metin_combat", "metin_battle", "metin_greed", "metin_black", "metin_darkness"):
-                    if mk_r in MONSTER_TEMPLATES:
-                        MONSTER_TEMPLATES[mk_r]["exp"] = min(14000, int(MONSTER_TEMPLATES[mk_r].get("exp", 2000) * 1.10))
-                        dr_l = MONSTER_TEMPLATES[mk_r].setdefault("drops", [])
-                        for d_id in ("bonus_changer", "blessing_scroll"):
-                            found_d = next((d for d in dr_l if d.get("itemId") == d_id), None)
-                            if found_d:
-                                found_d["chance"] = round(min(0.65, float(found_d.get("chance", 0.25)) + 0.05), 2)
-                            else:
-                                dr_l.append({"itemId": d_id, "chance": 0.28})
-            elif dom_key == "class_skill_rotation":
-                if t_cls in CHARACTER_CLASSES:
-                    bs = CHARACTER_CLASSES[t_cls].setdefault("baseStats", {})
-                    bs["atk"] = min(115, int(bs.get("atk", 55)) + 3)
-                    bs["magicAtk"] = min(115, int(bs.get("magicAtk", 50)) + 3)
-                    for sk_d in CHARACTER_CLASSES[t_cls].get("skills", []):
-                        sk_d["cooldown"] = round(max(3.5, float(sk_d.get("cooldown", 6.0)) - 0.4), 1)
-                        sk_d["power"] = min(380, int(float(sk_d.get("power", 120)) * 1.06))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict) and str(wp_b.get("class_id", "")).lower() == t_cls:
-                        sk_m = wp_b.setdefault("skills", {})
-                        for sk_k in list(sk_m.keys()):
-                            sk_m[sk_k] = min(30, int(sk_m.get(sk_k, 10)) + 1)
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "mount_cavalry_charge":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        am = wp_b.get("active_mount")
-                        if isinstance(am, dict):
-                            am["bonusAtkPct"] = min(40, int(am.get("bonusAtkPct", 16)) + 4)
-                            am["bonusDef"] = min(120, int(am.get("bonusDef", 35)) + 12)
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "monster_swarm_counter":
-                for mk_sw in ("dire_wolf", "alpha_blue_wolf", "cunning_red_boar", "white_oath_archer", "white_oath_commander", "orc_scout", "orc_warrior", "orc_sorcerer"):
-                    if mk_sw in MONSTER_TEMPLATES:
-                        MONSTER_TEMPLATES[mk_sw]["exp"] = min(8500, int(MONSTER_TEMPLATES[mk_sw].get("exp", 450) * 1.10))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "quest_story_hunting_rewards":
-                for q_tpl in QUEST_TEMPLATES:
-                    if isinstance(q_tpl, dict) and str(q_tpl.get("category", "")) != "biologist":
-                        q_tpl["rewardExp"] = min(45000, int(q_tpl.get("rewardExp", 1500) * 1.25))
-                        q_tpl["rewardYang"] = min(65000, int(q_tpl.get("rewardYang", 3000) * 1.25))
-                        q_tpl["rewardRep"] = min(5000, int(q_tpl.get("rewardRep", 300) * 1.20))
-                        r_items = q_tpl.setdefault("rewardItems", [])
-                        if not any(ri.get("itemId") in ("scroll_blessing", "item_bonus_changer") for ri in r_items if isinstance(ri, dict)):
-                            r_items.append({"itemId": "scroll_blessing", "count": 1})
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        wp_b["questsTurnedIn"] = int(wp_b.get("questsTurnedIn", 8)) + 2
-                        af_st_q = ((wp_b.get("autofarm") or {}).get("stats") or {})
-                        if isinstance(af_st_q, dict):
-                            af_st_q["questsTurnedIn"] = int(af_st_q.get("questsTurnedIn", 8)) + 2
-                        wp_b["yang"] = int(wp_b.get("yang", 50000)) + 8500
-                        wp_b["reputation"] = int(wp_b.get("reputation", 1200)) + 650
-            elif dom_key == "biologist_research_rewards":
-                for q_tpl in QUEST_TEMPLATES:
-                    if isinstance(q_tpl, dict) and str(q_tpl.get("category", "")) == "biologist":
-                        q_tpl["rewardExp"] = min(55000, int(q_tpl.get("rewardExp", 2500) * 1.15))
-                        q_tpl["rewardYang"] = min(75000, int(q_tpl.get("rewardYang", 5000) * 1.15))
-                        q_tpl["rewardRep"] = min(6000, int(q_tpl.get("rewardRep", 500) * 1.15))
-                        bb = q_tpl.setdefault("biologistBonus", {})
-                        if "hp" in bb:
-                            bb["hp"] = min(450, int(bb["hp"]) + 25)
-                        if "atk" in bb:
-                            bb["atk"] = min(16, int(bb["atk"]) + 1)
-                        if "def" in bb:
-                            bb["def"] = min(14, int(bb["def"]) + 1)
-                        if "vsMonsterPct" in bb:
-                            bb["vsMonsterPct"] = min(6, int(bb["vsMonsterPct"]) + 1)
-                        if "critChance" in bb:
-                            bb["critChance"] = min(4, int(bb["critChance"]) + 1)
-                        if "vsMetinPct" in bb:
-                            bb["vsMetinPct"] = min(6, int(bb["vsMetinPct"]) + 1)
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        wp_b["biologistBonusBoosts"] = min(2, int(wp_b.get("biologistBonusBoosts", 0)) + 1)
-                        wp_b["questsTurnedIn"] = int(wp_b.get("questsTurnedIn", 8)) + 1
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "runenweber_bonus_pity":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        eq_b = wp_b.get("equipment") or {}
-                        wpn_s = eq_b.get("weapon")
-                        if isinstance(wpn_s, dict):
-                            b_list = wpn_s.setdefault("bonuses", [])
-                            if b_list and isinstance(b_list[0], dict):
-                                b_list[0]["value"] = max(int(b_list[0].get("value", 12)), 15)
-                                b_list[0]["isLocked"] = True
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "worldboss_coop_rewards":
-                for mk_wb in ("chief_orc", "nine_tails", "giant_turtle", "flame_king", "yellow_tiger_ghost"):
-                    if mk_wb in MONSTER_TEMPLATES:
-                        MONSTER_TEMPLATES[mk_wb]["exp"] = min(65000, int(MONSTER_TEMPLATES[mk_wb].get("exp", 8500) * 1.15))
-                        MONSTER_TEMPLATES[mk_wb]["goldMax"] = min(45000, int(MONSTER_TEMPLATES[mk_wb].get("goldMax", 5000) * 1.15))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "economy_market_velocity":
-                for mk_ec in ("savage_infantry", "savage_general", "black_wind_soldier", "orc_warrior", "orc_sorcerer"):
-                    if mk_ec in MONSTER_TEMPLATES:
-                        MONSTER_TEMPLATES[mk_ec]["goldMax"] = min(2500, int(MONSTER_TEMPLATES[mk_ec].get("goldMax", 320) * 1.15))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        wp_b["gold"] = int(wp_b.get("gold", 50000)) + 3500
-            elif dom_key == "party_bridge_synergy":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        wp_b["sharedPartyKills"] = int(wp_b.get("sharedPartyKills", 0)) + 8
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "passive_mastery_matrix":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        WORLD.compute_player_combat_stats(wp_b)
-                        wp_b["hp"] = int(wp_b.get("max_hp", 2000))
-            elif dom_key == "species_locomotion_ai":
-                if hasattr(WORLD, "_ensure_monster_species_ai"):
-                    sp_map = WORLD._ensure_monster_species_ai()
-                    if isinstance(sp_map, dict):
-                        for _spk, spv in sp_map.items():
-                            if isinstance(spv, dict):
-                                spv["level"] = min(15, int(spv.get("level", 3)) + 1)
-                                spv["xp"] = int(spv.get("xp", 120)) + 180
-                                spv["evadeSuccesses"] = int(spv.get("evadeSuccesses", 10)) + 5
-                                spv["flankHits"] = int(spv.get("flankHits", 14)) + 6
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "monolith_awakening_cadence":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        inv_b = wp_b.setdefault("inventory", [])
-                        if isinstance(inv_b, list):
-                            found_shard = False
-                            found_core = False
-                            for it_m in inv_b:
-                                if isinstance(it_m, dict):
-                                    if it_m.get("itemId") == "mat_monolith_shard":
-                                        it_m["count"] = int(it_m.get("count", 0)) + 12
-                                        found_shard = True
-                                    elif it_m.get("itemId") == "mat_awakened_rift_core":
-                                        it_m["count"] = int(it_m.get("count", 0)) + 4
-                                        found_core = True
-                            if not found_shard and len(inv_b) < 42:
-                                inv_b.append({"id": f"shard_{pid_b}_{int(time.time())}", "itemId": "mat_monolith_shard", "name": "Monolith-Splitter", "type": "material", "count": 12})
-                            if not found_core and len(inv_b) < 42:
-                                inv_b.append({"id": f"core_{pid_b}_{int(time.time())}", "itemId": "mat_awakened_rift_core", "name": "Erweckter Risskern", "type": "material", "count": 4})
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "bot_rebirth_level38_cycle":
-                for _mk_c, mt_c in list(MONSTER_TEMPLATES.items()):
-                    if isinstance(mt_c, dict) and 1 <= int(mt_c.get("level", 1)) <= 38 and str(mt_c.get("rank", "")) != "metin":
-                        mt_c["exp"] = min(25000, int(mt_c.get("exp", 80) * 1.14))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        wp_b["gold"] = int(wp_b.get("gold", 50000)) + 2500
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "talisman_belt_alchemy":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        eq_b = wp_b.setdefault("equipment", {})
-                        for sl_tb in ("talisman", "belt", "necklace", "bracelet"):
-                            it_tb = eq_b.get(sl_tb)
-                            if isinstance(it_tb, dict):
-                                cur_u = int(it_tb.get("upgrade", 6))
-                                if cur_u < 9:
-                                    it_tb["upgrade"] = cur_u + 1
-                                    nm_b = str(it_tb.get("name", "Artefakt")).split(" +")[0]
-                                    it_tb["name"] = f"{nm_b} +{it_tb['upgrade']}"
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "dungeon_malakor_raids":
-                for mk_dg in ("lykos_boss", "brutal_captain", "malakor_dungeon_lord", "chief_orc"):
-                    if mk_dg in MONSTER_TEMPLATES:
-                        MONSTER_TEMPLATES[mk_dg]["exp"] = min(75000, int(MONSTER_TEMPLATES[mk_dg].get("exp", 4500) * 1.18))
-                        MONSTER_TEMPLATES[mk_dg]["goldMax"] = min(55000, int(MONSTER_TEMPLATES[mk_dg].get("goldMax", 3500) * 1.18))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        WORLD.compute_player_combat_stats(wp_b)
-            elif dom_key == "guild_imperial_warfare":
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        wp_b["alignmentPoints"] = min(20000, int(wp_b.get("alignmentPoints", 4500)) + 600)
-                        WORLD.compute_player_combat_stats(wp_b)
-            else:
-                for mk_eg in ("orc_warrior", "orc_sorcerer", "orc_general", "dark_tormentor"):
-                    if mk_eg in MONSTER_TEMPLATES:
-                        MONSTER_TEMPLATES[mk_eg]["exp"] = min(12000, int(MONSTER_TEMPLATES[mk_eg].get("exp", 1400) * 1.12))
-                for pid_b, wp_b in list(WORLD.players.items()):
-                    if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                        WORLD.compute_player_combat_stats(wp_b)
+        # SSOT Master-Handbuch (Ultimate Edition): Mathematische Werte, Drop-Pools, Schmied-Chancen und Bot-Inventare
+        # sind unveränderliche Single Source of Truth (SSOT) und dürfen NIEMALS zur Laufzeit mutiert oder gepusht werden!
+        for pid_b, wp_b in list(WORLD.players.items()):
+            if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
+                WORLD.compute_player_combat_stats(wp_b)
 
         hist = ctrl.setdefault("appliedProposalsHistory", [])
         hist_ids = {str(h.get("id", "")) for h in hist if isinstance(h, dict)}
@@ -2340,6 +2029,8 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                     "equipmentSlots": EQUIPMENT_SLOTS,
                     "items": ITEM_TEMPLATES,
                     "blacksmithRates": BLACKSMITH_RATES,
+                    "blacksmithTierRates": BLACKSMITH_TIER_RATES,
+                    "map2UpgradeMatBySlot": MAP2_UPGRADE_MAT_BY_SLOT,
                     "runeBonusPool": RUNE_BONUS_POOL,
                     "mounts": MOUNTS,
                     "mountSkins": MOUNT_SKIN_DEFS,
@@ -2544,18 +2235,21 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                 "rare": "#38bdf8",
                 "epic": "#a855f7",
                 "legendary": "#f59e0b",
+                "instabil": "#06b6d4",
                 "mythic": "#ef4444",
             }
 
             def _skill_rank_badge(lv_val: int) -> str:
-                lv_i = max(1, min(30, int(lv_val or 1)))
+                lv_i = max(0, min(50, int(lv_val or 0)))
+                if lv_i >= 50:
+                    return "L1 (Legendärer Meister)"
+                if lv_i >= 40:
+                    return f"P{lv_i - 39} (Perfekter Meister)"
                 if lv_i >= 30:
-                    return "P (Perfekter Meister)"
+                    return f"G{lv_i - 29} (Großmeister)"
                 if lv_i >= 20:
-                    return f"G{lv_i - 19} (Großmeister)"
-                if lv_i >= 12:
-                    return f"M{lv_i - 11} (Meister)"
-                return f"Stufe {lv_i}"
+                    return f"M{lv_i - 19} (Meister)"
+                return f"Stufe {lv_i} / 20"
 
             live_bots = live_data.get("bots", {})
             for bid in bot_ids:
@@ -2576,65 +2270,12 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                     rot_order = list(evo_prof.get("activeRotationOrder") or [])
                     desired_bonus_set = set(evo_prof.get("desiredBonusIds") or [])
 
-                    # Dynamische Synchronisation der Bot-Fertigkeiten, Passives, Pet & Reittier passend zum aktuellen Charakter-Level (lvl_b)
-                    sk_map = wp.setdefault("skills", {})
-                    for idx_sk, sk_def in enumerate(cdef_b.get("skills", [])):
-                        sk_id = sk_def["id"]
-                        cur_sk_lv = int(sk_map.get(sk_id, 1) or 1)
-                        if idx_sk == 0:
-                            target_sk_lv = min(30, max(1, int(lvl_b * 0.85) + (cur_run_kills // 900)))
-                        elif sk_id in rot_order[:3]:
-                            target_sk_lv = min(30, max(1, int(lvl_b * 0.72) + (cur_run_kills // 1200) - idx_sk))
-                        else:
-                            target_sk_lv = min(30, max(1, int(lvl_b * 0.50) + (cur_run_kills // 1800) - idx_sk))
-                        sk_map[sk_id] = max(1, min(30, max(cur_sk_lv if lvl_b > 1 else 1, target_sk_lv)))
-
-                    ps_map = wp.setdefault("passives", {})
-                    for ps_id, ps_def in PASSIVE_SKILL_DEFS.items():
-                        cur_ps = max(0, min(int(ps_def.get("maxLevel", 20)), int(ps_map.get(ps_id, 0) or 0)))
-                        ps_map[ps_id] = cur_ps
-
+                    # SSOT Teil I Abs. 4 (Kein unlauterer Push): Strikte Read-Only-Auswertung der echten Bot-Daten!
+                    sk_map = wp.get("skills") or {}
+                    ps_map = wp.get("passives") or {}
                     pet_d = WORLD._ensure_player_pet_data(wp) if hasattr(WORLD, "_ensure_player_pet_data") else (wp.get("petData") or {})
-                    target_pet_lv = max(1, min(38, int(lvl_b * 0.95) + min(2, cur_run_kills // 1800)))
-                    pet_d["level"] = target_pet_lv
-                    pet_d["vit"] = min(40, int(target_pet_lv * 0.45))
-                    if cls_id in ("sura", "shaman"):
-                        pet_d["int"] = min(45, int(target_pet_lv * 0.65))
-                        pet_d["str"] = min(30, int(target_pet_lv * 0.30))
-                        pet_d["dex"] = min(30, int(target_pet_lv * 0.30))
-                    elif cls_id == "ninja":
-                        pet_d["dex"] = min(45, int(target_pet_lv * 0.65))
-                        pet_d["str"] = min(35, int(target_pet_lv * 0.45))
-                        pet_d["int"] = min(20, int(target_pet_lv * 0.15))
-                    else:
-                        pet_d["str"] = min(45, int(target_pet_lv * 0.65))
-                        pet_d["dex"] = min(35, int(target_pet_lv * 0.40))
-                        pet_d["int"] = min(20, int(target_pet_lv * 0.15))
-                    pet_sk_map = pet_d.setdefault("skills", {})
-                    max_psk_cap = max(1, min(8, 1 + target_pet_lv // 5))
-                    for psk_def in PET_SKILL_DEFS:
-                        psk_id = psk_def["id"]
-                        psk_max = int(psk_def.get("maxLevel", 20))
-                        if psk_id == "auto_pickup":
-                            pet_sk_map[psk_id] = 5 if lvl_b >= 5 else 1
-                        elif psk_def.get("isActive"):
-                            pet_sk_map[psk_id] = min(psk_max, max(1, int(target_pet_lv / 10)))
-                        elif psk_id in ("erfahrungsrausch", "jaeger", "schatzgraeber", "monsterschild", "gluecksbringer", "dungeonmeister", "zerstoerung_dss", "zerstoerung_fks"):
-                            pet_sk_map[psk_id] = min(psk_max, max_psk_cap)
-                        else:
-                            pet_sk_map[psk_id] = min(psk_max, max(1, max_psk_cap - 1))
-
-                    mnt_d = wp.setdefault("mountData", {})
-                    if "mounted" in bid:
-                        target_horse_lv = 50 if lvl_b >= 34 else (35 if lvl_b >= 18 else max(10, int(lvl_b * 1.4)))
-                    else:
-                        target_horse_lv = min(35, max(1, int(lvl_b * 0.90)))
-                    mnt_d["level"] = target_horse_lv
-                    tot_h_pts = int(mnt_d["level"]) * 2
-                    mnt_d["dmgPoints"] = int(tot_h_pts * 0.65)
-                    mnt_d["hpPoints"] = tot_h_pts - mnt_d["dmgPoints"]
-                    if hasattr(WORLD, "_ensure_player_mount_data"):
-                        mnt_d = WORLD._ensure_player_mount_data(wp)
+                    pet_sk_map = pet_d.get("skills") or {}
+                    mnt_d = WORLD._ensure_player_mount_data(wp) if hasattr(WORLD, "_ensure_player_mount_data") else (wp.get("mountData") or {"level": 1})
                     comp_stats = WORLD.compute_player_combat_stats(wp) if hasattr(WORLD, "compute_player_combat_stats") else (wp.get("computed") or {})
 
                     # Hilfsfunktion für exakte In-Game-Icons & Slot-Größen (1x1, 1x2, 1x3)
@@ -2743,54 +2384,8 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                         sz_label = f"{sz} {'Slot' if sz == 1 else 'Slots'} (1×{sz})"
                         return tid, slot_id, w_sub, sz, sz_label, icon_url
 
-                    # 1. Ausgerüstete Items (Equipment Slots inkl. Talisman, Gürtel & Artefakt-Ring erst ab Level 5)
-                    eq_raw = wp.setdefault("equipment", {})
-                    if lvl_b >= 5:
-                        eq_raw["talisman"] = {
-                            "templateId": "talisman_monolith",
-                            "name": "Riss-Talisman der Wächter",
-                            "slot": "talisman",
-                            "slotSize": 1,
-                            "plusLevel": min(6, max(1, lvl_b // 4)),
-                            "reqLevel": 1,
-                            "rarity": "epic" if lvl_b >= 18 else "rare",
-                            "customIcon": "/assets/icons/items/uppitems/monolith_core.png",
-                            "effectiveStats": {"atk": 6 + int(lvl_b * 0.8), "vsMonsterPct": 4, "vsMetinPct": 5},
-                            "bonuses": [
-                                {"id": "bonus_vs_monster", "name": "Stark gegen Monster", "value": 4, "unit": "%"},
-                                {"id": "bonus_vs_metin", "name": "Stark gegen Rissmonolythen", "value": 5, "unit": "%"},
-                            ],
-                        }
-                        eq_raw["belt"] = {
-                            "templateId": "belt_iron",
-                            "name": "Kriegsgürtel der Wacht",
-                            "slot": "belt",
-                            "slotSize": 1,
-                            "plusLevel": min(6, max(1, lvl_b // 4)),
-                            "reqLevel": 1,
-                            "rarity": "rare",
-                            "customIcon": "/assets/icons/items/equipment/1/wood_bracers.png",
-                            "effectiveStats": {"def": 5 + int(lvl_b * 0.6), "hp": 160 + lvl_b * 15},
-                            "bonuses": [
-                                {"id": "bonus_hp", "name": "Max. TP", "value": 250, "unit": ""},
-                                {"id": "bonus_hp_absorb", "name": "TP-Absaugung", "value": 3, "unit": "%"},
-                            ],
-                        }
-                        eq_raw["exp_ring"] = {
-                            "templateId": "spec_hmr" if lvl_b >= 15 else "spec_exp_ring",
-                            "name": "Halbmondring" if lvl_b >= 15 else "EXP Ring (Erfahrungsring)",
-                            "slot": "exp_ring",
-                            "slotSize": 1,
-                            "plusLevel": 0,
-                            "reqLevel": 1,
-                            "rarity": "legendary" if lvl_b >= 15 else "epic",
-                            "customIcon": "/assets/icons/items/itemshop/ring_moon.png" if lvl_b >= 15 else "/assets/icons/items/itemshop/ring_of_experience.png",
-                            "effectiveStats": {"hp": 250, "vsMonsterPct": 5, "vsMetinPct": 5} if lvl_b >= 15 else {"hp": 150, "vsMonsterPct": 4, "expBonusPct": 30},
-                            "bonuses": [
-                                {"id": "bonus_vs_monster", "name": "Stark gegen Monster", "value": 5 if lvl_b >= 15 else 4, "unit": "%"},
-                                {"id": "bonus_exp", "name": "EXP-Bonus", "value": 30 if lvl_b >= 15 else 50, "unit": "%"},
-                            ],
-                        }
+                    # 1. Ausgerüstete Items (strikte SSOT Read-Only-Auswertung ohne künstliche Item-Injektion)
+                    eq_raw = wp.get("equipment") or {}
 
                     equipment_list = []
                     for slot_k, slot_label in SLOT_LABELS_DE:
@@ -3172,8 +2767,7 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                         len(completed_quests_list) + repeat_cycles,
                     )
 
-                    # Permanente Biologen-Forschungsboni sauber über __biologist_bonuses__ in compute_player_combat_stats einrechnen
-                    wp.setdefault("quests", {})["__biologist_bonuses__"] = {"aitc_bio": bio_bonuses}
+                    # Read-only Kampfwert-Berechnung ohne Mutation von wp["quests"]
                     if hasattr(WORLD, "compute_player_combat_stats"):
                         comp_stats = WORLD.compute_player_combat_stats(wp)
 
@@ -4477,34 +4071,7 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                         self._apply_balance_proposal_live(pr_f["id"], ctrl, pr_f, auto_mode=True, reset_kill_base=(idx_d == len(all_20_keys) - 1))
                     msg = f"🌐 Komplett-Zyklus abgeschlossen: Alle 20 System-Domänen (bal_prop_{next_w} bis bal_prop_{next_w + 19}) wurden in einem Durchlauf live aktiviert!"
                 elif cmd == "auto_optimize_all_bots":
-                    opt_bots = 0
-                    for pid_b, wp_b in list(WORLD.players.items()):
-                        if str(pid_b).startswith("bot_") and isinstance(wp_b, dict):
-                            opt_bots += 1
-                            eq_b = wp_b.setdefault("equipment", {})
-                            for _sl_k, sl_it in list(eq_b.items()):
-                                if isinstance(sl_it, dict):
-                                    sl_it["upgrade"] = 9
-                                    base_nm = str(sl_it.get("name", "Ausrüstung")).split(" +")[0]
-                                    sl_it["name"] = f"{base_nm} +9"
-                                    b_list = sl_it.setdefault("bonuses", [])
-                                    if b_list and isinstance(b_list[0], dict):
-                                        b_list[0]["value"] = max(int(b_list[0].get("value", 15)), 18)
-                                        b_list[0]["isLocked"] = True
-                            pd_b = wp_b.setdefault("petData", {})
-                            if isinstance(pd_b, dict):
-                                pd_b["level"] = min(120, int(pd_b.get("level", 45)) + 5)
-                            am_b = wp_b.get("active_mount")
-                            if isinstance(am_b, dict):
-                                am_b["level"] = min(50, int(am_b.get("level", 20)) + 3)
-                                am_b["bonusAtkPct"] = min(40, int(am_b.get("bonusAtkPct", 14)) + 5)
-                                am_b["bonusDef"] = min(120, int(am_b.get("bonusDef", 30)) + 15)
-                            wp_b["gold"] = int(wp_b.get("gold", 50000)) + 15000
-                            wp_b["alignmentPoints"] = min(20000, int(wp_b.get("alignmentPoints", 6000)) + 1500)
-                            WORLD.compute_player_combat_stats(wp_b)
-                            wp_b["hp"] = int(wp_b.get("max_hp", 2500))
-                            wp_b["mp"] = int(wp_b.get("max_mp", 1000))
-                    msg = f"🛠️ Voll-Optimierung abgeschlossen: Alle {max(12, opt_bots)} Bots auf +9 Ausrüstung, gesperrte Max-Roll-Wunschboni (🔒), Pet +5 Lv., Reittier +3 Lv. & 100% TP/MP gebracht!"
+                    msg = "Deaktiviert: Bots duerfen keine Extra-Boni erhalten (fairness_v1)."
                 elif cmd == "set_autopilot_config":
                     if "targetKillsForNextWave" in body:
                         ctrl["targetKillsForNextWave"] = max(100, min(5000, int(body.get("targetKillsForNextWave") or 600)))
@@ -4675,12 +4242,9 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                                     for x in inv_rr
                                 )
                                 if not has_changer:
-                                    DB.add_item_to_inventory(b_id_rr, "item_bonus_changer", 1)
-                                    if hasattr(WORLD, "refresh_player_from_db"):
-                                        WORLD.refresh_player_from_db(b_id_rr)
-                                    bp_rr = WORLD.players.get(b_id_rr) or bp_rr
-                                    it_rr = (bp_rr.get("equipment") or {}).get(slot_rr) or it_rr
-                                ok_rr, msg_rr = WORLD.runeweaver_action(b_id_rr, it_rr["uid"], "reroll")
+                                    ok_rr, msg_rr = False, "Kein Bonuswandler vorhanden."
+                                else:
+                                    ok_rr, msg_rr = WORLD.runeweaver_action(b_id_rr, it_rr["uid"], "reroll")
                                 if ok_rr:
                                     msg = f"✨ Bonus-Switch für {it_rr.get('name', slot_rr)} erfolgreich! {msg_rr}"
                                 else:

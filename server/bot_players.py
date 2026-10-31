@@ -47,7 +47,14 @@ CONTROL_STATE_PATH = os.path.join(DATA_DIR, "bot_control_state.json")
 # GEDÄCHTNIS / MITTEILUNGEN AN ALLE BOTS (aktuelle Spielregeln, Stand 29.10.2026)
 # Wird in jeden Bot-Zustand (p["botMemory"]) und in die gemeinsame Wissensbasis geschrieben.
 # ----------------------------------------------------------------------------
-from game_data import BOT_GAME_RULES_MEMORY, BOT_GAME_RULES_MEMORY_VERSION  # noqa: E402 (zentral, auch vom Server genutzt)
+from game_data import (  # noqa: E402
+    BOT_GAME_RULES_MEMORY,
+    BOT_GAME_RULES_MEMORY_VERSION,
+    is_tier_equipment,
+    resolve_item_template_id,
+    equip_tier_for_level,
+    equip_tier_item_ids,
+)
 
 
 def apply_bot_rules_memory(p: dict) -> None:
@@ -112,7 +119,7 @@ BOT_CONFIGS = [
         "groupRole": "tank",
         "preferredMode": "monsters_and_metins",
         "statPriority": ["str", "str", "vit"],
-        "skillPriority": ["aura_sword", "whirlwind", "three_way_cut", "dash_strike", "berserk"],
+        "skillPriority": ["sword_aura", "whirlwind", "three_way_cut", "dash_strike", "berserk"],
         "startX": 560.0,
         "startZ": -680.0,
         "useMount": False,
@@ -130,8 +137,8 @@ BOT_CONFIGS = [
         "roleDesc": "Schattenjäger (Ninja • Dolche • Seiryu) • Rissmonolithen-Spezialist & Krit-Burst",
         "groupRole": "burst_dps",
         "preferredMode": "metin_hunter",
-        "statPriority": ["dex", "dex", "str"],
-        "skillPriority": ["stealth", "ambush", "rolling_dagger", "poison_cloud", "shadow_step"],
+        "statPriority": ["dex", "dex", "vit"],
+        "skillPriority": ["feather_walk", "ambush", "rolling_dagger", "fast_attack", "poison_cloud"],
         "startX": 585.0,
         "startZ": -650.0,
         "useMount": False,
@@ -150,7 +157,7 @@ BOT_CONFIGS = [
         "groupRole": "bruiser_aoe",
         "preferredMode": "monsters_and_metins",
         "statPriority": ["int", "int", "vit"],
-        "skillPriority": ["enchanted_blade", "enchanted_armor", "finger_strike", "dragon_swirl", "dark_orb"],
+        "skillPriority": ["enchanted_blade", "dark_protection", "finger_strike", "dragon_swirl", "dark_orb"],
         "startX": 525.0,
         "startZ": -705.0,
         "useMount": False,
@@ -168,8 +175,8 @@ BOT_CONFIGS = [
         "roleDesc": "Seelenweber (Schamane • 6.5m Stab • Seiryu) • Drachen-Buffs, Magie-AoE & Gruppenheilung",
         "groupRole": "support_healer",
         "preferredMode": "monsters_and_metins",
-        "statPriority": ["int", "int", "dex"],
-        "skillPriority": ["dragon_help", "natures_heal", "dragon_blessing", "dragon_roar", "lightning_claw"],
+        "statPriority": ["int", "int", "vit"],
+        "skillPriority": ["dragon_aid", "blessing", "dragon_roar", "flying_talisman", "cure"],
         "startX": 545.0,
         "startZ": -665.0,
         "useMount": False,
@@ -188,7 +195,7 @@ BOT_CONFIGS = [
         "groupRole": "mounted_breaker",
         "preferredMode": "metin_hunter",
         "statPriority": ["str", "str", "vit"],
-        "skillPriority": ["aura_sword", "berserk", "whirlwind", "three_way_cut", "dash_strike"],
+        "skillPriority": ["sword_aura", "berserk", "whirlwind", "three_way_cut", "dash_strike"],
         "startX": 380.0,
         "startZ": -730.0,
         "useMount": True,
@@ -206,8 +213,8 @@ BOT_CONFIGS = [
         "roleDesc": "Schattenjäger (Ninja • Krit-Klingen & Gift • Seiryu) • Flanken-Jägerin & Boss-Assassine",
         "groupRole": "burst_dps",
         "preferredMode": "monsters_and_metins",
-        "statPriority": ["dex", "dex", "str"],
-        "skillPriority": ["stealth", "ambush", "rolling_dagger", "poison_cloud", "shadow_step"],
+        "statPriority": ["dex", "dex", "vit"],
+        "skillPriority": ["feather_walk", "ambush", "rolling_dagger", "fast_attack", "poison_cloud"],
         "startX": 505.0,
         "startZ": -690.0,
         "useMount": False,
@@ -226,8 +233,8 @@ BOT_CONFIGS = [
         "roleDesc": "Klingenwächter (Krieger • Einhand & Schild • Kaeryu) • Bollwerk-Tank & Wächter",
         "groupRole": "tank",
         "preferredMode": "monsters_and_metins",
-        "statPriority": ["str", "str", "vit"],
-        "skillPriority": ["aura_sword", "whirlwind", "three_way_cut", "dash_strike", "berserk"],
+        "statPriority": ["vit", "str", "vit"],
+        "skillPriority": ["strong_body", "sword_strike", "whirlwind", "three_way_cut", "dash_strike"],
         "startX": -560.0,
         "startZ": -680.0,
         "useMount": False,
@@ -245,8 +252,8 @@ BOT_CONFIGS = [
         "roleDesc": "Schattenjäger (Ninja • Dolche • Kaeryu) • Krit-Assassine & Monolithen-Jäger",
         "groupRole": "burst_dps",
         "preferredMode": "metin_hunter",
-        "statPriority": ["dex", "dex", "str"],
-        "skillPriority": ["stealth", "ambush", "rolling_dagger", "poison_cloud", "shadow_step"],
+        "statPriority": ["dex", "dex", "vit"],
+        "skillPriority": ["feather_walk", "ambush", "rolling_dagger", "fast_attack", "poison_cloud"],
         "startX": -585.0,
         "startZ": -650.0,
         "useMount": False,
@@ -265,7 +272,7 @@ BOT_CONFIGS = [
         "groupRole": "bruiser_aoe",
         "preferredMode": "monsters_and_metins",
         "statPriority": ["int", "int", "vit"],
-        "skillPriority": ["enchanted_blade", "enchanted_armor", "finger_strike", "dragon_swirl", "dark_orb"],
+        "skillPriority": ["enchanted_blade", "dark_protection", "finger_strike", "dragon_swirl", "dark_orb"],
         "startX": -525.0,
         "startZ": -705.0,
         "useMount": False,
@@ -283,8 +290,8 @@ BOT_CONFIGS = [
         "roleDesc": "Seelenweber (Schamane • 6.5m Stab • Kaeryu) • Heilung, Segen & Elementar-Orkan",
         "groupRole": "support_healer",
         "preferredMode": "monsters_and_metins",
-        "statPriority": ["int", "int", "dex"],
-        "skillPriority": ["dragon_help", "natures_heal", "dragon_blessing", "dragon_roar", "lightning_claw"],
+        "statPriority": ["int", "int", "vit"],
+        "skillPriority": ["dragon_aid", "cure", "blessing", "dragon_roar", "flying_talisman"],
         "startX": -545.0,
         "startZ": -665.0,
         "useMount": False,
@@ -303,7 +310,7 @@ BOT_CONFIGS = [
         "groupRole": "mounted_breaker",
         "preferredMode": "metin_hunter",
         "statPriority": ["str", "str", "vit"],
-        "skillPriority": ["aura_sword", "berserk", "whirlwind", "three_way_cut", "dash_strike"],
+        "skillPriority": ["sword_aura", "berserk", "whirlwind", "three_way_cut", "dash_strike"],
         "startX": -380.0,
         "startZ": -730.0,
         "useMount": True,
@@ -321,8 +328,8 @@ BOT_CONFIGS = [
         "roleDesc": "Runenmagier (Sura • Dunkelmagie & Runenklinge • Kaeryu) • Riss-Exorzist & Wellen-Brecher",
         "groupRole": "bruiser_aoe",
         "preferredMode": "monsters_and_metins",
-        "statPriority": ["int", "int", "vit"],
-        "skillPriority": ["enchanted_blade", "enchanted_armor", "finger_strike", "dragon_swirl", "dark_orb"],
+        "statPriority": ["int", "vit", "int"],
+        "skillPriority": ["dark_protection", "dark_orb", "enchanted_blade", "finger_strike", "dragon_swirl"],
         "startX": -505.0,
         "startZ": -690.0,
         "useMount": False,
@@ -333,27 +340,27 @@ BOT_CONFIGS = [
     },
 ]
 
-# Die 2 aktuell existierenden Level-/Farmgebiete der Open World (Gebiet 1: Heimatlande Nord Lv. 1–17, Gebiet 2: Bakra-Herbstauen Süd Lv. 18–40)
+# SSOT Teil I Abs. 2: Map 1 (Lv. 1–8, Lv. 9–15, Lv. 16–22 Eid-Kämpfer) & Map 2 ab exakt Level 23 (Lv. 23–29 Anfangsgebiet, Lv. 30–38 Restgebiet)
 EMPIRE_HUNTING_PROGRESSION = {
     "seiryu": [
-        {"id": "m1_seiryu_meadows", "area": 1, "name": "Gebiet 1 • Östliche Seiryu-Wiesen (Lv. 1–5)", "x": 560.0, "z": -680.0, "minLvl": 1, "maxLvl": 5},
-        {"id": "m1_north_steppe_east", "area": 1, "name": "Gebiet 1 • Nördliche Steppe Ost (Lv. 4–8)", "x": 180.0, "z": -750.0, "minLvl": 4, "maxLvl": 8},
-        {"id": "m1_east_grasland", "area": 1, "name": "Gebiet 1 • Großes Ost-Grasland (Lv. 7–12)", "x": 620.0, "z": -360.0, "minLvl": 7, "maxLvl": 12},
-        {"id": "m1_river_meadows_east", "area": 1, "name": "Gebiet 1 • Silberstrom-Auen Ost & Weol (Lv. 11–17)", "x": 260.0, "z": -195.0, "minLvl": 11, "maxLvl": 17},
-        {"id": "m2_autumn_north_east", "area": 2, "name": "Gebiet 2 • Nordöstliche Bakra-Ahornwälder (Lv. 18–23)", "x": 520.0, "z": 185.0, "minLvl": 18, "maxLvl": 23},
-        {"id": "m2_autumn_north_center", "area": 2, "name": "Gebiet 2 • Goldenes Bakra-Herbsttal Ost (Lv. 22–27)", "x": 240.0, "z": 260.0, "minLvl": 22, "maxLvl": 27},
-        {"id": "m2_autumn_heart_east", "area": 2, "name": "Gebiet 2 • Östliches Bakra-Hochland (Lv. 26–31)", "x": 440.0, "z": 460.0, "minLvl": 26, "maxLvl": 31},
-        {"id": "m2_autumn_south_east", "area": 2, "name": "Gebiet 2 • Südliches Bakra-Heerlager Ost (Lv. 30–40)", "x": 320.0, "z": 625.0, "minLvl": 30, "maxLvl": 40},
+        {"id": "m1_seiryu_meadows", "area": 1, "name": "Map 1 • Östliche Seiryu-Wiesen (Lv. 1–4)", "x": 560.0, "z": -680.0, "minLvl": 1, "maxLvl": 4},
+        {"id": "m1_north_steppe_east", "area": 1, "name": "Map 1 • Nördliche Steppe Ost (Lv. 5–8 • Wolfskralle)", "x": 180.0, "z": -750.0, "minLvl": 5, "maxLvl": 8},
+        {"id": "m1_east_grasland", "area": 1, "name": "Map 1 • Großes Ost-Grasland (Lv. 9–15 • Bärengalle/Tigerfell)", "x": 620.0, "z": -360.0, "minLvl": 9, "maxLvl": 15},
+        {"id": "m1_river_meadows_east", "area": 1, "name": "Map 1 • Silberstrom-Auen Ost (Lv. 16–22 • Eid-Kämpfer)", "x": 260.0, "z": -195.0, "minLvl": 16, "maxLvl": 22},
+        {"id": "m2_autumn_north_east", "area": 2, "name": "Map 2 • Anfangsgebiet Nordost-Bakra (Lv. 23–26)", "x": 520.0, "z": 185.0, "minLvl": 23, "maxLvl": 26},
+        {"id": "m2_autumn_north_center", "area": 2, "name": "Map 2 • Anfangsgebiet Herbsttal Ost (Lv. 26–29)", "x": 240.0, "z": 260.0, "minLvl": 26, "maxLvl": 29},
+        {"id": "m2_autumn_heart_east", "area": 2, "name": "Map 2 • Östliches Bakra-Hochland (Lv. 30–34)", "x": 440.0, "z": 460.0, "minLvl": 30, "maxLvl": 34},
+        {"id": "m2_autumn_south_east", "area": 2, "name": "Map 2 • Südliches Bakra-Heerlager Ost (Lv. 34–38)", "x": 320.0, "z": 625.0, "minLvl": 34, "maxLvl": 38},
     ],
     "kaeryu": [
-        {"id": "m1_kaeryu_meadows", "area": 1, "name": "Gebiet 1 • Westliche Kaeryu-Wiesen (Lv. 1–5)", "x": -560.0, "z": -680.0, "minLvl": 1, "maxLvl": 5},
-        {"id": "m1_north_steppe_west", "area": 1, "name": "Gebiet 1 • Nördliche Steppe West (Lv. 4–8)", "x": -180.0, "z": -750.0, "minLvl": 4, "maxLvl": 8},
-        {"id": "m1_west_grasland", "area": 1, "name": "Gebiet 1 • Großes West-Grasland (Lv. 7–12)", "x": -620.0, "z": -360.0, "minLvl": 7, "maxLvl": 12},
-        {"id": "m1_river_meadows_west", "area": 1, "name": "Gebiet 1 • Silberstrom-Auen West & Weol (Lv. 11–17)", "x": -260.0, "z": -195.0, "minLvl": 11, "maxLvl": 17},
-        {"id": "m2_autumn_north_west", "area": 2, "name": "Gebiet 2 • Nordwestliche Bakra-Herbstwiesen (Lv. 18–23)", "x": -520.0, "z": 185.0, "minLvl": 18, "maxLvl": 23},
-        {"id": "m2_autumn_north_center_w", "area": 2, "name": "Gebiet 2 • Goldenes Bakra-Herbsttal West (Lv. 22–27)", "x": -240.0, "z": 260.0, "minLvl": 22, "maxLvl": 27},
-        {"id": "m2_autumn_heart_west", "area": 2, "name": "Gebiet 2 • Westliches Bakra-Hochland (Lv. 26–31)", "x": -440.0, "z": 460.0, "minLvl": 26, "maxLvl": 31},
-        {"id": "m2_autumn_south_west", "area": 2, "name": "Gebiet 2 • Südliches Bakra-Heerlager West (Lv. 30–40)", "x": -320.0, "z": 625.0, "minLvl": 30, "maxLvl": 40},
+        {"id": "m1_kaeryu_meadows", "area": 1, "name": "Map 1 • Westliche Kaeryu-Wiesen (Lv. 1–4)", "x": -560.0, "z": -680.0, "minLvl": 1, "maxLvl": 4},
+        {"id": "m1_north_steppe_west", "area": 1, "name": "Map 1 • Nördliche Steppe West (Lv. 5–8 • Wolfskralle)", "x": -180.0, "z": -750.0, "minLvl": 5, "maxLvl": 8},
+        {"id": "m1_west_grasland", "area": 1, "name": "Map 1 • Großes West-Grasland (Lv. 9–15 • Bärengalle/Tigerfell)", "x": -620.0, "z": -360.0, "minLvl": 9, "maxLvl": 15},
+        {"id": "m1_river_meadows_west", "area": 1, "name": "Map 1 • Silberstrom-Auen West (Lv. 16–22 • Eid-Kämpfer)", "x": -260.0, "z": -195.0, "minLvl": 16, "maxLvl": 22},
+        {"id": "m2_autumn_north_west", "area": 2, "name": "Map 2 • Anfangsgebiet Nordwest-Bakra (Lv. 23–26)", "x": -520.0, "z": 185.0, "minLvl": 23, "maxLvl": 26},
+        {"id": "m2_autumn_north_center_w", "area": 2, "name": "Map 2 • Anfangsgebiet Herbsttal West (Lv. 26–29)", "x": -240.0, "z": 260.0, "minLvl": 26, "maxLvl": 29},
+        {"id": "m2_autumn_heart_west", "area": 2, "name": "Map 2 • Westliches Bakra-Hochland (Lv. 30–34)", "x": -440.0, "z": 460.0, "minLvl": 30, "maxLvl": 34},
+        {"id": "m2_autumn_south_west", "area": 2, "name": "Map 2 • Südliches Bakra-Heerlager West (Lv. 34–38)", "x": -320.0, "z": 625.0, "minLvl": 34, "maxLvl": 38},
     ],
 }
 
@@ -1269,6 +1276,10 @@ def score_bot_equipment_item(item_dict: dict, cls_id: str, use_two_hand: bool = 
     slot = tpl.get("slot") or item_dict.get("slot")
     if not slot:
         return -1.0
+    # Es darf AUSSCHLIESSLICH das 10-Stufen-Equipment (Lv. 1 bis 90) getragen werden!
+    if slot in ("weapon", "armor", "helmet", "shield", "gloves", "shoes", "necklace", "bracelet", "earrings"):
+        if not is_tier_equipment(tpl_id):
+            return -1.0
     allowed_classes = tpl.get("classes")
     if allowed_classes and cls_id not in allowed_classes:
         return -1.0
@@ -1484,13 +1495,10 @@ def auto_maintain_bot_character(world: WorldAuthority, p: dict, cfg: dict, colle
                 if not ok:
                     break
 
+    # SSOT Teil I Abs. 7: Pferde bleiben strikt auf Level 1 gesperrt, solange keine Affen im Spiel existieren!
     md = world._ensure_player_mount_data(p)
-    if int(md.get("level", 1)) < 50 and int(p.get("yang", 0)) >= 15000:
-        world.level_up_horse(pid)
-    while int(md.get("statPoints", 0)) > 0:
-        ok, _ = world.allocate_mount_stat(pid, "dmg", 1)
-        if not ok:
-            break
+    md["level"] = 1
+    md["statPoints"] = 0
 
     # 4. Intelligenter Trank-Einkauf beim NPC-Händler (kein Gratis-Cheat, sondern regulärer Kauf mit Yang!)
     hp_pots = sum(
@@ -1548,6 +1556,20 @@ def auto_maintain_bot_character(world: WorldAuthority, p: dict, cfg: dict, colle
             p = world.players[pid]
             active_buffs = p.get("activeBuffs", {})
             continue
+
+    # 5c. Ausrüstungs-Hygiene: Altes Nicht-Tier-Equipment sofort in passendes Tier-Equipment auflösen!
+    for slot_k, eq_it in list((p.get("equipment") or {}).items()):
+        if not eq_it or slot_k.startswith("costume") or str(eq_it.get("templateId", "")).startswith("spec_"):
+            continue
+        eq_tid = str(eq_it.get("templateId") or eq_it.get("id") or "")
+        if not is_tier_equipment(eq_tid):
+            resolved_tid = resolve_item_template_id(eq_tid)
+            if is_tier_equipment(resolved_tid):
+                with world.db._connect() as _c:
+                    _c.execute("UPDATE inventory_items SET template_id = ? WHERE item_uid = ?", (resolved_tid, eq_it["uid"]))
+                    _c.commit()
+                world.refresh_player_from_db(pid)
+                p = world.players[pid]
 
     # 6. Besseres gedropptes Equipment automatisch anlegen (nutzt effectiveStats, +Stufe, Item-Tier & Boni)
     p_lvl = int(p.get("level", 1))
@@ -1675,7 +1697,7 @@ def auto_maintain_bot_character(world: WorldAuthority, p: dict, cfg: dict, colle
 
         # Wertvolle Items (+4..+9 Ausrüstung, fremde Fähigkeitsbücher, Perlen) -> Offline-Shop in der Map-1-Hauptstadt!
         is_foreign_book = (tpl_id.startswith("fb_") or itype == "skill_book") and tpl.get("classId") != p["class_id"]
-        is_valuable_gear = itype == "equipment" and (plus >= 4 or len(inv_item.get("bonuses") or []) >= 3)
+        is_valuable_gear = itype == "equipment" and is_tier_equipment(tpl_id) and (plus >= 4 or len(inv_item.get("bonuses") or []) >= 3)
         if (is_foreign_book or is_valuable_gear or tpl_id == "mat_white_pearl") and b_stat["offlineShopListingsCreated"] < 8:
             price = estimate_item_market_price(inv_item)
             default_city_x = -820.0 if cfg["empire"] == "kaeryu" else 820.0
@@ -1697,8 +1719,8 @@ def auto_maintain_bot_character(world: WorldAuthority, p: dict, cfg: dict, colle
                 p = world.players[pid]
             continue
 
-        # Schwache ungenutzte Ausrüstung (+0..+2) intelligent über Auto-Sell verkaufen
-        if itype == "equipment" and plus <= 2:
+        # Schwache ungenutzte Ausrüstung (+0..+2) ODER altes Nicht-Tier-Equipment intelligent über Auto-Sell verkaufen
+        if itype == "equipment" and (plus <= 2 or not is_tier_equipment(tpl_id)):
             deleted = world.db.delete_item(pid, inv_item["uid"])
             if deleted:
                 sell_gain = max(30, int(deleted.get("sellPrice", 120) * (1.0 + plus * 0.25)))
@@ -1736,6 +1758,8 @@ def auto_maintain_bot_character(world: WorldAuthority, p: dict, cfg: dict, colle
             itype_l = tpl_l.get("type", lst.get("type", "misc"))
             needs_it = False
             if itype_l == "equipment":
+                if not is_tier_equipment(iid):
+                    continue
                 slot_k = tpl_l.get("slot", "weapon")
                 cur_eq = (p.get("equipment") or {}).get(slot_k)
                 cand_sc = score_bot_equipment_item(lst, cfg["classId"], use_two_hand=bool(cfg.get("useTwoHand", False)))
@@ -2079,14 +2103,16 @@ def step_bot_ai(
     # 10. Berittener Buff-Zyklus (EisensturmBot: Kurz absteigen für Aura/Kampfrausch, sofort wieder aufsteigen)
     if cfg.get("useMount"):
         active_buffs = p.get("activeBuffs", {})
-        aura_exp = float((active_buffs.get("aura_sword") or {}).get("expiresAt", 0.0))
+        aura_exp = float((active_buffs.get("sword_aura") or {}).get("expiresAt", 0.0))
         bers_exp = float((active_buffs.get("berserk") or {}).get("expiresAt", 0.0))
-        if now >= aura_exp or now >= bers_exp:
+        has_aura = int((p.get("skills") or {}).get("sword_aura", 0)) > 0
+        has_bers = int((p.get("skills") or {}).get("berserk", 0)) > 0
+        if (has_aura and now >= aura_exp) or (has_bers and now >= bers_exp):
             p["active_mount"] = None
             world.compute_player_combat_stats(p)
-            if now >= aura_exp and now >= p["skillCooldowns"].get("aura_sword", 0.0):
+            if has_aura and now >= aura_exp and now >= p["skillCooldowns"].get("sword_aura", 0.0):
                 world.perform_player_skill(pid, 1, best_mob["id"])
-            if now >= bers_exp and now >= p["skillCooldowns"].get("berserk", 0.0):
+            if has_bers and now >= bers_exp and now >= p["skillCooldowns"].get("berserk", 0.0):
                 world.perform_player_skill(pid, 5, best_mob["id"])
             p["active_mount"] = cfg.get("mountId", "mount_crystal_wolf")
             world.compute_player_combat_stats(p)
@@ -2097,7 +2123,7 @@ def step_bot_ai(
         cdef = CHARACTER_CLASSES[p["class_id"]]
         active_buffs = p.get("activeBuffs", {})
         for sk in cdef["skills"]:
-            if int(p.get("skills", {}).get(sk["id"], 1)) <= 0:
+            if int(p.get("skills", {}).get(sk["id"], 0)) <= 0:
                 continue
             if sk.get("type") == "buff":
                 eb = active_buffs.get(sk["id"])
@@ -2799,6 +2825,7 @@ def _live_bot_autonomous_maintenance(
     yang = int(p_state.get("yang", 0))
     inv = p_state.get("inventory") or []
     eq = p_state.get("equipment") or {}
+    af_stats = (p_state.get("autofarm") or {}).get("stats") or {}
     sectors_init = EMPIRE_HUNTING_PROGRESSION.get(cfg.get("empire", "seiryu"), EMPIRE_HUNTING_PROGRESSION["seiryu"])
     best_init_sec_idx = 0
     for s_i, s_def in enumerate(sectors_init):
@@ -3456,7 +3483,7 @@ def _live_bot_autonomous_maintenance(
                 chat_ai.processed_msg_ids.add(msg_id)
                 chat_ai.last_reply_ts = now_ts
                 chat_ai._record_sent(pid, reply_txt)
-                reply_channel = cmsg.get("channel") if cmsg.get("channel") in ("global", "local", "empire", "trade") else "global"
+                reply_channel = cmsg.get("channel") if cmsg.get("channel") in ("global", "local", "empire", "trade", "bots") else "global"
                 api_post(
                     server_url,
                     {

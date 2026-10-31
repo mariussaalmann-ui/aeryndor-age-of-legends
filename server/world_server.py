@@ -16,11 +16,24 @@ from typing import Dict, List, Optional, Tuple
 from database import GameDatabase
 from bot_navigation import BotNavigator
 from game_data import (
+    ACTIVE_SKILL_BOOK_IDS,
+    ALL_SPIRIT_STONE_IDS,
     BLACKSMITH_RATES,
+    BLACKSMITH_TIER_RATES,
+    BOT_GAME_RULES_MEMORY,
     CHARACTER_CLASSES,
     CLASS_ALLOWED_WEAPONS,
     DEFAULT_DROP_FILTER,
     DUNGEONS,
+    EQUIP_TIERS,
+    equip_tier_for_drop_level,
+    equip_tier_for_level,
+    equip_tier_item_ids,
+    get_blacksmith_upgrade_req,
+    is_tier_equipment,
+    PASSIVE_SKILL_BOOK_IDS,
+    resolve_item_template_id,
+    SPIRIT_STONE_IDS_BY_GRADE,
     ITEM_TEMPLATES,
     MAPS,
     MAX_HORSE_LEVEL,
@@ -210,7 +223,8 @@ class WorldAuthority:
                 "id": "sys_welcome",
                 "sender": "System",
                 "channel": "system",
-                "text": "Willkommen in Aeryndor: Legacy of the Monoliths (Level 1–99)! Kanäle: Normal • ! Global • $ Handel • % Gilde • 💎 Drops.",
+                "isBot": False,
+                "text": "Willkommen in Aeryndor: Legacy of the Monoliths (Level 1–99)! Filter: Allgemein • Gruppe • Gilde • System • Handel • Beute • Bots.",
                 "time": now_hm,
             },
             {
@@ -218,27 +232,23 @@ class WorldAuthority:
                 "sender": "[GM] Aeryndor",
                 "channel": "global",
                 "isGM": True,
+                "isBot": False,
                 "text": "👑 Das GM-Team ist online! Bei Fragen oder Support erreicht ihr uns direkt über die Freundes- & GM-Liste unten rechts 😊✨",
                 "time": now_hm,
             },
             {
                 "id": "chat_trade_1",
-                "sender": "KlingenmeisterVeyron",
+                "sender": "[Bot]Veyron",
                 "channel": "trade",
+                "isBot": True,
                 "text": "💰 Verkaufe Vollmondschwert +6 (+15% Rissmonolithen) & Segensschriftrollen am Marktplatz! 🔥⚔️",
                 "time": now_hm,
             },
             {
-                "id": "chat_guild_1",
-                "sender": "ShadowLord",
-                "channel": "guild",
-                "text": "🛡️ Gilden-Treffen an der Steinbrücke! Danach gemeinsamer Boss-Run im Grenzland 😄👍",
-                "time": now_hm,
-            },
-            {
                 "id": "chat_normal_1",
-                "sender": "Nachtklinge",
+                "sender": "[Bot]Nachtklinge",
                 "channel": "normal",
+                "isBot": True,
                 "text": "Die neuen Rissmonolithen im Norden droppen richtig gut! Gerade Fertigkeitsbuch & Ausrüstung gedroppt 🎉💎",
                 "time": now_hm,
             },
@@ -246,13 +256,15 @@ class WorldAuthority:
                 "id": "chat_drops_init",
                 "sender": "Beute",
                 "channel": "drops",
-                "text": "💎 Beute-Protokoll aktiv: Alle gedroppten & erhaltenen Gegenstände (Ausrüstung, Upp-Items, Bücher, Truhen) werden hier im Reiter [💎 Drops] aufgelistet.",
+                "isBot": False,
+                "text": "💎 Beute-Protokoll aktiv: Alle gedroppten & erhaltenen Gegenstände (Ausrüstung, Upp-Items, Bücher, Truhen) werden ausschließlich hier im Filter [Beute] aufgelistet.",
                 "time": now_hm,
             },
             {
                 "id": "chat_global_2",
-                "sender": "Aurelia",
+                "sender": "[Bot]Aurelia",
                 "channel": "global",
+                "isBot": True,
                 "text": "Suche nette Mitspieler für Map 2 Grenzland-Gruppe (Lv. 15–30) – schreibt mir gern im Messenger ❤️✨",
                 "time": now_hm,
             },
@@ -525,7 +537,7 @@ class WorldAuthority:
             (["grey_wolf", "alpha_bloodwolf", "red_boar"], -420, -440, 13),
             (["alpha_bloodwolf", "red_boar", "forest_bear"], -280, -410, 13),
             (["red_boar", "forest_bear", "grizzly_bear"], -140, -430, 13),
-            (["forest_bear", "grizzly_bear", "white_tiger"], 0, -440, 14),
+            (["forest_bear", "grizzly_bear", "striped_tiger", "white_tiger"], 0, -440, 14),
             (["red_boar", "forest_bear", "grizzly_bear"], 140, -430, 13),
             (["alpha_bloodwolf", "red_boar", "forest_bear"], 280, -410, 13),
             (["grey_wolf", "alpha_bloodwolf", "red_boar"], 420, -440, 13),
@@ -533,28 +545,27 @@ class WorldAuthority:
             (["wild_boar", "alpha_bloodwolf", "red_boar"], 680, -450, 13),
             (["grey_wolf", "wild_boar", "alpha_bloodwolf"], 820, -410, 13),
 
-            # --- MAP 1 SÜD: Äußere Silberstrom-Auen West/Ost & WHEOL-DENKMAL GARNISON (0, -180 oberhalb des Flusses) ---
-            (["forest_bear", "grizzly_bear", "white_tiger"], -760, -145, 13),
-            (["forest_bear", "grizzly_bear"], -610, -190, 13),
-            (["grizzly_bear", "white_tiger", "black_bear"], -460, -155, 13),
-            # Wheol-Denkmal & Vorfeld im Süden von Map 1 oberhalb des Silberstroms (x ∈ [-320, +320], z ∈ [-330, -85]): WEISSER EID
+            # --- MAP 1 SÜD: Äußere Silberstrom-Auen West/Ost (Bären/Tiger Lv. 9–15) & WEOL-DENKMAL GARNISON (Eid-Kämpfer Lv. 16–22) ---
+            (["forest_bear", "grizzly_bear", "striped_tiger", "white_tiger"], -760, -145, 13),
+            (["forest_bear", "grizzly_bear", "striped_tiger"], -610, -190, 13),
+            (["grizzly_bear", "striped_tiger", "white_tiger", "black_bear"], -460, -155, 13),
             (["blackice_bandit", "white_oath_archer", "white_oath_crusher"], -285, -295, 12),
-            (["white_oath_archer", "white_oath_crusher", "bandit_captain"], -155, -305, 12),
-            (["white_oath_archer", "white_oath_crusher", "bandit_captain"], 0, -310, 12),
-            (["white_oath_archer", "white_oath_crusher", "bandit_captain"], 155, -305, 12),
+            (["white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], -155, -305, 12),
+            (["white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], 0, -310, 12),
+            (["white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], 155, -305, 12),
             (["blackice_bandit", "white_oath_archer", "white_oath_crusher"], 285, -295, 12),
             (["blackice_bandit", "white_oath_archer", "white_oath_crusher"], -240, -215, 12),
-            (["white_oath_archer", "white_oath_crusher", "bandit_captain"], -115, -225, 12),
-            (["white_oath_archer", "white_oath_crusher", "bandit_captain"], 115, -225, 12),
+            (["white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], -115, -225, 12),
+            (["white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], 115, -225, 12),
             (["blackice_bandit", "white_oath_archer", "white_oath_crusher"], 240, -215, 12),
-            (["blackice_bandit", "white_oath_archer", "white_oath_crusher"], -245, -125, 12),
-            (["blackice_bandit", "white_oath_crusher", "bandit_captain"], -115, -120, 12),
-            (["white_oath_archer", "white_oath_crusher", "bandit_captain"], 0, -95, 12),
-            (["blackice_bandit", "white_oath_crusher", "bandit_captain"], 115, -120, 12),
-            (["blackice_bandit", "white_oath_archer", "white_oath_crusher"], 245, -125, 12),
-            (["grizzly_bear", "white_tiger", "black_bear"], 460, -155, 13),
-            (["forest_bear", "grizzly_bear"], 610, -190, 13),
-            (["forest_bear", "grizzly_bear", "white_tiger"], 760, -145, 13),
+            (["blackice_bandit", "white_oath_archer", "white_oath_vanguard"], -245, -125, 12),
+            (["blackice_bandit", "white_oath_crusher", "white_oath_vanguard"], -115, -120, 12),
+            (["white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], 0, -95, 12),
+            (["blackice_bandit", "white_oath_crusher", "white_oath_vanguard"], 115, -120, 12),
+            (["blackice_bandit", "white_oath_archer", "white_oath_vanguard"], 245, -125, 12),
+            (["grizzly_bear", "striped_tiger", "white_tiger", "black_bear"], 460, -155, 13),
+            (["forest_bear", "grizzly_bear", "striped_tiger"], 610, -190, 13),
+            (["forest_bear", "grizzly_bear", "striped_tiger", "white_tiger"], 760, -145, 13),
 
             # --- MAP 1 BOSSGEBIETE (Westliches Gebirge -1080, -480 & Östliches Gebirge +1080, -480) ---
             (["white_tiger", "black_bear", "king_tiger"], -1020, -440, 13),
@@ -591,76 +602,76 @@ class WorldAuthority:
             (["blackwind_maniac", "blackwind_archer", "blackwind_jakto"], 610, 460, 14),
             (["blackwind_soldier", "blackwind_maniac", "blackwind_archer"], 780, 420, 14),
             (["blackwind_tosu", "blackwind_guryung", "savage_minion"], -540, 620, 14),
-            (["savage_minion", "savage_archer", "savage_general"], -380, 640, 14),
-            (["blackwind_guryung", "savage_minion", "savage_archer"], -230, 665, 14),
-            (["blackwind_guryung", "savage_minion", "savage_archer"], 230, 665, 14),
-            (["savage_minion", "savage_archer", "savage_general"], 380, 640, 14),
+            (["savage_minion", "savage_archer", "savage_duelist", "savage_enforcer"], -380, 640, 14),
+            (["savage_minion", "savage_archer", "savage_duelist"], -230, 665, 14),
+            (["savage_minion", "savage_archer", "savage_duelist"], 230, 665, 14),
+            (["savage_minion", "savage_archer", "savage_duelist", "savage_enforcer"], 380, 640, 14),
             (["blackwind_tosu", "blackwind_guryung", "savage_minion"], 540, 620, 14),
-            (["savage_minion", "savage_archer", "savage_general"], -910, 640, 14),
-            (["savage_minion", "savage_archer", "savage_general"], -1010, 710, 14),
+            (["savage_archer", "savage_duelist", "savage_enforcer"], -910, 640, 14),
+            (["savage_archer", "savage_duelist", "savage_enforcer"], -1010, 710, 14),
         ]
         for pool, cx, cz, roam in m1_pack_spawns:
             self._spawn_monster_pack("morgenwacht", pool, float(cx), float(cz), float(roam))
 
         # Zusätzliche dichte Level-Spawns in allen Level-Gebieten von Morgenwacht (Map 1 & Map 2):
         extra_m1_spawns = []
-        # 1. Kaeryu-Umland & Westliche Starter-Wiesen (Lv. 1–5)
+        # 1. Kaeryu-Umland & Westliche Starter-Wiesen (Lv. 1–8)
         for gx in (-980, -900, -820, -740, -660, -580, -500, -420):
             for gz in (-920, -840, -760, -680, -600, -530):
                 if dist2d(gx, gz, -820.0, -780.0) >= 162.0:
                     pool = ["stray_dog", "wild_dog"] if dist2d(gx, gz, -820.0, -780.0) < 235.0 else ["stray_dog", "wild_dog", "grey_wolf", "wild_boar"]
                     extra_m1_spawns.append((pool, gx, gz, 12))
 
-        # 2. Seiryu-Umland & Östliche Starter-Wiesen (Lv. 1–5)
+        # 2. Seiryu-Umland & Östliche Starter-Wiesen (Lv. 1–8)
         for gx in (420, 500, 580, 660, 740, 820, 900, 980):
             for gz in (-920, -840, -760, -680, -600, -530):
                 if dist2d(gx, gz, 820.0, -780.0) >= 162.0:
                     pool = ["stray_dog", "wild_dog"] if dist2d(gx, gz, 820.0, -780.0) < 235.0 else ["stray_dog", "wild_dog", "grey_wolf", "wild_boar"]
                     extra_m1_spawns.append((pool, gx, gz, 12))
 
-        # 3. Nördlicher Map-1-Levelbereich rund um das Orktal-Portal (Wölfe, Keiler & Bären • Lv. 3–8)
+        # 3. Nördlicher Map-1-Levelbereich rund um das Orktal-Portal (Wölfe & Keiler • Lv. 3–8)
         for gx in (-310, -230, -150, -75, 0, 75, 150, 230, 310):
             for gz in (-950, -880, -800, -720, -650):
                 if dist2d(gx, gz, 0.0, -1020.0) >= 62.0:
                     extra_m1_spawns.append((["grey_wolf", "wild_boar", "alpha_bloodwolf", "red_boar"], gx, gz, 12))
 
-        # 4. Große Zentralwiesen, West- & Ost-Grasland von Map 1 (Lv. 4–10)
+        # 4. Große Zentralwiesen, West- & Ost-Grasland von Map 1 (Lv. 6–15 Bären & Tiger)
         for gx in range(-900, 901, 90):
             for gz in (-510, -430, -360):
                 pool = (
                     ["grey_wolf", "wild_boar", "alpha_bloodwolf"]
                     if abs(gx) > 480
-                    else ["alpha_bloodwolf", "forest_bear", "grizzly_bear"]
+                    else ["forest_bear", "grizzly_bear", "striped_tiger", "white_tiger"]
                 )
                 extra_m1_spawns.append((pool, gx, gz, 13))
 
-        # 5. Süden von Map 1 oberhalb des Silberstroms: Wheol-Denkmal Garnison (Weißer Eid in der Mitte, Bären/Tiger außen)
+        # 5. Süden von Map 1 oberhalb des Silberstroms: Weol-Denkmal Garnison (Eid-Kämpfer Lv. 16–22 innen, Bären/Tiger Lv. 9–15 außen)
         for gx in range(-880, 881, 80):
             for gz in (-285, -210, -135):
                 if abs(gx) <= 340:
                     if dist2d(gx, gz, 0.0, -180.0) >= 66.0:
-                        extra_m1_spawns.append((["blackice_bandit", "white_oath_archer", "white_oath_crusher"], gx, gz, 12))
+                        extra_m1_spawns.append((["blackice_bandit", "white_oath_archer", "white_oath_crusher", "white_oath_vanguard"], gx, gz, 12))
                 else:
-                    extra_m1_spawns.append((["forest_bear", "grizzly_bear", "white_tiger"], gx, gz, 13))
+                    extra_m1_spawns.append((["forest_bear", "grizzly_bear", "striped_tiger", "white_tiger"], gx, gz, 13))
 
-        # 6. Bakra-Gebiet Nord & Goldenes Herbsttal (Schwarzwind-Vorhut & Soldaten • Lv. 14–21)
+        # 6. Map 2 Anfangsgebiet Nord & Goldenes Herbsttal (Schwarzwind-Vorhut & Soldaten • Lv. 23–29)
         for gx in range(-880, 881, 70):
             for gz in (95, 160, 225, 290, 350):
                 pool = (
                     ["blackwind_soldier", "blackwind_maniac", "blackwind_archer"]
-                    if gz < 200
-                    else ["blackwind_maniac", "blackwind_archer", "blackwind_jakto", "bloodleaf_warrior"]
+                    if gz < 225
+                    else ["blackwind_maniac", "blackwind_archer", "blackwind_jakto"]
                 )
                 extra_m1_spawns.append((pool, gx, gz, 13))
 
-        # 7. Bakra-Gebiet Mitte & Süd: Gelbwiesen, Hochland & Heerlager vor Bakra (Lv. 18–25)
+        # 7. Map 2 Restgebiet Mitte & Süd: Gelbwiesen, Hochland & Heerlager vor Bakra (Lv. 30–38)
         for gx in range(-900, 901, 75):
             for gz in (415, 485, 555, 625, 695):
                 if dist2d(gx, gz, 0.0, 880.0) >= 180.0:
                     pool = (
-                        ["blackwind_archer", "blackwind_jakto", "bloodleaf_warrior"]
-                        if gz < 540
-                        else ["bloodleaf_warrior", "savage_minion", "savage_archer"]
+                        ["bloodleaf_warrior", "savage_minion", "savage_archer"]
+                        if gz < 555
+                        else ["savage_minion", "savage_archer", "savage_duelist", "savage_enforcer"]
                     )
                     extra_m1_spawns.append((pool, gx, gz, 14))
 
@@ -668,18 +679,17 @@ class WorldAuthority:
             if not is_in_safe_zone("morgenwacht", float(cx), float(cz)):
                 self._spawn_monster_pack("morgenwacht", pool, float(cx), float(cz), float(roam))
 
-        # Rissmonolithen auf dem 2800x2800m Kontinent (Map 1 im Norden Lv. 5–20 & Map 2 im Süden Lv. 25–40):
+        # Rissmonolithen auf dem 2800x2800m Kontinent (Map 1 im Norden Lv. 5–20 & Map 2 im Süden Lv. 25–35; Lv. 40+ noch nicht vergeben!):
         for _ in range(10):
             self._create_monster_instance("morgenwacht", "metin_sorrow", 0.0, 0.0, 0.0)
             self._create_monster_instance("morgenwacht", "metin_combat", 0.0, 0.0, 0.0)
         for _ in range(7):
             self._create_monster_instance("morgenwacht", "metin_battle", 0.0, 0.0, 0.0)
             self._create_monster_instance("morgenwacht", "metin_greed", 0.0, 0.0, 0.0)
-        for _ in range(5):
+        for _ in range(6):
             self._create_monster_instance("morgenwacht", "metin_black", 0.0, 0.0, 0.0)
             self._create_monster_instance("morgenwacht", "metin_darkness", 0.0, 0.0, 0.0)
             self._create_monster_instance("morgenwacht", "metin_bloodleaf", 0.0, 0.0, 0.0)
-            self._create_monster_instance("morgenwacht", "metin_abyss", 0.0, 0.0, 0.0)
 
         # ---------------------------------------------------------------------
         # 3 FESTE GEBIETSBOSSE AUF DEN 3 BOSS-PLÄTZEN (15 Minuten = 900s Respawn)
@@ -700,58 +710,82 @@ class WorldAuthority:
         # DIE BEDEUTENDEN RISSMONOLITHEN AUF DER OPEN WORLD (Morgenwacht)
         # ---------------------------------------------------------------------
         self._spawn_major_rift_monoliths()
+        self._ensure_fallback_nav_obstacles()
+
+    def _ensure_fallback_nav_obstacles(self):
+        """Stellt sicher, dass self.nav immer Basis-Kollisionshindernisse (Denkmäler, Flussufer zwischen Brücken, Monolithen) kennt."""
+        try:
+            from server.bot_navigation import MapObstacles
+        except ImportError:
+            try:
+                from bot_navigation import MapObstacles
+            except ImportError:
+                return
+        if "morgenwacht" in self.nav.maps and self.nav.maps["morgenwacht"].count > 20:
+            return
+        circles = [
+            [0.0, -180.0, 26.0],     # Weol-Denkmal Zentrum
+            [0.0, -1020.0, 18.0],    # Nord-Ruinenportal
+            [-820.0, -780.0, 9.0],   # Kaeryu Stadtbrunnen
+            [820.0, -780.0, 9.0],    # Seiryu Stadtbrunnen
+            [0.0, 880.0, 11.0],      # Bakra Marktbrunnen
+        ]
+        for mob in self.monsters.values():
+            if mob.get("mapId") == "morgenwacht" and mob.get("kind") == "metin":
+                circles.append([float(mob["x"]), float(mob["z"]), 2.8])
+        # Silberstrom-Flussbarrieren außerhalb der beiden Brücken (x ≈ -760 und x ≈ +760)
+        segments = [
+            [-1380.0, 0.0, -792.0, 0.0, 10.0],
+            [-728.0, 0.0, 728.0, 0.0, 10.0],
+            [792.0, 0.0, 1380.0, 0.0, 10.0],
+        ]
+        self.nav.maps["morgenwacht"] = MapObstacles(
+            "morgenwacht",
+            {"mapId": "morgenwacht", "layoutHash": "fallback_ssot_v1", "circles": circles, "segments": segments, "boxes": []},
+        )
 
     def _pick_random_monolith_coords(
         self, map_id: str, exclude_mob_id: Optional[str] = None, template_id: Optional[str] = None
     ) -> Tuple[float, float]:
-        """Wählt zufällige, über das Großgebiet verteilte Koordinaten für Rissmonolithen:
-        - Auf 'morgenwacht' (2800x2800m Kontinent):
-          'starter' Monolithen (Lv. 5/10): Map 1 Wiesen & Grasland im Norden (z ∈ [-780, -90])
-          'advanced' Monolithen (Lv. 15/20/25/30): Map 1 Süd-Auen & Map 2 Herbstregion (z ∈ [-260, +680])
-        - Schließt Städte (Kaeryu, Seiryu, Bakra), das Wheol-Denkmal, Flüsse, Brücken und das Südmeer strikt aus."""
-        zone_tier = None
+        """Wählt zufällige Koordinaten für Rissmonolithen strikt gemäß SSOT Abschnitt 10:
+        - Lv. 5 & 10: Map 1 Nord/Mitte (z ∈ [-780, -210])
+        - Lv. 15 & 20: Map 1 Mitte/Süd (z ∈ [-480, -85]) -> STRIKT auf Map 1!
+        - Lv. 25, 30 & 35: Map 2 Herbstregion (z ∈ [+105, +650]) -> STRIKT auf Map 2!"""
         tpl_lvl = 5
         if template_id and template_id in MONSTER_TEMPLATES:
-            zone_tier = MONSTER_TEMPLATES[template_id].get("zoneTier")
             tpl_lvl = int(MONSTER_TEMPLATES[template_id].get("level", 5))
 
         starter_sectors = [
-            (-640.0, -360.0, -760.0, -520.0),  # Westliche Kaeryu-Wiesen
-            (360.0, 640.0, -760.0, -520.0),    # Östliche Seiryu-Wiesen
-            (-320.0, 320.0, -780.0, -540.0),   # Nördliche Königssteppe
-            (-840.0, -340.0, -490.0, -210.0),  # Großes West-Grasland
-            (-310.0, 310.0, -490.0, -210.0),   # Riesige Zentralwiesen Map 1
-            (340.0, 840.0, -490.0, -210.0),    # Großes Ost-Grasland
+            (-640.0, -360.0, -760.0, -520.0),
+            (360.0, 640.0, -760.0, -520.0),
+            (-320.0, 320.0, -780.0, -540.0),
+            (-840.0, -340.0, -490.0, -230.0),
+            (-310.0, 310.0, -490.0, -240.0),
+            (340.0, 840.0, -490.0, -230.0),
         ]
-        mid_sectors = [
-            (-780.0, -280.0, -210.0, -75.0),   # Nördliche Silberstrom-Auen West
-            (-220.0, 220.0, -210.0, -75.0),    # Nördliches Brückental
-            (280.0, 780.0, -210.0, -75.0),     # Nördliche Silberstrom-Auen Ost
-            (-780.0, -280.0, 85.0, 340.0),     # Map 2 Nordwestliche Herbstwiesen
-            (-240.0, 240.0, 85.0, 340.0),      # Map 2 Goldenes Herbsttal
-            (280.0, 780.0, 85.0, 340.0),      # Map 2 Nordöstliche Ahornwälder
+        map1_south_sectors = [
+            (-820.0, -340.0, -420.0, -90.0),
+            (-310.0, 310.0, -380.0, -95.0),
+            (340.0, 820.0, -420.0, -90.0),
         ]
         map2_high_sectors = [
-            (-780.0, -280.0, 110.0, 340.0),    # Map 2 Nordwestliche Herbstwiesen
-            (-240.0, 240.0, 110.0, 340.0),     # Map 2 Goldenes Herbsttal
-            (280.0, 780.0, 110.0, 340.0),     # Map 2 Nordöstliche Ahornwälder
-            (-760.0, -260.0, 360.0, 650.0),    # Map 2 Westliches Herbsthochland
-            (-220.0, 220.0, 360.0, 640.0),     # Map 2 Zentrale Gelbwiesen vor Bakra
-            (260.0, 760.0, 360.0, 650.0),      # Map 2 Östliches Blutlaub-Tal
+            (-780.0, -280.0, 110.0, 340.0),
+            (-240.0, 240.0, 110.0, 340.0),
+            (280.0, 780.0, 110.0, 340.0),
+            (-760.0, -260.0, 360.0, 650.0),
+            (-220.0, 220.0, 360.0, 640.0),
+            (260.0, 760.0, 360.0, 650.0),
         ]
 
-        if zone_tier == "starter" or tpl_lvl <= 10:
+        if tpl_lvl <= 10:
             sectors = starter_sectors
-            fallback_z_range = (-740.0, -180.0)
-        elif tpl_lvl >= 25:
+            fallback_z_range = (-740.0, -220.0)
+        elif tpl_lvl <= 20:
+            sectors = map1_south_sectors
+            fallback_z_range = (-410.0, -95.0)
+        else:
             sectors = map2_high_sectors
             fallback_z_range = (110.0, 620.0)
-        elif zone_tier == "advanced" or tpl_lvl >= 15:
-            sectors = mid_sectors
-            fallback_z_range = (-180.0, 340.0)
-        else:
-            sectors = starter_sectors + mid_sectors + map2_high_sectors
-            fallback_z_range = (-740.0, 620.0)
 
         existing_metins = [
             m for mid, m in self.monsters.items()
@@ -1595,36 +1629,21 @@ class WorldAuthority:
         if not isinstance(raw_mount, dict):
             raw_mount = {}
 
-        # Einmaliges Starter-Paket Pferdemedaillen ins Inventar legen, damit der Spieler direkt im Mount-Fenster steigern kann
-        starter_granted = bool(raw_mount.get("starterMedalsGranted", False))
-        if not starter_granted:
-            raw_mount["starterMedalsGranted"] = True
-            inv = p.setdefault("inventory", [])
-            existing_medals = next((it for it in inv if it.get("templateId") == "pferdemedaille"), None)
-            if existing_medals:
-                existing_medals["quantity"] = int(existing_medals.get("quantity", 1)) + 25
-            else:
-                tpl = ITEM_TEMPLATES.get("pferdemedaille", {})
-                inv.append(
-                    {
-                        "uid": f"it_{uuid.uuid4().hex[:10]}",
-                        "templateId": "pferdemedaille",
-                        "name": tpl.get("name", "Pferdemedaille"),
-                        "type": tpl.get("type", "material"),
-                        "slotSize": 1,
-                        "rarity": tpl.get("rarity", "rare"),
-                        "icon": tpl.get("icon", "mount_seal_horse"),
-                        "customIcon": tpl.get("customIcon", "./assets/icons/items/mount/mount_seal.png"),
-                        "quantity": 25,
-                        "stackable": True,
-                        "description": tpl.get("description", ""),
-                    }
-                )
+        is_bot = str(p.get("player_id") or "").startswith("bot_")
+        # SSOT: KEIN Gratis-Paket Pferdemedaillen! Pferdemedaillen droppen erst, wenn Affen hinzugefügt werden.
+        # Kein Bot darf sein Pferde-/Mount-Level steigern (strikt Stufe 1!).
+        if is_bot:
+            raw_mount["level"] = 1
+            raw_mount["dmgPoints"] = 0
+            raw_mount["hpPoints"] = 0
+            inv = p.get("inventory")
+            if isinstance(inv, list):
+                p["inventory"] = [it for it in inv if not (isinstance(it, dict) and it.get("templateId") == "pferdemedaille")]
 
-        horse_lvl = max(1, min(MAX_HORSE_LEVEL, int(raw_mount.get("level", 1) or 1)))
-        total_pts = horse_lvl * 2
-        dmg_pts = max(0, int(raw_mount.get("dmgPoints", 0) or 0))
-        hp_pts = max(0, int(raw_mount.get("hpPoints", 0) or 0))
+        horse_lvl = 1 if is_bot else max(1, min(MAX_HORSE_LEVEL, int(raw_mount.get("level", 1) or 1)))
+        total_pts = 0 if (is_bot and horse_lvl <= 1) else (horse_lvl * 2 if horse_lvl > 1 else 0)
+        dmg_pts = 0 if is_bot else max(0, int(raw_mount.get("dmgPoints", 0) or 0))
+        hp_pts = 0 if is_bot else max(0, int(raw_mount.get("hpPoints", 0) or 0))
         if dmg_pts + hp_pts > total_pts:
             dmg_pts = min(dmg_pts, total_pts)
             hp_pts = max(0, min(hp_pts, total_pts - dmg_pts))
@@ -1747,11 +1766,13 @@ class WorldAuthority:
         return mount_data
 
     def compute_player_combat_stats(self, p: dict) -> dict:
-        # Begrenze aktive Fertigkeiten auf Maximalstufe 30 (1..19 Normal/Meister, 20..29 Großmeister G1..G10, 30 Perfekter Meister P)
+        # Begrenze aktive Fertigkeiten auf Maximalstufe 50 (0..19 Punkte, 20..29 M1..M10, 30..39 G1..G10, 40..49 P1..P10, 50 L1)
         refunded = 0
         for sk_k, sk_v in list(p.get("skills", {}).items()):
-            if int(sk_v) > 30:
-                p["skills"][sk_k] = 30
+            if int(sk_v) > 50:
+                p["skills"][sk_k] = 50
+            elif int(sk_v) < 0:
+                p["skills"][sk_k] = 0
         for ps_k, ps_v in list(p.get("passives", {}).items()):
             if int(ps_v) > 20:
                 refunded += int(ps_v) - 20
@@ -1870,15 +1891,15 @@ class WorldAuthority:
                 item["effectiveStats"] = eff
             else:
                 eff = item.get("effectiveStats", {})
-            max_hp += int(eff.get("hp", 0) * 0.75)
-            atk += eff.get("atk", 0) * 0.54
-            magic_atk += eff.get("magicAtk", 0) * 0.54
-            defense += eff.get("def", 0) * 0.56
-            crit_chance += eff.get("critChance", 0) * 0.45
-            pierce_chance += eff.get("pierceChance", 0) * 0.50 + eff.get("critChance", 0) * 0.10
-            vs_monster_pct += eff.get("vsMonsterPct", 0) * 0.50
-            vs_metin_pct += eff.get("vsMetinPct", 0) * 0.50
-            vs_boss_pct += eff.get("vsBossPct", 0) * 0.55
+            max_hp += int(eff.get("hp", 0))
+            atk += float(eff.get("atk", 0))
+            magic_atk += float(eff.get("magicAtk", 0))
+            defense += float(eff.get("def", 0))
+            crit_chance += float(eff.get("critChance", 0))
+            pierce_chance += float(eff.get("pierceChance", 0))
+            vs_monster_pct += float(eff.get("vsMonsterPct", 0))
+            vs_metin_pct += float(eff.get("vsMetinPct", 0))
+            vs_boss_pct += float(eff.get("vsBossPct", 0))
             vs_devil_pct += eff.get("vsDevilPct", 0)
             vs_undead_pct += eff.get("vsUndeadPct", 0)
             vs_orcs_pct += eff.get("vsOrcsPct", 0)
@@ -2135,25 +2156,36 @@ class WorldAuthority:
         tot_buff_atk_pct = 0.0
         tot_buff_matk_pct = 0.0
         tot_buff_def_pct = 0.0
-        tot_buff_spd_pct = 0.0
+        tot_buff_atk_spd_pct = 0.0
+        tot_buff_move_spd_pct = 0.0
         for buff_id, buff_data in list(p.get("activeBuffs", {}).items()):
             if buff_data["expiresAt"] > now:
                 if buff_id in ("orb_vwk", "vwk"):
                     in_vwk = True
                 tot_buff_atk_pct += float(buff_data.get("atkPct", 0)) * 0.25
                 tot_buff_matk_pct += float(buff_data.get("magicAtkPct", buff_data.get("atkPct", 0))) * 0.25
-                tot_buff_spd_pct += float(buff_data.get("speedPct", 0)) * 0.35
+                if "atkSpeedPct" in buff_data or "moveSpeedPct" in buff_data:
+                    tot_buff_atk_spd_pct += float(buff_data.get("atkSpeedPct", 0))
+                    tot_buff_move_spd_pct += float(buff_data.get("moveSpeedPct", 0))
+                else:
+                    raw_spd = float(buff_data.get("speedPct", 0))
+                    tot_buff_atk_spd_pct += raw_spd * 0.35
+                    tot_buff_move_spd_pct += raw_spd * 0.25
                 if buff_data.get("hpAbsorbPct"):
                     hp_absorb_pct += float(buff_data["hpAbsorbPct"]) * 0.65
                 if buff_data.get("defPct"):
                     tot_buff_def_pct += float(buff_data["defPct"]) * 0.22
                 if buff_data.get("critPct"):
                     crit_chance += float(buff_data["critPct"]) * 0.30
+                sk_lv = int(buff_data.get("skillLevel", p.get("skills", {}).get(buff_id, 1)))
+                sk_tier = 5 if sk_lv >= 50 else (4 if sk_lv >= 40 else (3 if sk_lv >= 30 else (2 if sk_lv >= 20 else 1)))
                 active_buffs.append(
                     {
                         "id": buff_id,
                         "name": buff_data["name"],
                         "remaining": round(buff_data["expiresAt"] - now, 1),
+                        "skillLevel": sk_lv,
+                        "skillTier": sk_tier,
                     }
                 )
             else:
@@ -2165,10 +2197,10 @@ class WorldAuthority:
             magic_atk *= 1.0 + min(28.0, tot_buff_matk_pct) / 100.0
         if tot_buff_def_pct > 0:
             defense *= 1.0 + min(22.0, tot_buff_def_pct) / 100.0
-        if tot_buff_spd_pct > 0:
-            eff_s_cap = min(25.0, tot_buff_spd_pct)
-            atk_speed *= 1.0 + eff_s_cap / 100.0
-            speed *= 1.0 + (eff_s_cap * 0.45) / 100.0
+        if tot_buff_atk_spd_pct > 0:
+            atk_speed *= 1.0 + min(30.0, tot_buff_atk_spd_pct) / 100.0
+        if tot_buff_move_spd_pct > 0:
+            speed *= 1.0 + min(40.0, tot_buff_move_spd_pct) / 100.0
 
         # Klassenspezifische Waffen-Mechaniken (Klingenwächter, Schattenjäger, Runenmagier, Seelenweber)
         is_double_strike = False
@@ -2197,17 +2229,17 @@ class WorldAuthority:
                     atk += int_s * 0.65
                     atk *= 1.06
 
-        # Stufengerechte Low-/Mid-Level Balance-Dämpfung (verhindert unrealistische Werte im Bereich Lv. 1–45)
+        # Stufengerechte Low-/Mid-Level Balance-Dämpfung (erlaubt volle SSOT +9 Werte ohne künstliche Beschneidung)
         if lvl <= 45:
-            soft_def_cap = 35.0 + lvl * 4.2
+            soft_def_cap = 55.0 + lvl * 8.5
             if defense > soft_def_cap:
-                defense = soft_def_cap + (defense - soft_def_cap) * 0.18
-            soft_atk_cap = 55.0 + lvl * 7.8
+                defense = soft_def_cap + (defense - soft_def_cap) * 0.35
+            soft_atk_cap = 85.0 + lvl * 10.5
             if atk > soft_atk_cap:
-                atk = soft_atk_cap + (atk - soft_atk_cap) * 0.18
-            soft_matk_cap = 45.0 + lvl * 6.8
+                atk = soft_atk_cap + (atk - soft_atk_cap) * 0.35
+            soft_matk_cap = 75.0 + lvl * 9.5
             if magic_atk > soft_matk_cap:
-                magic_atk = soft_matk_cap + (magic_atk - soft_matk_cap) * 0.18
+                magic_atk = soft_matk_cap + (magic_atk - soft_matk_cap) * 0.35
             soft_mob_cap = 6.0 + lvl * 0.55
             if vs_monster_pct > soft_mob_cap:
                 vs_monster_pct = soft_mob_cap + (vs_monster_pct - soft_mob_cap) * 0.18
@@ -2342,38 +2374,37 @@ class WorldAuthority:
         p["computed"] = computed
         return computed
 
-    def compute_map_level_factor(self, player_lvl: int, map_id: str) -> float:
+    def compute_map_level_factor(self, player_lvl: int, map_id: str, for_exp: bool = False) -> float:
         """
         Prüft, ob der Charakter im vorgesehenen Levelbereich der Karte (minLevel..maxLevel) liegt.
-        Je höher man über das Map-Maximallevel kommt, desto weniger EXP & Drops gibt es auf dieser Karte:
-        - Innerhalb [minLevel .. maxLevel]: 100 % (1.0)
-        - +1 Level über Map-Max: 75 % (0.75)
-        - +2 Level über Map-Max: 50 % (0.50)
-        - +3 Level über Map-Max: 30 % (0.30)
-        - +4 Level über Map-Max: 15 % (0.15)
-        - +5 Level über Map-Max: 5 % (0.05)
-        - >= +6 Level über Map-Max (oder unter minLevel): 0 % (0.0) -> keine EXP & keine Drops mehr!
+        SSOT Teil I Abs. 1: Ab Level 38 kaum noch EXP in den jetzigen Gebieten (Map 1 & Map 2 = 'morgenwacht').
         """
         mdef = MAPS.get(map_id, MAPS["morgenwacht"])
         min_lvl = int(mdef.get("minLevel", 1))
-        max_lvl = int(mdef.get("maxLevel", 15))
+        max_lvl = int(mdef.get("maxLevel", 37))
         pl = max(1, int(player_lvl))
         if pl < min_lvl:
             return 0.0
+        if map_id == "morgenwacht" and pl >= 38:
+            if for_exp:
+                return 0.02 if pl == 38 else (0.01 if pl == 39 else 0.0)
+            over_mw = pl - 37
+            drop_table = {1: 0.80, 2: 0.55, 3: 0.30, 4: 0.15, 5: 0.05}
+            return drop_table.get(over_mw, 0.0)
         if pl <= max_lvl:
             return 1.0
         over = pl - max_lvl
         table = {1: 0.75, 2: 0.50, 3: 0.30, 4: 0.15, 5: 0.05}
         return table.get(over, 0.0)
 
-    def compute_level_reward_penalty(self, player_lvl: int, mob_lvl: int, map_id: str) -> float:
+    def compute_level_reward_penalty(self, player_lvl: int, mob_lvl: int, map_id: str, for_exp: bool = False) -> float:
         """
         Kombinierte Levelbereichs-Skalierung (Charakter-Level vs. Map-Levelbereich & Monster-Level):
-        1. Außerhalb des Map-Levelbereichs sinkt die Ausbeute rapide bis auf 0 %.
+        1. Außerhalb des Map-Levelbereichs sinkt die Ausbeute rapide bis auf 0 % (EXP ab Lv. 38 in Map 1/2 -> ~2%).
         2. Auch innerhalb der Karte sinken EXP & Drops schrittweise, je weiter das Charakter-Level
            über dem Monster-Level liegt (ab +12 Level über dem Monster: 0 % EXP & 0 % Drops).
         """
-        map_factor = self.compute_map_level_factor(player_lvl, map_id)
+        map_factor = self.compute_map_level_factor(player_lvl, map_id, for_exp=for_exp)
         if map_factor <= 0.0:
             return 0.0
 
@@ -2593,6 +2624,8 @@ class WorldAuthority:
             "_lastBotMonolithAwakenCheckAt",
             "_monolithItemsSeededAt",
             "_botTradeStatusUntil",
+            "potionRegenRemaining",
+            "potionRegenRate",
         ):
             if k in old and old.get(k) is not None:
                 fresh[k] = old.get(k)
@@ -2668,6 +2701,16 @@ class WorldAuthority:
                 p["hp"] = min(p["max_hp"], p["hp"] + max(2.0, p["max_hp"] * 0.012 * regen_mult * hp_reg_mult) * dt)
             if p["mp"] < p["max_mp"]:
                 p["mp"] = min(p["max_mp"], p["mp"] + max(2.0, p["max_mp"] * 0.025 * regen_mult * mp_reg_mult) * dt)
+            # Trank-Regen: langsame TP-Auffüllung über Zeit
+            potion_rem = float(p.get("potionRegenRemaining", 0.0))
+            if potion_rem > 0.0 and p["hp"] < p["max_hp"]:
+                pot_rate = float(p.get("potionRegenRate", 40.0))
+                pot_tick = min(potion_rem, pot_rate * dt)
+                actual_tick = min(pot_tick, p["max_hp"] - p["hp"])
+                p["hp"] = min(p["max_hp"], p["hp"] + actual_tick)
+                p["potionRegenRemaining"] = max(0.0, potion_rem - pot_tick)
+                if p["potionRegenRemaining"] <= 0.0:
+                    p["potionRegenRate"] = 0.0
 
             # Aktive Pet-Skills ticken (Auto-Pickup, Heilung, Erneuerung)
             if p.get("active_pet"):
@@ -3018,7 +3061,7 @@ class WorldAuthority:
         best_class_ttk = 999.0
         hotspots = []
         bots_in_same_region = 0
-        target_north = p_lvl < 18
+        target_north = p_lvl < 23
 
         for pid, bp in list(self.players.items()):
             if not str(pid).startswith("bot_"):
@@ -3044,9 +3087,9 @@ class WorldAuthority:
             if (bz < 0.0) == target_north:
                 bots_in_same_region += 1
 
-            # Prüfe, ob dieser Bot im passenden Levelfenster und auf der richtigen Reichsseite jagt
+            # Prüfe, ob dieser Bot im passenden Levelfenster (Lv. 1–22 Map 1 Nord, ab Lv. 23 Map 2 Süd) jagt
             if bemp == p_emp and not is_in_safe_zone(bp.get("map_id", "morgenwacht"), bx, bz):
-                if (p_lvl >= 18 and bz > 40.0) or (p_lvl < 18 and bz < -40.0):
+                if (p_lvl >= 23 and bz > 40.0) or (p_lvl < 23 and bz < -40.0):
                     ldiff = abs(blvl - p_lvl)
                     if ldiff <= 6 and ldiff < best_bot_lvl_diff:
                         best_bot_lvl_diff = ldiff
@@ -3935,13 +3978,75 @@ class WorldAuthority:
             self.use_healing_potion(p["player_id"], auto_triggered=True)
             hp_pct = (p["hp"] / max(1, p["max_hp"])) * 100.0
         if af.get("autoPotion", True) and mp_pct <= 35.0:
-            if not self.db.consume_item_by_template(p["player_id"], "potion_mp_medium", 1):
-                if af.get("autoBuyPotions", True):
-                    self._auto_restock_potions(p, now=now, force=False, include_mp=True)
-                    self.db.consume_item_by_template(p["player_id"], "potion_mp_medium", 1)
-            p["mp"] = min(p["max_mp"], p["mp"] + max(450, int(p["max_mp"] * 0.45)))
-            stats["potionsUsed"] = int(stats.get("potionsUsed", 0)) + 1
-            self.refresh_player_from_db(p["player_id"])
+            consumed_mp = (
+                self.db.consume_item_by_template(p["player_id"], "potion_mp_large", 1)
+                or self.db.consume_item_by_template(p["player_id"], "potion_mp_medium", 1)
+                or self.db.consume_item_by_template(p["player_id"], "potion_mp_small", 1)
+            )
+            if not consumed_mp and af.get("autoBuyPotions", True):
+                self._auto_restock_potions(p, now=now, force=False, include_mp=True)
+                consumed_mp = self.db.consume_item_by_template(p["player_id"], "potion_mp_medium", 1)
+            if consumed_mp:
+                p["mp"] = min(p["max_mp"], p["mp"] + max(450, int(p["max_mp"] * 0.45)))
+                stats["potionsUsed"] = int(stats.get("potionsUsed", 0)) + 1
+                self.refresh_player_from_db(p["player_id"])
+
+        is_bot_af = str(p.get("player_id", "") or "").startswith("bot_")
+        # SSOT Teil I Abs. 6: Intelligenter Einsatz von Violetten (+15% AS/+20% MS) & Grünen (+20% MS) Tränken sowie Truhen im sicheren Zustand
+        if is_bot_af and (now - float(p.get("_lastBotConsumableCheckAt", 0.0) or 0.0)) >= 4.0:
+            p["_lastBotConsumableCheckAt"] = now
+            b_buffs = p.get("activeBuffs") or {}
+            in_safe_now = is_in_safe_zone(p["map_id"], p["pos_x"], p["pos_z"])
+            for it_c in list(p.get("inventory") or []):
+                if not isinstance(it_c, dict) or not it_c.get("uid") or it_c.get("reservedShopId") or it_c.get("reserved_shop_id"):
+                    continue
+                tid_c = str(it_c.get("templateId", ""))
+                tpl_c = ITEM_TEMPLATES.get(tid_c, {})
+                if tid_c == "potion_speed" and not in_safe_now:
+                    if float((b_buffs.get("potion_violet") or {}).get("expiresAt", 0.0) or 0.0) <= now + 3.0:
+                        self.use_or_open_inventory_item(p["player_id"], it_c["uid"])
+                        break
+                elif tid_c == "potion_atk_speed" and not in_safe_now:
+                    if (
+                        float((b_buffs.get("potion_violet") or {}).get("expiresAt", 0.0) or 0.0) <= now + 3.0
+                        and float((b_buffs.get("potion_green") or {}).get("expiresAt", 0.0) or 0.0) <= now + 3.0
+                    ):
+                        self.use_or_open_inventory_item(p["player_id"], it_c["uid"])
+                        break
+                elif tpl_c.get("type") == "chest" and (in_safe_now or hp_pct >= 88.0):
+                    self.use_or_open_inventory_item(p["player_id"], it_c["uid"])
+                    break
+
+        # SSOT Teil I Abs. 6: Aktives Boss-Skill-Ausweichen (AI-Hitbox-Erkennung auf telegrafierte Flächenangriffe VOR Schadensapplikation!)
+        if (is_bot_af or af.get("useBotSystemData", True)) and self.telegraphs:
+            px_t, pz_t = float(p["pos_x"]), float(p["pos_z"])
+            for tel in self.telegraphs:
+                if tel.get("mapId") != p["map_id"] or float(tel.get("explodeAt", 0.0)) <= now:
+                    continue
+                t_rad = float(tel.get("radius", 4.8))
+                d_tel = dist2d(px_t, pz_t, float(tel["x"]), float(tel["z"]))
+                if d_tel <= t_rad + 1.45:
+                    out_dx = px_t - float(tel["x"])
+                    out_dz = pz_t - float(tel["z"])
+                    if math.hypot(out_dx, out_dz) < 0.15:
+                        ang_rnd = random.uniform(0.0, math.pi * 2.0)
+                        out_dx, out_dz = math.sin(ang_rnd), math.cos(ang_rnd)
+                    if p.get("active_mount"):
+                        p["active_mount"] = None
+                        p["_lastAutoMountSwitchAt"] = now
+                        self.compute_player_combat_stats(p)
+                    res_dg = self.perform_player_dodge(p["player_id"], {"dx": out_dx, "dz": out_dz})
+                    if res_dg.get("ok"):
+                        p["tacticalDodges"] = int(p.get("tacticalDodges", 0)) + 1
+                        stats["tacticalDodges"] = int(stats.get("tacticalDodges", 0)) + 1
+                        p["autoFarmStatus"] = f"💨 Boss-Hitbox erkannt: Ausweichrolle aus '{tel.get('skillName', 'Boss-Flächenangriff')}'!"
+                        p["_botTradeStatusUntil"] = now + 2.4
+                        return
+                    out_len = max(0.01, math.hypot(out_dx, out_dz))
+                    esc_x = float(tel["x"]) + (out_dx / out_len) * (t_rad + 2.2)
+                    esc_z = float(tel["z"]) + (out_dz / out_len) * (t_rad + 2.2)
+                    self._move_player_towards(p, esc_x, esc_z, dt)
+                    return
 
         # Auto-Reittier rufen falls gewünscht (respektiert manuelles Absitzen)
         if af.get("autoMount", False) and not p.get("active_mount") and now >= float(p.get("_manualDismountUntil", 0.0) or 0.0):
@@ -4101,27 +4206,22 @@ class WorldAuthority:
                 # Nur ziehen, wenn der Bot nicht bereits überrannt wird (<= 2 am Bot) und sich mind. 3 Monster im Umkreis lohnen!
                 if already_chasing <= 2 and len(pullable_mobs) >= 3:
                     inv_c = p.get("inventory") or []
-                    has_cape = any(
-                        isinstance(it, dict)
-                        and it.get("templateId") == "cape_bravery"
-                        and int(it.get("quantity", 1)) > 0
-                        and not it.get("reservedShopId")
-                        for it in inv_c
-                    )
-                    # Falls ein Bot keine Tapferkeitsumhänge mehr im Inventar hat, kauft er bei Händlerin Yuna günstig ein 5er-Bündel nach
-                    if is_bot_p and not has_cape and int(p.get("yang", 0)) >= 1200:
-                        p["yang"] = int(p.get("yang", 0)) - 450
-                        self.db.add_item_to_inventory(pid_c, "cape_bravery", quantity=5)
-                        self.refresh_player_from_db(pid_c)
-                        has_cape = True
+                    cape_tpl_id = None
+                    for it in inv_c:
+                        if (
+                            isinstance(it, dict)
+                            and it.get("templateId") in ("item_bravery_cape", "cape_bravery")
+                            and int(it.get("quantity", 1)) > 0
+                            and not it.get("reservedShopId")
+                        ):
+                            cape_tpl_id = it.get("templateId")
+                            break
 
                     used_cape = False
-                    if has_cape:
-                        used_cape = self.db.consume_item_by_template(pid_c, "cape_bravery", 1)
+                    if cape_tpl_id:
+                        used_cape = self.db.consume_item_by_template(pid_c, cape_tpl_id, 1)
                         if used_cape:
                             self.refresh_player_from_db(pid_c)
-                    elif not is_bot_p and af.get("autoPull", False):
-                        used_cape = True
 
                     if used_cape:
                         p["lastAutoPullTime"] = now
@@ -4149,13 +4249,23 @@ class WorldAuthority:
                             },
                         )
 
-        # 3. Automatisch nahe Beute einsammeln (unter Beachtung des Drop-Filters; alle Kategorien werden aufgehoben)
+        # 3. Automatisch nahe Beute einsammeln (SSOT Strikter Ziel-Fokus: Während ein Ziel lebt, KEIN 18m-Lauf-Abbruch mitten im Kampf!)
+        locked_fight_tid = p.get("manualFocusTargetId") or p.get("autoFarmTargetId") or p.get("targetId")
+        locked_fight_mob = self.monsters.get(locked_fight_tid) if locked_fight_tid else None
+        is_actively_fighting = bool(
+            locked_fight_mob
+            and locked_fight_mob.get("mapId") == p["map_id"]
+            and locked_fight_mob.get("state") != "dead"
+            and int(locked_fight_mob.get("hp", 0)) > 0
+            and dist2d(p["pos_x"], p["pos_z"], locked_fight_mob["x"], locked_fight_mob["z"]) <= 24.0
+        )
         if af.get("autoLoot", True):
+            max_loot_scan = 3.8 if is_actively_fighting else 18.0
             allowed_drops = []
             for d in self.drops.values():
                 if d["mapId"] != p["map_id"]:
                     continue
-                if dist2d(p["pos_x"], p["pos_z"], d["x"], d["z"]) > 18.0:
+                if dist2d(p["pos_x"], p["pos_z"], d["x"], d["z"]) > max_loot_scan:
                     continue
                 can_pick, _ = self.can_player_pickup_drop(p["player_id"], d, now=now, is_auto=True)
                 if not can_pick:
@@ -4172,7 +4282,7 @@ class WorldAuthority:
                 ddist = dist2d(p["pos_x"], p["pos_z"], nearest_drop["x"], nearest_drop["z"])
                 if ddist <= 3.8:
                     self.pickup_drop(p["player_id"], nearest_drop["id"], auto_sell=nearest_sell)
-                else:
+                elif not is_actively_fighting:
                     action_lbl = "Auto-Verkauf" if nearest_sell else "Sammle Beute"
                     p["autoFarmStatus"] = f"💎 {action_lbl}: {nearest_drop['name']}"
                     self._move_player_towards(p, nearest_drop["x"], nearest_drop["z"], dt)
@@ -4246,7 +4356,8 @@ class WorldAuthority:
         max_fallback_dist = 320.0 if is_bot_player else 950.0
         px_f, pz_f = float(p["pos_x"]), float(p["pos_z"])
 
-        # Schneller Pfad: Wenn bereits ein lebendes Ziel anvisiert ist, nur alle 0.40s alle 2.500+ Monster neu durchsuchen!
+        # SSOT Teil I Abs. 6: STRIKTER ZIEL-FOKUS (Kein Flattern!)
+        # Ein einmal anvisiertes lebendes Ziel wird konsequent bekämpft, bis es vollständig besiegt ist!
         cur_af_tid = manual_focus_id or p.get("autoFarmTargetId") or p.get("targetId")
         cur_af_mob = self.monsters.get(cur_af_tid) if cur_af_tid else None
         if (
@@ -4254,19 +4365,20 @@ class WorldAuthority:
             and cur_af_mob["mapId"] == p["map_id"]
             and cur_af_mob["state"] != "dead"
             and int(cur_af_mob.get("hp", 0)) > 0
-            and (now - float(p.get("_lastAutoFarmTargetScanAt", 0.0) or 0.0)) < 0.40
+            and not self._is_mob_claimed_by_real_player(p, cur_af_mob)
         ):
             d_cur = dist2d(px_f, pz_f, cur_af_mob["x"], cur_af_mob["z"])
-            rf_cur = self.compute_level_reward_penalty(player_lvl, int(cur_af_mob.get("level", 1)), p["map_id"])
-            is_cur_coop_boss = bool(
-                cur_af_mob.get("isRiftWorldBoss")
-                or cur_af_mob.get("isMonolithEliteBoss")
-                or (cur_af_mob.get("kind") == "metin" and cur_af_mob.get("monolithState") in ("instabil", "erwacht"))
-            )
-            if is_cur_coop_boss and rf_cur <= 0.0:
-                rf_cur = 0.85
-            if not use_bot_ai or rf_cur > 0.0 or manual_focus_id or is_cur_coop_boss:
-                candidates.append((-100.0, d_cur, cur_af_mob, rf_cur))
+            if d_cur <= max_fallback_dist or manual_focus_id:
+                rf_cur = self.compute_level_reward_penalty(player_lvl, int(cur_af_mob.get("level", 1)), p["map_id"])
+                is_cur_coop_boss = bool(
+                    cur_af_mob.get("isRiftWorldBoss")
+                    or cur_af_mob.get("isMonolithEliteBoss")
+                    or (cur_af_mob.get("kind") == "metin" and cur_af_mob.get("monolithState") in ("instabil", "erwacht"))
+                )
+                if is_cur_coop_boss and rf_cur <= 0.0:
+                    rf_cur = 0.85
+                if not use_bot_ai or rf_cur > 0.0 or manual_focus_id or is_cur_coop_boss or int(cur_af_mob.get("hp", 1)) < int(cur_af_mob.get("maxHp", 1)):
+                    candidates.append((-1000.0, d_cur, cur_af_mob, rf_cur))
 
         if not candidates:
             p["_lastAutoFarmTargetScanAt"] = now
@@ -4324,11 +4436,11 @@ class WorldAuthority:
                     if mob_reward_factor <= 0.0 and not is_coop_world_event:
                         continue
                 if is_bot_player and not is_manual_focus:
-                    # Bots ab Level 18 gehören in Map 2 (Südlich des Silberstroms, z > 0) und ignorieren Map-1-Monster (z < 0, inkl. Weißer Eid!),
-                    # außer ein aktiver Weltboss oder erwachter Monolith steht in unmittelbarer Nähe (<= 165m).
-                    if player_lvl >= 18 and mob["z"] < 0.0 and not (is_coop_world_event and d <= 165.0):
+                    # SSOT Teil I Abs. 2: Bots wechseln exakt mit Erreichen von Level 23 nach Map 2 (z > 0)!
+                    # Unter Level 23 bleiben sie strikt in Map 1 (z < 0: Lv. 1–8 Wölfe, Lv. 9–15 Bären/Tiger, Lv. 16–22 Eid-Kämpfer).
+                    if player_lvl >= 23 and mob["z"] < 0.0 and not (is_coop_world_event and d <= 165.0):
                         continue
-                    if player_lvl < 14 and mob["z"] > 0.0:
+                    if player_lvl < 23 and mob["z"] > 0.0:
                         continue
                     b_emp = str(p.get("empire", "seiryu")).lower()
                     if mob["z"] < -30.0:
@@ -4612,7 +4724,7 @@ class WorldAuthority:
                 if p.get("active_mount"):
                     saved_mount = p["active_mount"]
                     for sk in cdef["skills"]:
-                        if sk.get("type") != "buff" or int(p.get("skills", {}).get(sk["id"], 1)) <= 0:
+                        if sk.get("type") != "buff" or int(p.get("skills", {}).get(sk["id"], 0)) <= 0:
                             continue
                         existing_buff = active_buffs.get(sk["id"])
                         if existing_buff and float(existing_buff.get("expiresAt", 0.0)) > now + 1.5:
@@ -4624,11 +4736,13 @@ class WorldAuthority:
                             p["active_mount"] = saved_mount
                             self.compute_player_combat_stats(p)
                             if isinstance(res_b, dict) and res_b.get("ok"):
+                                if is_bot_player:
+                                    self._record_bot_qa_telemetry(p, sk["id"], res_b, now)
                                 return
 
-                    # Ab Militärgaul (Lv. 50+) Reit-Skills nutzen
+                    # Ab Militärgaul (Lv. 50+) Reit-Skills nutzen (für Bots wegen Affen-Sperre auf Lv. 1 gesperrt)
                     m_data = self._ensure_player_mount_data(p)
-                    if int(m_data.get("level", 1)) >= 50:
+                    if not is_bot_player and int(m_data.get("level", 1)) >= 50:
                         for h_sk in HORSE_SKILLS:
                             cd_until = p["skillCooldowns"].get(h_sk["id"], 0.0)
                             if now >= cd_until and p["mp"] >= h_sk["mpCost"]:
@@ -4636,8 +4750,7 @@ class WorldAuthority:
                                 if isinstance(res, dict) and res.get("ok"):
                                     return
                 else:
-                    # Selbstlernende Build- & Rotations-Evolution v3.0/v5.0:
-                    # Bots & Spieler mit aktivierter Bot-KI sortieren ihre Fertigkeiten dynamisch nach der Rotation mit der kürzesten Kill-Zeit (TTK)!
+                    # Selbstlernende Build- & Rotations-Evolution v6.0 (SSOT):
                     ordered_skills = list(cdef["skills"])
                     evo_v3 = p.get("evolutionV3") if is_bot_player else None
                     rot_order = (evo_v3 or {}).get("activeRotationOrder")
@@ -4648,10 +4761,10 @@ class WorldAuthority:
                         ordered_skills.sort(key=lambda s: order_map.get(s["id"], 99))
                     elif p.get("class_id") == "ninja":
                         ordered_skills.sort(
-                            key=lambda s: (0 if s["id"] in ("stealth", "shadow_step") else (1 if s["id"] == "ambush" else 2))
+                            key=lambda s: (0 if s["id"] == "feather_walk" else (1 if s["id"] == "ambush" else 2))
                         )
                     for sk in ordered_skills:
-                        if int(p.get("skills", {}).get(sk["id"], 1)) <= 0:
+                        if int(p.get("skills", {}).get(sk["id"], 0)) <= 0:
                             continue
                         if sk.get("type") == "buff":
                             existing_buff = active_buffs.get(sk["id"])
@@ -4663,12 +4776,16 @@ class WorldAuthority:
                                 continue
                             res = self.perform_player_skill(p["player_id"], sk["slot"], target_mob["id"])
                             if isinstance(res, dict) and res.get("ok"):
+                                if is_bot_player:
+                                    self._record_bot_qa_telemetry(p, sk["id"], res, now)
                                 return
 
-            # Standardangriff im flüssigen 4er-Combo-Rhythmus (wie im Gyazo-Referenzvideo)
+            # Standardangriff im flüssigen 4er-Combo-Rhythmus
             atk_interval = 0.64 / max(0.80, min(1.45, p["computed"]["atkSpeed"]))
             if now - p.get("lastBasicAttack", 0.0) >= atk_interval:
-                self.perform_basic_attack(p["player_id"], target_mob["id"])
+                res_atk = self.perform_basic_attack(p["player_id"], target_mob["id"])
+                if is_bot_player and isinstance(res_atk, dict) and res_atk.get("ok"):
+                    self._record_bot_qa_telemetry(p, f"combo_{res_atk.get('comboStep', 1)}", res_atk, now)
 
     def _get_base_bot_friendship_table(self) -> dict:
         return {
@@ -4781,53 +4898,58 @@ class WorldAuthority:
                 return "🏰 Stadt Seiryu (Map 1 Nordost)"
             if math.hypot(x - (-820.0), z - (-780.0)) <= 165.0:
                 return "🏰 Stadt Kaeryu (Map 1 Nordwest)"
-            if z <= -480.0:
+            if z <= -520.0:
                 if x > 220.0:
-                    return "Gebiet 1 • Nördliche Steppe Ost (Lv. 3–8)"
+                    return "Map 1 • Nördliche Steppe Ost (Lv. 1–8)"
                 if x < -220.0:
-                    return "Gebiet 1 • Nördliche Steppe West (Lv. 3–8)"
-                return "Gebiet 1 • Nördliches Hochland (Lv. 4–9)"
+                    return "Map 1 • Nördliche Steppe West (Lv. 1–8)"
+                return "Map 1 • Nördliches Hochland (Lv. 1–8)"
+            if z <= -280.0:
+                if x > 240.0:
+                    return "Map 1 • Silberstrom-Wälder Ost (Lv. 9–15)"
+                if x < -240.0:
+                    return "Map 1 • Silberstrom-Wälder West (Lv. 9–15)"
+                return "Map 1 • Bären- & Tiger-Haine (Lv. 9–15)"
             if x > 240.0:
-                return "Gebiet 1 • Silberstrom-Auen Ost (Lv. 10–16)"
+                return "Map 1 • Eid-Grenzland Ost (Lv. 16–22)"
             if x < -240.0:
-                return "Gebiet 1 • Silberstrom-Auen West (Lv. 10–16)"
-            return "Gebiet 1 • Zentrales Weol-Grenzland (Lv. 12–17)"
+                return "Map 1 • Eid-Grenzland West (Lv. 16–22)"
+            return "Map 1 • Zentrales Eid-Lager (Lv. 16–22)"
         else:
             if math.hypot(x - 0.0, z - 880.0) <= 185.0:
                 return "🏯 Außenposten Bakra (Map 2 Süd)"
-            if z < 340.0:
+            if z < 360.0:
                 if x > 220.0:
-                    return "Gebiet 2 • Nordöstliche Bakra-Wiesen (Lv. 18–24)"
+                    return "Map 2 • Anfangsgebiet Ost (Lv. 23–29)"
                 if x < -220.0:
-                    return "Gebiet 2 • Nordwestliche Bakra-Wiesen (Lv. 18–24)"
-                return "Gebiet 2 • Goldenes Bakra-Herbsttal (Lv. 20–26)"
+                    return "Map 2 • Anfangsgebiet West (Lv. 23–29)"
+                return "Map 2 • Anfangsgebiet Zentrum (Lv. 23–29)"
             if x > 220.0:
-                return "Gebiet 2 • Östliches Bakra-Herbsttal (Lv. 25–32)"
+                return "Map 2 • Östliches Schwarzwind-Tal (Lv. 30–38)"
             if x < -220.0:
-                return "Gebiet 2 • Westliches Bakra-Herbsttal (Lv. 25–32)"
-            return "Gebiet 2 • Südliches Riss-Tal Bakra (Lv. 28–35)"
+                return "Map 2 • Westliches Schwarzwind-Tal (Lv. 30–38)"
+            return "Map 2 • Südliches Riss-Tal Bakra (Lv. 30–38)"
 
     def _get_ideal_bot_hunting_anchor(self, bot: dict) -> Tuple[float, float]:
-        """Liefert den optimalen Jagd-Anker (anchorX, anchorZ) für einen Bot passend zu seinem Reich und Level
-        (Lv. 1–17 in Map 1 Nord z < 0; ab Lv. 18 in Map 2 Süd z > 0)."""
+        """Liefert den optimalen Jagd-Anker (anchorX, anchorZ) strikt nach SSOT Teil I Abs. 2:
+        Map 1 (z < 0): Lv. 1–8 -> Lv. 9–15 -> Lv. 16–22.
+        Map 2 (z > 0): Sofortiger Gebietswechsel ab Level 23 (Lv. 23–29 Anfangsgebiet -> Lv. 30–38 Restgebiet)."""
         emp = str(bot.get("empire", "seiryu")).lower()
         lvl = int(bot.get("level", 1))
         sign = -1.0 if emp == "kaeryu" else 1.0
         if lvl < 5:
-            return sign * 560.0, -680.0
+            return sign * 560.0, -690.0
         if lvl < 9:
-            return sign * 220.0, -740.0
-        if lvl < 13:
-            return sign * 580.0, -380.0
-        if lvl < 18:
-            return sign * 240.0, -195.0
+            return sign * 320.0, -640.0
+        if lvl < 16:
+            return sign * 540.0, -390.0
         if lvl < 23:
-            return sign * 480.0, 185.0
-        if lvl < 27:
-            return sign * 240.0, 285.0
-        if lvl < 31:
-            return sign * 420.0, 460.0
-        return sign * 320.0, 625.0
+            return sign * 260.0, -185.0
+        if lvl < 30:
+            return sign * 420.0, 225.0
+        if lvl < 35:
+            return sign * 410.0, 465.0
+        return sign * 310.0, 625.0
 
     def _score_bot_equipment_item(self, bot: dict, item_or_tpl, plus_level: int = 0, bonuses: Optional[list] = None) -> float:
         """Bewertet ein Ausrüstungsteil (Waffe, Rüstung, Helm, Schild, Schuhe, Handschuhe, Schmuck, Spezial-Item)
@@ -4909,60 +5031,60 @@ class WorldAuthority:
         return round(score, 2)
 
     def _get_bot_evolution_v3_profile(self, bot: dict) -> dict:
-        """Initialisiert und liefert das Selbstlernende Build-, Pet-, Boss-Kiting-, Stadt- & Rotations-Evolutionsprofil v5.0 eines Bots."""
+        """Initialisiert und liefert das SSOT v6.0 Build-, Pet-, Boss-Dodge-, Stadt- & Rotations-Evolutionsprofil eines Bots."""
         cls_id = str(bot.get("class_id", "warrior"))
         profiles = {
             "warrior": {
-                "buildName": "Krieger-Berserker v5.0 (DSS + STR + Monster + Boss-Schildblock + Pet-Wucht)",
-                "desiredBonusIds": ["bonus_vs_monster", "bonus_dss", "bonus_str", "bonus_crit", "bonus_hp_absorb", "bonus_vs_metin", "bonus_atk_val"],
+                "buildName": "Krieger-SSOT v6.0 (STR/VIT • Aura/Starker Körper • DSS + Monster)",
+                "desiredBonusIds": ["bonus_vs_monster", "bonus_dss", "bonus_str", "bonus_crit", "bonus_hp_absorb", "bonus_vs_metin", "bonus_hp"],
                 "rotations": [
-                    {"name": "Burst-Exekution", "order": ["aura_of_sword", "berserk", "three_way_cut", "sword_spin", "dash", "earth_shatter"]},
-                    {"name": "AoE-Wirbelsturm", "order": ["aura_of_sword", "sword_spin", "earth_shatter", "three_way_cut", "dash", "berserk"]},
-                    {"name": "Kontroll-Brecher", "order": ["aura_of_sword", "dash", "sword_spin", "three_way_cut", "berserk", "iron_body"]},
-                    {"name": "Omni-Rissbrecher v5.0", "order": ["aura_of_sword", "berserk", "sword_spin", "three_way_cut", "earth_shatter", "dash"]},
+                    {"name": "Körper-Berserker", "order": ["sword_aura", "berserk", "whirlwind", "three_way_cut", "dash_strike", "sword_strike"]},
+                    {"name": "AoE-Schwertwirbel", "order": ["sword_aura", "whirlwind", "three_way_cut", "dash_strike", "berserk", "strong_body"]},
+                    {"name": "Mental-Bollwerk", "order": ["strong_body", "sword_aura", "whirlwind", "sword_strike", "dash_strike", "three_way_cut"]},
+                    {"name": "Omni-Rissbrecher v6.0", "order": ["sword_aura", "berserk", "three_way_cut", "whirlwind", "sword_strike", "dash_strike"]},
                 ],
             },
             "ninja": {
-                "buildName": "Schatten-Kritiker v5.0 (Krit + DEX + Durchbohren + Taktik-Dodge + Pet-Biss)",
+                "buildName": "Schattenjäger-SSOT v6.0 (DEX/VIT • Hinterhalt/Degenwirbel • Krit + Durchbohren)",
                 "desiredBonusIds": ["bonus_vs_monster", "bonus_crit", "bonus_dex", "bonus_pierce", "bonus_dss", "bonus_atk_speed", "bonus_vs_metin"],
                 "rotations": [
-                    {"name": "Schatten-Assassine", "order": ["stealth", "shadow_step", "ambush", "rolling_dagger", "poison_cloud", "rapid_shot"]},
-                    {"name": "Gift-Wirbel", "order": ["poison_cloud", "rolling_dagger", "stealth", "ambush", "shadow_step", "arrow_rain"]},
-                    {"name": "Blitz-Kombo", "order": ["shadow_step", "rolling_dagger", "ambush", "stealth", "rapid_shot", "poison_cloud"]},
-                    {"name": "Phantom-Exekutor v5.0", "order": ["stealth", "ambush", "rolling_dagger", "shadow_step", "poison_cloud", "arrow_rain"]},
+                    {"name": "Schatten-Assassine", "order": ["feather_walk", "ambush", "rolling_dagger", "fast_attack", "poison_cloud"]},
+                    {"name": "Gift-Wirbel", "order": ["feather_walk", "poison_cloud", "rolling_dagger", "ambush", "fast_attack"]},
+                    {"name": "Blitz-Kombo", "order": ["feather_walk", "fast_attack", "rolling_dagger", "ambush", "poison_cloud"]},
+                    {"name": "Phantom-Exekutor v6.0", "order": ["feather_walk", "ambush", "fast_attack", "rolling_dagger", "poison_cloud"]},
                 ],
             },
             "sura": {
-                "buildName": "Runenkrieger-Exorzist v5.0 (INT + DSS/FKS + TP-Absorb + Runenschild + Pet-Fluch)",
+                "buildName": "Runenkrieger-SSOT v6.0 (INT/VIT/STR • Verzauberte Klinge / Dunkler Stein)",
                 "desiredBonusIds": ["bonus_vs_monster", "bonus_int", "bonus_dss", "bonus_fks", "bonus_crit", "bonus_hp_absorb", "bonus_vs_metin"],
                 "rotations": [
-                    {"name": "Klingen-Exorzist", "order": ["enchanted_blade", "enchanted_armor", "finger_strike", "dragon_swirl", "dark_orb", "flame_spirit"]},
-                    {"name": "Abgrund-Wirbel", "order": ["enchanted_blade", "dragon_swirl", "flame_spirit", "finger_strike", "fear", "dark_orb"]},
-                    {"name": "Dunkle Resonanz", "order": ["enchanted_blade", "flame_spirit", "dark_orb", "finger_strike", "dragon_swirl", "enchanted_armor"]},
-                    {"name": "Runen-Overdrive v5.0", "order": ["enchanted_blade", "flame_spirit", "finger_strike", "dragon_swirl", "dark_orb", "fear"]},
+                    {"name": "Klingen-Exorzist", "order": ["enchanted_blade", "dark_protection", "finger_strike", "dragon_swirl", "dark_orb"]},
+                    {"name": "Abgrund-Wirbel", "order": ["enchanted_blade", "dragon_swirl", "finger_strike", "dark_orb", "dark_protection"]},
+                    {"name": "Dunkler-Stein-Magie", "order": ["dark_protection", "enchanted_blade", "dark_orb", "finger_strike", "dragon_swirl"]},
+                    {"name": "Runen-Overdrive v6.0", "order": ["enchanted_blade", "finger_strike", "dark_orb", "dragon_swirl", "dark_protection"]},
                 ],
             },
             "shaman": {
-                "buildName": "Drachen-Orakel v5.0 (INT + FKS + Krit + Boss-Kiting + Pet-Resonanz)",
-                "desiredBonusIds": ["bonus_int", "bonus_vs_monster", "bonus_fks", "bonus_crit", "bonus_vs_metin", "bonus_hp", "bonus_atk_speed"],
+                "buildName": "Seelenweber-SSOT v6.0 (INT/VIT • Hilfe des Drachen / Segen / Gebrüll)",
+                "desiredBonusIds": ["bonus_int", "bonus_vs_monster", "bonus_fks", "bonus_crit", "bonus_vs_metin", "bonus_hp", "bonus_cast_speed"],
                 "rotations": [
-                    {"name": "Drachenzorn-Salve", "order": ["dragon_help", "dragon_blessing", "dragon_roar", "shooting_dragon", "talisman_throw", "lightning_claw"]},
-                    {"name": "Gebrüll-Inferno", "order": ["dragon_help", "dragon_roar", "lightning_claw", "shooting_dragon", "talisman_throw", "dragon_blessing"]},
-                    {"name": "Äther-Orkan", "order": ["dragon_help", "dragon_blessing", "talisman_throw", "dragon_roar", "shooting_dragon", "natures_heal"]},
-                    {"name": "Himmlische Resonanz v5.0", "order": ["dragon_help", "dragon_blessing", "dragon_roar", "talisman_throw", "shooting_dragon", "lightning_claw"]},
+                    {"name": "Drachenzorn-Salve", "order": ["dragon_aid", "blessing", "dragon_roar", "flying_talisman", "cure"]},
+                    {"name": "Gebrüll-Inferno", "order": ["dragon_aid", "dragon_roar", "flying_talisman", "blessing", "cure"]},
+                    {"name": "Heil-Orakel", "order": ["blessing", "dragon_aid", "cure", "flying_talisman", "dragon_roar"]},
+                    {"name": "Himmlische Resonanz v6.0", "order": ["dragon_aid", "blessing", "flying_talisman", "dragon_roar", "cure"]},
                 ],
             },
         }
         prof = profiles.get(cls_id, profiles["warrior"])
         evo = bot.get("evolutionV3")
-        if not isinstance(evo, dict) or not evo.get("rotations"):
+        if not isinstance(evo, dict) or not evo.get("rotations") or evo.get("version") != "v6.0_ssot_ultimate":
             rot0 = prof["rotations"][0]
             rot_stats = {
                 str(i): {"name": r["name"], "kills": 0, "totalTtk": 0.0, "avgTtkSec": 0.0, "bestTtkSec": 99.9}
                 for i, r in enumerate(prof["rotations"])
             }
             evo = {
-                "version": "v5.0_omni_synergy",
+                "version": "v6.0_ssot_ultimate",
                 "generation": 1,
                 "totalKillsEvaluated": 0,
                 "activeRotationIdx": 0,
@@ -4981,13 +5103,7 @@ class WorldAuthority:
             }
             bot["evolutionV3"] = evo
         else:
-            evo["version"] = "v5.0_omni_synergy"
             evo["desiredBonusBuild"] = prof["buildName"]
-            if len(evo.get("rotations") or []) < len(prof["rotations"]):
-                evo["rotations"] = prof["rotations"]
-                r_st = evo.setdefault("rotationStats", {})
-                for i, r in enumerate(prof["rotations"]):
-                    r_st.setdefault(str(i), {"name": r["name"], "kills": 0, "totalTtk": 0.0, "avgTtkSec": 0.0, "bestTtkSec": 99.9})
 
         # Zähle aktuell angelegte Wunsch-Boni & versiegelte Optimal-Boni
         matched_cnt = 0
@@ -5717,24 +5833,60 @@ class WorldAuthority:
             arrived_at = now
 
         if stage == "blacksmith":
-            bot["autoFarmStatus"] = f"🔨 Bei {npc_label} ({town_name}): Schmiede Ausrüstung auf höhere +Stufe..."
+            bot["autoFarmStatus"] = f"🔨 Bei {npc_label} ({town_name}): Schmiede Ausrüstung & fasse Geiststeine..."
             bot["_botTradeStatusUntil"] = now + 3.0
             if now - arrived_at >= 2.6:
-                eq = bot.get("equipment") or {}
+                bid_bs = bot["player_id"]
+                inv_bs = list(bot.get("inventory") or [])
+                has_segi = any(isinstance(i, dict) and i.get("templateId") == "scroll_blessing" and int(i.get("quantity", 1)) > 0 for i in inv_bs)
+                has_metal = any(isinstance(i, dict) and i.get("templateId") == "item_magic_metal" and int(i.get("quantity", 1)) > 0 for i in inv_bs)
                 upgraded_label = None
-                for sl_k in ("weapon", "armor", "helmet", "shield", "bracelet", "necklace", "earrings", "shoes", "talisman", "belt"):
-                    eq_it = eq.get(sl_k)
-                    if isinstance(eq_it, dict) and int(eq_it.get("plusLevel", 0)) < 9:
-                        new_plus = int(eq_it.get("plusLevel", 0)) + 1
-                        eq_it["plusLevel"] = new_plus
-                        if eq_it.get("uid"):
-                            fn = getattr(self.db, "update_item_upgrade_and_bonuses", getattr(self.db, "update_item_plus_and_bonuses", None))
-                            if fn:
-                                fn(eq_it["uid"], new_plus, eq_it.get("bonuses") or [])
-                        upgraded_label = f"{eq_it.get('name', 'Item')} +{new_plus}"
+                attempts_done = 0
+                for sl_k in ("weapon", "armor", "helmet", "shield", "bracelet", "necklace", "earrings", "shoes", "gloves", "belt", "talisman"):
+                    if attempts_done >= 3:
                         break
-                self.compute_player_combat_stats(bot)
-                bot["blacksmithUpgrades"] = int(bot.get("blacksmithUpgrades", 0)) + 1
+                    eq_map_now = (self.players.get(bid_bs) or bot).get("equipment") or {}
+                    eq_it = eq_map_now.get(sl_k)
+                    if not isinstance(eq_it, dict) or not eq_it.get("uid"):
+                        continue
+                    cur_pl = int(eq_it.get("plusLevel", 0))
+                    if cur_pl >= 9:
+                        continue
+                    req_bs = get_blacksmith_upgrade_req(eq_it.get("templateId", ""), cur_pl)
+                    cur_bot_ref = self.players.get(bid_bs) or bot
+                    if int(cur_bot_ref.get("yang", 0)) < int(req_bs.get("yang", 999999)):
+                        continue
+                    mat_req = req_bs.get("matId")
+                    mat_qty = int(req_bs.get("matCount", 0) or 0)
+                    if mat_req and mat_qty > 0:
+                        owned_m = sum(
+                            int(x.get("quantity", 1) or 1)
+                            for x in (cur_bot_ref.get("inventory") or [])
+                            if isinstance(x, dict) and x.get("templateId") == mat_req and not x.get("reservedShopId")
+                        )
+                        if owned_m < mat_qty:
+                            continue
+                    use_m = bool(has_metal and cur_pl >= 7)
+                    use_s = bool((not use_m) and has_segi and cur_pl >= 5)
+                    ok_up, msg_up, up_won = self.blacksmith_upgrade(
+                        bid_bs, eq_it["uid"], use_blessing=use_s, use_magic_metal=use_m
+                    )
+                    attempts_done += 1
+                    bot = self.players.get(bid_bs) or bot
+                    bot["blacksmithUpgrades"] = int(bot.get("blacksmithUpgrades", 0)) + 1
+                    if ok_up and up_won:
+                        upgraded_label = f"{eq_it.get('name', 'Item')} +{cur_pl + 1}"
+                        break
+
+                # Geiststeine (+0 bis +4) ehrlich in Waffe oder Rüstung sockeln
+                bot = self.players.get(bid_bs) or bot
+                for it_st in list(bot.get("inventory") or []):
+                    if isinstance(it_st, dict) and it_st.get("uid") and str(it_st.get("templateId", "")).startswith("stone_"):
+                        ok_st, _ = self.use_or_open_inventory_item(bid_bs, it_st["uid"])
+                        if ok_st:
+                            bot = self.players.get(bid_bs) or bot
+                            break
+
                 if upgraded_label:
                     self._emit_combat_event(
                         bot.get("map_id", "morgenwacht"),
@@ -5752,47 +5904,72 @@ class WorldAuthority:
             bot["_botTradeStatusUntil"] = now + 3.0
             if now - arrived_at >= 2.4:
                 self._optimize_bot_runeweaver_bonuses_v3(bot, now=now)
-                self._emit_combat_event(
-                    bot.get("map_id", "morgenwacht"),
-                    "combat_feedback",
-                    bot["pos_x"],
-                    bot["pos_z"],
-                    {"playerId": bot["player_id"], "feedbackType": "buff", "text": "🔮 Boni veredelt!", "color": "#c084fc"},
-                )
                 errand["stage"] = "merchant"
                 errand["arrivedAt"] = 0.0
             return True
 
-        # stage == "merchant"
-        bot["autoFarmStatus"] = f"🛒 Bei {npc_label} ({town_name}): Verkaufe Beute & fülle Vorräte auf..."
+        # stage == "merchant": Ehrlich Beute verkaufen, Tränke/Umhänge gegen Gold nachkaufen & Truhen sicher öffnen!
+        bot["autoFarmStatus"] = f"🛒 Bei {npc_label} ({town_name}): Verkaufe Beute & kaufe Tränke nach..."
         bot["_botTradeStatusUntil"] = now + 3.5
         if now - arrived_at >= 2.4:
-            sold_cnt = 0
+            bid_m = bot["player_id"]
+            b_lvl_m = int(bot.get("level", 1))
             sold_yang = 0
             for it in list(bot.get("inventory") or []):
-                if not isinstance(it, dict) or it.get("equippedSlot") or it.get("equipped_slot") or it.get("reservedShopId") or it.get("reserved_shop_id"):
+                if not isinstance(it, dict) or not it.get("uid") or it.get("equippedSlot") or it.get("equipped_slot") or it.get("reservedShopId") or it.get("reserved_shop_id"):
                     continue
-                tpl = ITEM_TEMPLATES.get(it.get("templateId", ""), {})
+                tid_m = str(it.get("templateId", ""))
+                tpl = ITEM_TEMPLATES.get(tid_m, {})
+                if tpl.get("type") == "chest":
+                    self.use_or_open_inventory_item(bid_m, it["uid"])
+                    bot = self.players.get(bid_m) or bot
+                    continue
+                sell_this = False
+                qty_m = max(1, int(it.get("quantity", 1) or 1))
                 if tpl.get("type") == "equipment":
                     sl_k = tpl.get("slot", "weapon")
                     cur_eq = (bot.get("equipment") or {}).get(sl_k)
                     cand_sc = self._score_bot_equipment_item(bot, it)
                     cur_sc = self._score_bot_equipment_item(bot, cur_eq) if cur_eq else -1.0
-                    if cand_sc <= cur_sc and int(it.get("plusLevel", 0)) < 5 and it.get("uid"):
-                        val = max(180, int(tpl.get("sellPrice", 150)))
-                        _rm_fn = getattr(self.db, "remove_inventory_item_by_uid", None) or getattr(self.db, "delete_item", None)
-                        try:
-                            _removed = bool(_rm_fn and _rm_fn(bot["player_id"], it["uid"]))
-                        except Exception:
-                            _removed = False
-                        if _removed:
-                            sold_cnt += 1
-                            sold_yang += val
+                    if cand_sc <= cur_sc and int(it.get("plusLevel", 0)) < 6:
+                        sell_this = True
+                elif tid_m in ("mat_wolf_claw", "mat_bear_gall", "mat_tiger_hide") and b_lvl_m >= 23 and qty_m > 12:
+                    sell_this = True
+                if sell_this:
+                    val = max(25, int(tpl.get("sellPrice", 80)) * qty_m)
+                    _rm_fn = getattr(self.db, "remove_inventory_item_by_uid", None) or getattr(self.db, "delete_item", None)
+                    try:
+                        _removed = bool(_rm_fn and _rm_fn(bid_m, it["uid"]))
+                    except Exception:
+                        _removed = False
+                    if _removed:
+                        sold_yang += val
             if sold_yang > 0:
                 bot["yang"] = int(bot.get("yang", 0)) + sold_yang
-                self.refresh_player_from_db(bot["player_id"])
-            bot["hp"] = bot["max_hp"]
-            bot["mp"] = bot["max_mp"]
+                self.refresh_player_from_db(bid_m)
+                bot = self.players.get(bid_m) or bot
+
+            # Rote & Blaue Tränke sowie Grüne/Violette Tränke & Tapferkeitsumhänge ehrlich gegen Gold kaufen
+            self._auto_restock_potions(bot, now=now, force=True, include_mp=True)
+            bot = self.players.get(bid_m) or bot
+            for shop_tid, min_have, buy_qty in (("potion_speed", 3, 5), ("potion_atk_speed", 3, 5), ("item_bravery_cape", 4, 5)):
+                s_tpl = ITEM_TEMPLATES.get(shop_tid, {})
+                b_price = int(s_tpl.get("buyPrice", 0) or 0)
+                if b_price <= 0:
+                    continue
+                have_cnt = sum(
+                    int(x.get("quantity", 1) or 1)
+                    for x in (bot.get("inventory") or [])
+                    if isinstance(x, dict) and x.get("templateId") == shop_tid
+                )
+                total_p = b_price * buy_qty
+                if have_cnt < min_have and int(bot.get("yang", 0)) >= total_p + 2500:
+                    ok_add, _ = self.db.add_item_to_inventory(bid_m, shop_tid, quantity=buy_qty)
+                    if ok_add:
+                        bot["yang"] = int(bot.get("yang", 0)) - total_p
+                        self.refresh_player_from_db(bid_m)
+                        bot = self.players.get(bid_m) or bot
+
             bot["townVisits"] = int(bot.get("townVisits", 0)) + 1
             bot["_lastTownErrandCompletedAt"] = now
             bot.pop("townErrand", None)
@@ -5926,36 +6103,93 @@ class WorldAuthority:
 
             if not has_human_pty and not fighting_monolith and not bot.get("townErrand"):
                 af_guard = bot.setdefault("autofarm", {})
-                if bot_lvl < 13:
+                ideal_x, ideal_z = self._get_ideal_bot_hunting_anchor(bot)
+                # SSOT Teil I Abs. 4: Aktive Server-Event-Teilnahme (passt Farmmodus dynamisch an lohnende Events an!)
+                evt_now_id = str((getattr(self, "world_event", None) or {}).get("id", ""))
+                if evt_now_id == "monolith_eruption" and bot_lvl >= 5:
+                    af_guard["huntMetins"] = True
+                    af_guard["prioritizeElites"] = True
+                elif evt_now_id == "boss_hunt_frenzy" and bot_lvl >= 12:
+                    af_guard["attackBosses"] = True
+                    af_guard["prioritizeElites"] = True
+
+                if bot_lvl < 23:
+                    # Unter Level 23 strikt in Map 1 (z < 0: Lv. 1–8 -> 9–15 -> 16–22)
                     if float(af_guard.get("anchorZ", -420.0) or -420.0) > -60.0 or float(bot.get("pos_z", -420.0)) > 15.0:
-                        af_guard["anchorZ"] = -420.0
-                elif bot_lvl >= 18:
-                    ideal_x, ideal_z = self._get_ideal_bot_hunting_anchor(bot)
-                    if float(af_guard.get("anchorZ", 0.0) or 0.0) < 120.0:
                         af_guard["anchorX"] = ideal_x
                         af_guard["anchorZ"] = ideal_z
-                    # Wenn ein Bot ab Level 18 noch in Map 1 (z < 0) steht, wechselt er sofort über seine Steinbrücke nach Map 2 (z > 0)!
-                    if float(bot.get("pos_z", 0.0)) < 0.0:
+                else:
+                    # Exakt mit Erreichen von Level 23 sofortiger Wechsel über die Reichs-Steinbrücke (±760) nach Map 2 (z > 0)!
+                    if abs(float(af_guard.get("anchorZ", 0.0) or 0.0) - ideal_z) > 125.0 or float(af_guard.get("anchorZ", 0.0) or 0.0) < 120.0:
+                        af_guard["anchorX"] = ideal_x
+                        af_guard["anchorZ"] = ideal_z
+                    if float(bot.get("pos_z", 0.0)) < 0.0 and not bot.get("_crossingToMap2"):
+                        bot["_crossingToMap2"] = True
                         bot["targetId"] = None
                         bot["autoFarmTargetId"] = None
-                        bot["pos_x"] = ideal_x + random.uniform(-24.0, 24.0)
-                        bot["pos_z"] = ideal_z + random.uniform(-24.0, 24.0)
                         bot["bridgeCrossings"] = int(bot.get("bridgeCrossings", 0)) + 1
+                        bot["autoFarmStatus"] = f"🌉 Lv.{bot_lvl} erreicht -> Gebietswechsel über Steinbrücke nach Map 2!"
+                        bot["_botTradeStatusUntil"] = now + 5.0
+                    elif float(bot.get("pos_z", 0.0)) > 40.0 and bot.get("_crossingToMap2"):
+                        bot.pop("_crossingToMap2", None)
                         bot["routeSector"] = self._get_bot_route_sector(bot)
                         bot["routeSectorLabel"] = self._get_bot_route_sector_label(bot)
+
             if now - float(bot.get("_lastAutoEquipCheckAt", 0.0) or 0.0) >= 2.0:
                 bot["_lastAutoEquipCheckAt"] = now
                 self._auto_equip_best_inventory_items_for_bot(bot, now=now)
-                # Aktive Fertigkeiten über normale Fertigkeitspunkte steigern; Passive Fertigkeiten nur über gedroppte FBs im Inventar erlernen/steigern
-                if int(bot.get("skill_points", 0)) > 0:
-                    cdef_bot = CHARACTER_CLASSES.get(bot.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
-                    for sk_d in cdef_bot.get("skills", []):
-                        sk_id_b = sk_d["id"]
-                        if sk_d.get("special") and sk_id_b not in (bot.get("skills") or {}):
-                            continue
-                        if int((bot.get("skills") or {}).get(sk_id_b, 1)) < 20:
-                            self.upgrade_skill_point(bid, sk_id_b, is_passive=False)
+
+                # SSOT Teil I Abs. 7: Klassenspezifische Statuspunkte-Verteilung (STR, DEX, INT, VIT)
+                if int(bot.get("stat_points", 0)) > 0:
+                    cls_st = str(bot.get("class_id", "warrior"))
+                    is_mental = "kassian" in bid or "donnerkeil" in bid
+                    stat_cycle = (
+                        ("vit", "str", "vit") if (cls_st == "warrior" and is_mental)
+                        else ("str", "str", "vit") if cls_st == "warrior"
+                        else ("dex", "dex", "vit") if cls_st == "ninja"
+                        else ("int_stat", "int_stat", "vit", "str") if cls_st == "sura"
+                        else ("int_stat", "int_stat", "vit")
+                    )
+                    while int(bot.get("stat_points", 0)) > 0:
+                        tot_alloc = int(bot.get("str", 0)) + int(bot.get("dex", 0)) + int(bot.get("int_stat", 0)) + int(bot.get("vit", 0))
+                        pick_st = stat_cycle[tot_alloc % len(stat_cycle)]
+                        if int(bot.get(pick_st, 10)) >= 90:
+                            pick_st = "vit" if int(bot.get("vit", 10)) < 90 else ("str" if cls_st != "shaman" else "dex")
+                        ok_st_a, _ = self.allocate_stat_point(bid, pick_st, 1)
+                        if not ok_st_a:
                             break
+
+                # SSOT Teil I Abs. 7 & Teil II Abs. 3: Aktive Skills von 0 -> 20 (M1) nach Klassen-Build priorisieren,
+                # danach ehrlich mit gedroppten Fertigkeitsbüchern (M1->G1), Seelensteinen (G1->P10) & Legendärem Seelenstein (L1) meistern!
+                cdef_bot = CHARACTER_CLASSES.get(bot.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
+                evo_sk_order = (bot.get("evolutionV3") or {}).get("activeRotationOrder") or [s["id"] for s in cdef_bot.get("skills", [])]
+                c_sk_map = {s["id"]: s for s in cdef_bot.get("skills", [])}
+                prio_sk_ids = [sid for sid in evo_sk_order if sid in c_sk_map] + [s["id"] for s in cdef_bot.get("skills", []) if s["id"] not in evo_sk_order]
+
+                while int(bot.get("skill_points", 0)) > 0:
+                    upgraded_any_sk = False
+                    # Erst alle Basis-Skills auf Stufe 1 freischalten, danach Haupt-Skill gezielt auf 20 (M1) ziehen!
+                    unlocked_target = next(
+                        (sid for sid in prio_sk_ids if not c_sk_map[sid].get("special") and int((bot.get("skills") or {}).get(sid, 0)) == 0),
+                        None,
+                    )
+                    target_sk_id = unlocked_target or next(
+                        (
+                            sid for sid in prio_sk_ids
+                            if (not c_sk_map[sid].get("special") or sid in (bot.get("skills") or {}))
+                            and int((bot.get("skills") or {}).get(sid, 0)) < 20
+                        ),
+                        None,
+                    )
+                    if not target_sk_id:
+                        break
+                    ok_sk_u, _ = self.upgrade_skill_point(bid, target_sk_id, is_passive=False)
+                    if not ok_sk_u:
+                        break
+                    upgraded_any_sk = True
+                    if not upgraded_any_sk:
+                        break
+
                 for inv_fb in list(bot.get("inventory") or []):
                     if not isinstance(inv_fb, dict) or inv_fb.get("reservedShopId") or inv_fb.get("reserved_shop_id"):
                         continue
@@ -5966,41 +6200,34 @@ class WorldAuthority:
                             self.read_passive_skill_book(bid, ps_target)
                             bot = self.players.get(bid) or bot
                             break
-                    elif tid_fb in ("book_skill", "chest_skill_books") and inv_fb.get("uid"):
+                    elif tid_fb.startswith("fb_") and tid_fb in ACTIVE_SKILL_BOOK_IDS:
+                        act_sk = tid_fb[3:]
+                        cur_sk_lv = int((bot.get("skills") or {}).get(act_sk, 0))
+                        if act_sk in c_sk_map and 20 <= cur_sk_lv < 30:
+                            self.read_skill_book(bid, act_sk)
+                            bot = self.players.get(bid) or bot
+                            break
+                    elif tid_fb == "mat_soul_stone":
+                        g_sk = next((sid for sid in prio_sk_ids if 30 <= int((bot.get("skills") or {}).get(sid, 0)) < 49), None)
+                        if g_sk:
+                            self.read_skill_book(bid, g_sk)
+                            bot = self.players.get(bid) or bot
+                            break
+                    elif tid_fb == "mat_legendary_soul_stone":
+                        p10_sk = next((sid for sid in prio_sk_ids if int((bot.get("skills") or {}).get(sid, 0)) == 49), None)
+                        if p10_sk:
+                            self.read_skill_book(bid, p10_sk)
+                            bot = self.players.get(bid) or bot
+                            break
+                    elif tid_fb in ("book_skill", "chest_skill_books", "item_skill_unlock_scroll") and inv_fb.get("uid"):
                         self.use_or_open_inventory_item(bid, inv_fb["uid"])
                         bot = self.players.get(bid) or bot
                         break
             if now - float(bot.get("_lastRuneweaverEvoCheckAt", 0.0) or 0.0) >= 9.0:
                 bot["_lastRuneweaverEvoCheckAt"] = now
                 self._optimize_bot_runeweaver_bonuses_v3(bot, now=now)
-            # Stelle sicher, dass Bots Erweckungs-Items ('mat_monolith_shard' & 'mat_awakened_rift_core') im Inventar führen
-            if not bot.get("_monolithItemsSeededAt") or (now - float(bot.get("_monolithItemsSeededAt", 0.0) or 0.0) >= 95.0):
-                is_first_seed = not bool(bot.get("_monolithItemsSeededAt"))
-                bot["_monolithItemsSeededAt"] = now
-                inv_b = bot.get("inventory") or []
-                cnt_shard = sum(
-                    int(it.get("quantity", 1) or 1)
-                    for it in inv_b
-                    if isinstance(it, dict) and it.get("templateId") == "mat_monolith_shard" and not it.get("reservedShopId") and not it.get("reserved_shop_id")
-                )
-                cnt_core = sum(
-                    int(it.get("quantity", 1) or 1)
-                    for it in inv_b
-                    if isinstance(it, dict) and it.get("templateId") == "mat_awakened_rift_core" and not it.get("reservedShopId") and not it.get("reserved_shop_id")
-                )
-                added_awk = False
-                target_shards = 3 if is_first_seed else 1
-                target_cores = 2 if is_first_seed else (1 if bot_lvl >= 10 else 0)
-                if cnt_shard < target_shards:
-                    self.db.add_item_to_inventory(bid, "mat_monolith_shard", (3 if is_first_seed else 2) - cnt_shard)
-                    added_awk = True
-                if cnt_core < target_cores:
-                    self.db.add_item_to_inventory(bid, "mat_awakened_rift_core", (2 if is_first_seed else 1) - cnt_core)
-                    added_awk = True
-                if added_awk:
-                    self.refresh_player_from_db(bid)
-                    bot = self.players.get(bid) or bot
-                    bot["_monolithItemsSeededAt"] = now
+            # SSOT Teil I Abs. 4: KEIN Gratis-Spawnen von Erweckungssteinen ('mat_monolith_shard' / 'mat_awakened_rift_core')!
+            # Bots erfarmen Erweckungssteine zu 100% fair wie normale Spieler.
             if bot.get("pendingPartyInvite"):
                 self.handle_party_action(bid, "accept", {})
             if bot.get("pendingTradeRequest"):
@@ -6152,8 +6379,8 @@ class WorldAuthority:
                     min_x_c = -1120.0 if bm_emp == "kaeryu" else -160.0
                     max_x_c = 160.0 if bm_emp == "kaeryu" else 1120.0
                     af_bm["anchorX"] = max(min_x_c, min(max_x_c, bm["pos_x"] + math.cos(ang_sep) * 74.0))
-                    min_north_z = 140.0 if int(bm.get("level", 1)) >= 18 else -1180.0
-                    max_south_z = 720.0 if int(bm.get("level", 1)) >= 14 else -80.0
+                    min_north_z = 140.0 if int(bm.get("level", 1)) >= 23 else -1180.0
+                    max_south_z = 720.0 if int(bm.get("level", 1)) >= 23 else -80.0
                     af_bm["anchorZ"] = max(min_north_z, min(max_south_z, bm["pos_z"] + math.sin(ang_sep) * 56.0))
                     bm["autoFarmStatus"] = f"🚶 {slain_together} Monster gemeinsam erlegt – gehe wieder eigene Route!"
                     bm["_botTradeStatusUntil"] = now + 4.5
@@ -6394,22 +6621,24 @@ class WorldAuthority:
                         angle_off = idx_m * 1.2566
                         form_x = leader_p["pos_x"] + math.cos(angle_off) * 8.5
                         form_z = leader_p["pos_z"] + math.sin(angle_off) * 8.5
-                        if not human_member and int(helper.get("level", 1)) < 13 and form_z > -40.0:
+                        if not human_member and int(helper.get("level", 1)) < 23 and form_z > -40.0:
                             form_z = -380.0
                         af_h = helper.get("autofarm")
                         if isinstance(af_h, dict):
                             af_h["anchorX"] = form_x
                             af_h["anchorZ"] = form_z
 
-                # Gemeinsames Fokusfeuer auf Rissmonolithen, Bosse, Eliten oder das Ziel des Gruppenanführers
+                # Gemeinsames Fokusfeuer auf Rissmonolithen & Bosse (SSOT Strikter Ziel-Fokus: lebendes eigenes Ziel nicht bei normalen Mobs überschreiben!)
                 if leader_mob and leader_mob.get("state") != "dead" and leader_mob.get("mapId") == helper["map_id"]:
                     d_to_mob = dist2d(helper["pos_x"], helper["pos_z"], leader_mob["x"], leader_mob["z"])
+                    cur_h_tid = helper.get("autoFarmTargetId") or helper.get("targetId")
+                    cur_h_mob = self.monsters.get(cur_h_tid) if cur_h_tid else None
+                    cur_h_alive = bool(cur_h_mob and cur_h_mob.get("state") != "dead" and int(cur_h_mob.get("hp", 0)) > 0)
                     if d_to_mob <= 95.0 and (
                         active_tactic == "focus"
                         or leader_mob.get("kind") == "metin"
                         or leader_mob.get("isBoss")
-                        or leader_mob.get("isElite")
-                        or not helper.get("autoFarmTargetId")
+                        or not cur_h_alive
                     ):
                         helper["targetId"] = leader_mob["id"]
                         helper["autoFarmTargetId"] = leader_mob["id"]
@@ -7476,6 +7705,13 @@ class WorldAuthority:
                 "ok": False,
                 "reason": f"🐎 '{skill['name']}' ist nur zu Fuß nutzbar! Nutze vom Sattel aus deine Militärpferd-Fertigkeiten [F1 / F2 / F4]!",
             }
+        skill_lvl = int(p.get("skills", {}).get(skill["id"], 0))
+        if skill_lvl <= 0:
+            return {
+                "ok": False,
+                "error": f"⚠️ '{skill['name']}' ist noch auf Stufe 0 – vergib zuerst mindestens 1 Fertigkeitspunkt!",
+            }
+
         # Globaler Skill-Cooldown (1.45s), damit Fertigkeiten nicht gleichzeitig gespammt werden
         if now - p.get("lastSkillCastTime", 0.0) < 1.45:
             return {"ok": False, "error": "Fertigkeits-Rhythmus aktiv (kurz warten)."}
@@ -7494,14 +7730,19 @@ class WorldAuthority:
         eff_cd = float(skill["cooldown"]) * max(0.55, 1.0 - (cast_spd * 0.65) / 100.0)
         p["skillCooldowns"][skill["id"]] = now + eff_cd
 
-        skill_lvl = int(p.get("skills", {}).get(skill["id"], 1))
+        skill_tier = 5 if skill_lvl >= 50 else (4 if skill_lvl >= 40 else (3 if skill_lvl >= 30 else (2 if skill_lvl >= 20 else 1)))
         lvl_mult = 1.0 + (skill_lvl - 1) * 0.045
         int_scale = 1.0 + max(0, int(p.get("int_stat", 10)) - 10) * 0.008 if p.get("class_id") in ("shaman", "sura") else 1.0
+        p_cls = p.get("class_id", "warrior")
+        p_gender = p.get("gender", "m")
+        p_doctrine = p.get("doctrine", "")
 
         # 1. Selbst-Buff (z. B. Aura des Schwerts, Federschreiten, Verzauberte Klinge, Hilfe des Drachen)
         if skill["type"] == "buff":
             p["activeBuffs"][skill["id"]] = {
                 "name": skill["name"],
+                "skillLevel": skill_lvl,
+                "skillTier": skill_tier,
                 "atkPct": int(skill.get("buffAtkPct", 30) * lvl_mult * int_scale),
                 "magicAtkPct": int(skill.get("buffMagicAtkPct", skill.get("buffAtkPct", 30)) * lvl_mult * int_scale),
                 "hpAbsorbPct": round(float(skill.get("buffHpAbsorbPct", 0.0)) * lvl_mult, 1),
@@ -7516,9 +7757,19 @@ class WorldAuthority:
                 "skill_buff",
                 p["pos_x"],
                 p["pos_z"],
-                {"playerId": player_id, "skillId": skill["id"], "skillName": skill["name"], "color": skill["color"]},
+                {
+                    "playerId": player_id,
+                    "skillId": skill["id"],
+                    "skillName": skill["name"],
+                    "skillLevel": skill_lvl,
+                    "skillTier": skill_tier,
+                    "classId": p_cls,
+                    "gender": p_gender,
+                    "doctrine": p_doctrine,
+                    "color": skill["color"],
+                },
             )
-            return {"ok": True, "skill": skill["name"], "type": "buff"}
+            return {"ok": True, "skill": skill["name"], "type": "buff", "skillLevel": skill_lvl, "skillTier": skill_tier}
 
         # 2. Heilzauber (Seelenweber: Kurieren)
         if skill["type"] == "heal":
@@ -7529,9 +7780,20 @@ class WorldAuthority:
                 "heal",
                 p["pos_x"],
                 p["pos_z"],
-                {"playerId": player_id, "amount": heal_amount, "skillName": skill["name"], "color": "#22c55e"},
+                {
+                    "playerId": player_id,
+                    "skillId": skill["id"],
+                    "amount": heal_amount,
+                    "skillName": skill["name"],
+                    "skillLevel": skill_lvl,
+                    "skillTier": skill_tier,
+                    "classId": p_cls,
+                    "gender": p_gender,
+                    "doctrine": p_doctrine,
+                    "color": "#22c55e",
+                },
             )
-            return {"ok": True, "skill": skill["name"], "healed": heal_amount}
+            return {"ok": True, "skill": skill["name"], "healed": heal_amount, "skillLevel": skill_lvl, "skillTier": skill_tier}
 
         # 3. Dash-Angriff (z. B. Sausen)
         primary = self._find_valid_target(p, target_id, max_range=skill.get("dashRange", 7.5))
@@ -7601,13 +7863,18 @@ class WorldAuthority:
                 "playerId": player_id,
                 "skillId": skill["id"],
                 "skillName": skill["name"],
+                "skillLevel": skill_lvl,
+                "skillTier": skill_tier,
+                "classId": p_cls,
+                "gender": p_gender,
+                "doctrine": p_doctrine,
                 "color": skill["color"],
                 "radius": radius,
                 "crit": any_crit,
                 "pierce": any_pierce,
             },
         )
-        return {"ok": True, "skill": skill["name"], "hits": hit_count, "crit": any_crit, "pierce": any_pierce}
+        return {"ok": True, "skill": skill["name"], "hits": hit_count, "crit": any_crit, "pierce": any_pierce, "skillLevel": skill_lvl, "skillTier": skill_tier}
 
     def _find_valid_target(self, p: dict, preferred_id: Optional[str], max_range: float) -> Optional[dict]:
         tid = preferred_id or p.get("targetId")
@@ -7643,13 +7910,13 @@ class WorldAuthority:
 
         raw = base_offense * power_mult * random.uniform(0.93, 1.07)
 
-        # Stark gegen Monster / Metinsteine / Bosse (gedämpfte Multiplikatoren)
+        # SSOT Teil II Abs. 1: "Stark gegen Monster" erhöht Schaden AUSSCHLIESSLICH an normalen Monstern (NIEMALS an Bossen oder Monolithen!)
         if mob["kind"] == "metin":
             raw *= 1.0 + (comp["vsMetinPct"] * 0.65) / 100.0
+        elif mob.get("isBoss") or mob.get("isRiftWorldBoss") or mob.get("isMonolithEliteBoss") or mob.get("kind") == "boss":
+            raw *= 1.0 + (comp["vsBossPct"] * 0.65) / 100.0
         else:
             raw *= 1.0 + (comp["vsMonsterPct"] * 0.65) / 100.0
-        if mob["isBoss"]:
-            raw *= 1.0 + (comp["vsBossPct"] * 0.65) / 100.0
 
         is_crit = random.uniform(0, 100) <= comp.get("critChance", 10.0)
         is_pierce = random.uniform(0, 100) <= comp.get("pierceChance", 8.0)
@@ -8049,13 +8316,21 @@ class WorldAuthority:
         # Kombinierte Levelbereichs-Skalierung (Charakter-Level vs. Map-Levelbereich & Monster-Level):
         # Nur im passenden Levelbereich von Charakter, Karte und Monster gibt es volle EXP & Drops.
         # Je höher man kommt und sich vom Map-/Monster-Level entfernt, desto weniger bekommt man (bis auf 0%).
+        mob_map_id = mob.get("mapId", killer.get("map_id", "morgenwacht"))
         lvl_penalty = self.compute_level_reward_penalty(
             int(killer.get("level", 1)),
             int(mob.get("level", 1)),
-            mob.get("mapId", killer.get("map_id", "morgenwacht")),
+            mob_map_id,
+            for_exp=False,
+        )
+        exp_lvl_penalty = self.compute_level_reward_penalty(
+            int(killer.get("level", 1)),
+            int(mob.get("level", 1)),
+            mob_map_id,
+            for_exp=True,
         )
 
-        # 1. Erfahrungspunkte (nur solange im gültigen Levelbereich: lvl_penalty > 0)
+        # 1. Erfahrungspunkte (nur solange im gültigen Levelbereich; ab Lv. 38 in Map 1/2 stark gedämpft)
         party_id = killer.get("partyId")
         party = self.parties.get(party_id) if party_id else None
         nearby_party_members = []
@@ -8081,7 +8356,7 @@ class WorldAuthority:
         active_evt_id = str((getattr(self, "world_event", None) or {}).get("id", ""))
         evt_exp_mult = 1.30 if active_evt_id == "imperial_blessing" else 1.0
         evt_yang_mult = 1.25 if active_evt_id == "imperial_blessing" else 1.0
-        if lvl_penalty <= 0.0 and party_count <= 1:
+        if lvl_penalty <= 0.0 and exp_lvl_penalty <= 0.0 and party_count <= 1:
             exp_gain = 0
             yang_gain = 0
             rep_gain = 0
@@ -8093,9 +8368,9 @@ class WorldAuthority:
             base_exp_pool = tpl["exp"] * 0.26 * loot_mult * summon_exp_mult * party_bonus_mult * evt_exp_mult
             per_member_exp_share = base_exp_pool / max(1, party_count)
 
-            raw_killer_exp = per_member_exp_share * lvl_penalty * (1.0 + comp["expBonusPct"] / 100.0)
-            exp_gain = int(round(raw_killer_exp)) if lvl_penalty > 0.0 else 0
-            if exp_gain == 0 and lvl_penalty >= 0.25:
+            raw_killer_exp = per_member_exp_share * exp_lvl_penalty * (1.0 + comp["expBonusPct"] / 100.0)
+            exp_gain = int(round(raw_killer_exp)) if exp_lvl_penalty > 0.0 else 0
+            if exp_gain == 0 and exp_lvl_penalty >= 0.25:
                 exp_gain = 1
             if killer["level"] < MAX_PLAYER_LEVEL and exp_gain > 0:
                 killer["exp"] += exp_gain
@@ -8109,6 +8384,7 @@ class WorldAuthority:
                         int(mp.get("level", 1)),
                         int(mob.get("level", 1)),
                         mob.get("mapId", mp.get("map_id", "morgenwacht")),
+                        for_exp=True,
                     )
                     if mp_pen > 0.0 and mp["level"] < MAX_PLAYER_LEVEL:
                         mp_comp = mp.get("computed") or {}
@@ -8147,8 +8423,8 @@ class WorldAuthority:
             # Begleiter (Starter-Pet) erhält ebenfalls Pet-EXP im Kampf (inkl. Erfahrungsrausch-Bonus)
             self._award_pet_exp(killer, max(8, int(round(tpl["exp"] * 0.45 * loot_mult * evt_exp_mult))))
 
-            # 2. Direktes Yang + Rangpunkte — skaliert ebenfalls mit dem Map-/Monster-Levelabstand & aktivem Event
-            raw_yang = random.randint(tpl["yangMin"], tpl["yangMax"]) * 0.55 * loot_mult * lvl_penalty * evt_yang_mult * (1.0 + comp["yangBonusPct"] / 100.0)
+            # 2. Direktes Gold + Rangpunkte — SSOT Teil I Abs. 3: Ausgewogen für Tränke & Schmied-Upgrades ohne Gold-Inflation
+            raw_yang = random.randint(tpl["yangMin"], tpl["yangMax"]) * 0.38 * loot_mult * lvl_penalty * evt_yang_mult * (1.0 + comp["yangBonusPct"] / 100.0)
             yang_gain = int(round(raw_yang))
             killer["yang"] += yang_gain
             base_rep = 25 if mob["isBoss"] else (int(round(10 * loot_mult)) if mob["kind"] == "metin" else (5 if mob["isElite"] else 2))
@@ -8160,7 +8436,7 @@ class WorldAuthority:
         stats = self.ensure_autofarm_stats(af)
         stats["yangEarned"] = int(stats.get("yangEarned", 0)) + yang_gain
         stats["expEarned"] = int(stats.get("expEarned", 0)) + exp_gain
-        if exp_gain <= 0 or lvl_penalty <= 0.15:
+        if exp_gain <= 0 or exp_lvl_penalty <= 0.15:
             stats["zeroExpStreak"] = int(stats.get("zeroExpStreak", 0)) + 1
         else:
             stats["zeroExpStreak"] = 0
@@ -8312,330 +8588,236 @@ class WorldAuthority:
                         else:
                             self._complete_and_reward_quest(killer, qtpl, qstate)
 
-        # 4. Gegenstands-Drops (im passenden Levelbereich von Charakter & Map!)
-        # Beschworene Rissmonolith-/Boss-Wellenwächter sowie Ziele außerhalb des Levelbereichs (lvl_penalty <= 0) droppen nichts.
+        # 4. Gegenstands-Drops strikt nach SSOT-Master-Handbuch (Teil I Abs. 3 & Teil II Abs. 1–5)
         spawned_drop_names: List[str] = []
         if not is_summoned_guard and lvl_penalty > 0.0:
             mob_lvl = int(mob.get("level", 1))
             drop_bonus_mult = 1.0 + max(0.0, float(killer.get("dropBonusPct", 0.0))) / 100.0
-            if getattr(self, "world_event", {}).get("id") == "monolith_eruption" and mob["kind"] == "metin":
+            active_evt = str((getattr(self, "world_event", None) or {}).get("id", ""))
+            if active_evt == "monolith_eruption" and mob["kind"] == "metin":
                 drop_bonus_mult *= 1.25
-            elif getattr(self, "world_event", {}).get("id") == "boss_hunt_frenzy" and (mob["isBoss"] or mob.get("isElite", False)):
+            elif active_evt == "boss_hunt_frenzy" and (mob["isBoss"] or mob.get("isElite", False)):
                 drop_bonus_mult *= 1.25
 
-            # Level-passende Ausrüstungs- & Upp-Item-Pools (inkl. 10-Stufen-Ausrüstung Lv. 1 Holz bis Lv. 90 Ätherium)
-            if mob_lvl <= 8:
-                tier_keys = ["holz"]
-                equip_pool = [
-                    "sword_broadsword", "glaive_iron", "bell_amber", "armor_leather",
-                    "helm_iron", "shield_battle", "shoes_leather", "gloves_leather",
-                    "sword_silver", "bow_horn", "armor_tiger", "gloves_iron", "bracelet_silver",
-                ]
-                upp_pool = [
-                    "mat_wolf_claw", "mat_wolf_claw", "mat_cursed_iron", "ore_ebony",
-                    "scroll_blessing", "item_bonus_adder", "item_bonus_changer",
-                    "cape_bravery", "potion_hp_small", "potion_hp_medium",
-                ]
-            elif mob_lvl <= 22:
-                tier_keys = ["kupfer", "eisen"]
-                equip_pool = [
-                    "sword_silver", "bow_horn", "armor_tiger", "helm_iron", "shield_battle",
-                    "gloves_iron", "bracelet_silver", "necklace_ebony", "earrings_ebony",
-                    "sword_msk", "bow_crow", "armor_blacksteel", "sword_rsb",
-                ]
-                upp_pool = [
-                    "mat_wolf_claw", "mat_cursed_iron", "mat_cursed_iron", "mat_bloodleaf_resin",
-                    "ore_ebony", "ore_heaven_tear", "scroll_blessing", "item_bonus_adder",
-                    "item_bonus_changer", "cape_bravery", "potion_hp_medium", "potion_speed", "potion_atk_speed",
-                ]
-            else:
-                if mob_lvl >= 85:
-                    tier_keys = ["blaustahl", "aetherium"]
-                elif mob_lvl >= 70:
-                    tier_keys = ["donnerstahl", "blaustahl"]
-                elif mob_lvl >= 55:
-                    tier_keys = ["gold", "drachengold"]
-                elif mob_lvl >= 40:
-                    tier_keys = ["ebenholz", "silber", "gold"]
-                else:
-                    tier_keys = ["eisen", "ebenholz", "silber"]
-                equip_pool = [
-                    "sword_msk", "bow_crow", "armor_blacksteel", "sword_rsb", "armor_dragonscale",
-                    "necklace_ebony", "earrings_ebony", "bracelet_silver", "gloves_iron",
-                    "sword_grudge", "sword_sternenreisser",
-                ]
-                upp_pool = [
-                    "mat_cursed_iron", "mat_bloodleaf_resin", "mat_soul_stone", "mat_white_pearl",
-                    "ore_heaven_tear", "ore_aether_crystal", "scroll_blessing", "item_bonus_adder",
-                    "item_bonus_changer", "cape_bravery", "potion_speed", "potion_atk_speed",
-                ]
-            for tk in tier_keys:
-                for suffix in (
-                    f"wpn_{tk}_sword", f"wpn_{tk}_greatsword", f"wpn_{tk}_daggers", f"wpn_{tk}_bow", f"wpn_{tk}_staff",
-                    f"arm_{tk}_armor", f"eq_{tk}_shield", f"eq_{tk}_helmet", f"eq_{tk}_gloves",
-                    f"eq_{tk}_shoes", f"eq_{tk}_necklace", f"eq_{tk}_bracelet", f"eq_{tk}_earrings",
-                ):
-                    if suffix in ITEM_TEMPLATES:
-                        equip_pool.append(suffix)
+            # Niemals craftOnly-Equipment (Lv. 80 Blaustahl / Lv. 90 Ätherium) droppen lassen!
+            mob_tier_key = equip_tier_for_drop_level(mob_lvl)
+            equip_pool = [iid for iid in equip_tier_item_ids(mob_tier_key) if not ITEM_TEMPLATES.get(iid, {}).get("craftOnly")]
+            if not equip_pool:
+                equip_pool = equip_tier_item_ids("holz")
 
-            # Äthersiegel darf NIEMALS über allgemeine Template-Drops oder Monster/Bosse droppen (exklusiv Instabile/Erweckte Metins!)
-            tpl_drops = [d["itemId"] for d in tpl.get("drops", []) if d.get("itemId") in ITEM_TEMPLATES and d.get("itemId") != "item_aether_seal"]
-            tpl_equip = [iid for iid in tpl_drops if ITEM_TEMPLATES[iid].get("type") == "equipment"]
-            tpl_non_equip = [iid for iid in tpl_drops if ITEM_TEMPLATES[iid].get("type") != "equipment"]
+            tpl_entries = []
+            for d_entry in tpl.get("drops", []):
+                rid = resolve_item_template_id(d_entry.get("itemId", ""))
+                if rid in ITEM_TEMPLATES and rid not in ("item_aether_seal", "pferdemedaille") and not ITEM_TEMPLATES[rid].get("craftOnly"):
+                    tpl_entries.append((rid, float(d_entry.get("chance", 0.12))))
+            tpl_equip = [rid for rid, _ in tpl_entries if ITEM_TEMPLATES[rid].get("type") == "equipment"]
+            tpl_mats = [(rid, ch) for rid, ch in tpl_entries if ITEM_TEMPLATES[rid].get("type") != "equipment"]
+
+            def _pick_equip(cands: List[str]) -> str:
+                if not cands:
+                    return random.choice(equip_pool)
+                # SSOT: Lv. 30+ Waffen mit DSS & FKS droppen seltener als Rüstung/Schmuck
+                weights = [0.38 if ITEM_TEMPLATES.get(cid, {}).get("hasDssFks") else 1.0 for cid in cands]
+                return random.choices(cands, weights=weights, k=1)[0]
+
+            killer_cls = str(killer.get("class_id", "warrior"))
+            cls_skill_ids = [s["id"] for s in CHARACTER_CLASSES.get(killer_cls, {}).get("skills", [])]
+            cls_fb_pool = [f"fb_{sid}" for sid in cls_skill_ids if f"fb_{sid}" in ITEM_TEMPLATES]
+            all_active_fbs = list(ACTIVE_SKILL_BOOK_IDS) or cls_fb_pool
+            all_passive_fbs = list(PASSIVE_SKILL_BOOK_IDS)
+
+            def _pick_active_fb() -> str:
+                if cls_fb_pool and random.random() < 0.55:
+                    return random.choice(cls_fb_pool)
+                return random.choice(all_active_fbs) if all_active_fbs else "book_skill"
+
+            def _pick_spirit_stone(high_tier: bool = False) -> str:
+                g_weights = [15, 25, 30, 20, 10] if high_tier else [34, 30, 21, 11, 4]
+                grade = random.choices([0, 1, 2, 3, 4], weights=g_weights, k=1)[0]
+                g_pool = SPIRIT_STONE_IDS_BY_GRADE.get(grade) or ALL_SPIRIT_STONE_IDS
+                return random.choice(g_pool)
 
             selected_item_ids: List[str] = []
-            monolith_rarity = mob.get("monolithRarity", "normal")
-            is_rare_metin = mob["kind"] == "metin" and mob.get("monolithState") in ("instabil", "erwacht")
+            m_state = mob.get("monolithState", "schlafend")
+            is_rare_metin = mob["kind"] == "metin" and m_state in ("instabil", "erwacht")
+            is_high_lvl = mob_lvl >= 60
 
             if mob["kind"] == "metin":
-                m_state = mob.get("monolithState", "schlafend")
-                if m_state == "erwacht":
-                    target_count = 7
-                elif m_state == "instabil":
-                    target_count = 5
-                else:
-                    target_count = 3
+                # 1. GARANTIERT 1x aktives Fertigkeitsbuch (M1–G1) + 1x Geiststein (+0 bis +4)
+                selected_item_ids.append(_pick_active_fb())
+                selected_item_ids.append(_pick_spirit_stone(high_tier=(is_rare_metin or mob_lvl >= 35)))
 
-                # 0. Garantierte Erweckungs-Items je nach Monolith-Stufe:
-                # - Stufe 1 (schlafend) dropt Monolithensplitter (Item 1 für Stufe 2)
-                # - Stufe 2 (instabil) dropt Erwachter Risskern (Item 2 für Stufe 3) + Monolithensplitter
-                # - Stufe 3 (erwacht) dropt reichlich Schätze, Seelensteine, Mondlichttruhen & Risskerne!
-                shard_ground_qty = 3 if m_state == "erwacht" else (2 if m_state == "instabil" else 1)
-                for _ in range(shard_ground_qty):
+                # 2. Ausrüstung (+0..+4 schlafend, +0..+6 instabil/erwacht)
+                metin_eq_cands = list(tpl_equip) * 2 + list(equip_pool)
+                if metin_eq_cands and (is_rare_metin or random.random() < (0.78 if mob_lvl <= 20 else 0.62)):
+                    selected_item_ids.append(_pick_equip(metin_eq_cands))
+                if m_state == "erwacht" and metin_eq_cands:
+                    selected_item_ids.append(_pick_equip(metin_eq_cands))
+
+                # 3. Erweckungssteine: Instabil ab und zu, Erweckt sehr selten! (KEINE Gratis-Inventar-Duplikate mehr!)
+                shard_ch = 0.85 if m_state == "erwacht" else (0.38 if m_state == "instabil" else 0.16)
+                if random.random() < shard_ch * min(1.35, drop_bonus_mult):
                     selected_item_ids.append("mat_monolith_shard")
-                if m_state == "instabil":
+                core_ch = 0.14 if m_state == "erwacht" else (0.045 if m_state == "instabil" else 0.0)
+                if core_ch > 0.0 and random.random() < core_ch * min(1.35, drop_bonus_mult):
                     selected_item_ids.append("mat_awakened_rift_core")
-                elif m_state == "erwacht":
-                    selected_item_ids.extend(["mat_awakened_rift_core", "mat_soul_stone", "chest_moonlight"])
 
-                # Exklusiver, seltener Äthersiegel-Drop NUR bei Instabilen (4,5%) und Erweckten (9%) Rissmonolithen!
-                # Schlafende Rissmonolithen (Stufe 1) droppen NIEMALS Äthersiegel!
-                if m_state == "erwacht" and random.random() < 0.09:
+                # 4. Passive Skill-Bücher & Äthersiegel NUR ab Instabilen / Erweckten Monolithen
+                if is_rare_metin and all_passive_fbs and random.random() < (0.52 if m_state == "erwacht" else 0.26):
+                    selected_item_ids.append(random.choice(all_passive_fbs))
+                if m_state == "erwacht" and random.random() < 0.08:
                     selected_item_ids.append("item_aether_seal")
-                elif m_state == "instabil" and random.random() < 0.045:
+                elif m_state == "instabil" and random.random() < 0.035:
                     selected_item_ids.append("item_aether_seal")
 
-                # Gemeinsame Event-Belohnung für alle teilnehmenden Spieler
+                # 5. Seltene Items (Segi, Switcher, Hinzufügen, Seelenstein): NIEMALS von Monolithen unter Level 60!
+                if is_high_lvl:
+                    st_mult = 1.65 if m_state == "erwacht" else (1.25 if m_state == "instabil" else 0.85)
+                    if random.random() < 0.22 * st_mult:
+                        selected_item_ids.append("scroll_blessing")
+                    if random.random() < 0.18 * st_mult:
+                        selected_item_ids.append("mat_soul_stone")
+                    if random.random() < 0.16 * st_mult:
+                        selected_item_ids.append(random.choice(["item_bonus_adder", "item_bonus_changer"]))
+
+                if active_evt == "moonlight_chests" and random.random() < (0.45 if is_rare_metin else 0.22):
+                    selected_item_ids.append("chest_moonlight")
+
                 participants = set(mob.get("participants") or [])
                 participants.add(killer["player_id"])
-                shard_bonus_qty = 3 if m_state == "erwacht" else (2 if m_state == "instabil" else 1)
                 for part_id in participants:
                     part_p = self.players.get(part_id)
-                    if part_p and part_p.get("online") and part_p.get("map_id") == mob["mapId"]:
-                        # Gemäß Bot-Balancing bal_prop_03: Stufe-1-Monolith gibt 50% Chance auf Bonus-Teilnehmer-Splitter (Stufe 2/3 immer 100%)
-                        if m_state != "schlafend" or random.random() < 0.50:
-                            self.db.add_item_to_inventory(part_id, "mat_monolith_shard", shard_bonus_qty)
-                        if m_state in ("instabil", "erwacht"):
-                            self.db.add_item_to_inventory(part_id, "mat_awakened_rift_core", 1)
-                        self.refresh_player_from_db(part_id)
-                        part_p = self.players.get(part_id)
-                        if part_p and mob.get("realmConflictActive"):
-                            part_p["reputation"] = int(part_p.get("reputation", 0)) + 85
+                    if part_p and part_p.get("online") and part_p.get("map_id") == mob["mapId"] and mob.get("realmConflictActive"):
+                        part_p["reputation"] = int(part_p.get("reputation", 0)) + 85
 
-                # 1. Garantierter Haupt-Drop (Fertigkeitsbuch, Segi, Verzaubern/Verstärken, Seelenstein) - OHNE Äthersiegel im Standardpool!
-                core_metin_pool = ["book_skill", "book_skill", "scroll_blessing", "item_bonus_changer", "item_bonus_adder"]
-                if mob_lvl >= 15 or m_state != "schlafend":
-                    core_metin_pool.append("mat_soul_stone")
-                selected_item_ids.append(random.choice(core_metin_pool))
-
-                # 2. Garantierter Upp-Item / Verbrauchs-Drop
-                metin_upp_pool = list(upp_pool) + tpl_non_equip + ["mat_wolf_claw", "mat_cursed_iron", "mat_bloodleaf_resin", "cape_bravery"]
-                selected_item_ids.append(random.choice(metin_upp_pool))
-
-                # 3. Garantierte oder sehr häufige Ausrüstung + Bonus-Beute für restliche Drops
-                metin_equip_pool = list(equip_pool) + tpl_equip * 2
-                if target_count >= 3 and metin_equip_pool:
-                    selected_item_ids.append(random.choice(metin_equip_pool))
-
-                extra_pool = core_metin_pool + metin_upp_pool + metin_equip_pool
-                if getattr(self, "world_event", {}).get("id") == "moonlight_chests" or is_rare_metin:
-                    extra_pool.extend(["chest_moonlight", "chest_moonlight"])
-                while len(selected_item_ids) < target_count:
-                    selected_item_ids.append(random.choice(extra_pool))
-
-            elif mob.get("isRiftWorldBoss"):
-                # RISS-WELTBOSS: Dropt zusätzlich zum Rissmonolithen SEHR VIEL hochwertigen Loot (8–10 Items)!
-                target_count = random.choice([8, 9, 10])
-                selected_item_ids.extend([
-                    "chest_monolith_legend",
-                    "chest_moonlight",
-                    "mat_soul_stone",
-                    "mat_awakened_rift_core",
-                    "mat_monolith_shard",
-                    "scroll_blessing",
-                    "item_bonus_changer",
-                    "item_bonus_adder",
-                ])
-                wb_equip_pool = list(equip_pool) + tpl_equip * 2
-                for _ in range(2):
-                    if wb_equip_pool:
-                        selected_item_ids.append(random.choice(wb_equip_pool))
-                wb_extra_pool = [
-                    "item_blessing_orb", "book_skill", "mat_white_pearl", "chest_moonlight"
-                ] + wb_equip_pool
-                while len(selected_item_ids) < target_count:
-                    selected_item_ids.append(random.choice(wb_extra_pool))
-
-                # Entferne Referenz am zugehörigen Rissmonolithen, damit dessen Riss-Bollwerk erlischt
-                mono_id = mob.get("monolithBossOf")
-                if mono_id and mono_id in self.monsters:
-                    self.monsters[mono_id]["activeWorldBossId"] = None
-                self._emit_combat_event(
-                    mob["mapId"],
-                    "world_boss_defeated",
-                    mob["x"],
-                    mob["z"],
-                    {"bossId": mob["id"], "bossName": mob["name"], "killerName": killer["name"], "monolithId": mono_id},
-                )
-
-            elif mob["isBoss"]:
-                # Gebiets-Bosse droppen IMMER 3 bis 4 wertvolle Schätze (Truhe, Ausrüstung, Upp-Items & Rollen)
-                target_count = random.choice([3, 4])
-                boss_core = ["chest_monolith_legend", "chest_moonlight", "mat_soul_stone", "scroll_blessing"]
-                selected_item_ids.append(random.choice(boss_core))
-                boss_equip = list(equip_pool) + tpl_equip * 2
-                if boss_equip:
-                    selected_item_ids.append(random.choice(boss_equip))
-                boss_extra = boss_core + list(upp_pool) + tpl_drops + ["book_skill", "item_bonus_changer", "item_bonus_adder", "mat_white_pearl"]
-                while len(selected_item_ids) < target_count:
-                    selected_item_ids.append(random.choice(boss_extra))
-
-            elif mob.get("isMonolithEliteBoss"):
-                # Elite-Bosse aus Instabilen Rissmonolithen: Gut balancierter Loot (2–3 hochwertige Drops)!
-                target_count = 2 if mob_lvl <= 8 else random.choice([2, 3])
-                selected_item_ids.append("mat_monolith_shard")
-                if random.random() < (0.35 if mob_lvl <= 8 else 0.55):
-                    selected_item_ids.append("mat_awakened_rift_core")
-                eb_pool = (
-                    list(equip_pool)
-                    + tpl_equip * 2
-                    + list(upp_pool)
-                    + ["scroll_blessing", "item_bonus_changer", "item_bonus_adder", "book_skill"]
-                )
-                while len(selected_item_ids) < target_count:
-                    selected_item_ids.append(random.choice(eb_pool))
-
-            elif mob.get("isElite", False):
-                # Riss-Wächter & Elite-Monster: Chance auf Monolithensplitter
-                if mob.get("isMonolithGuard") and random.random() < 0.45:
+            elif mob.get("isRiftWorldBoss") or mob["isBoss"] or mob.get("isMonolithEliteBoss"):
+                is_wb = bool(mob.get("isRiftWorldBoss"))
+                is_dg = bool(mob.get("isDungeonBoss") or tpl.get("isDungeonBoss"))
+                boss_eq_cands = list(tpl_equip) * 2 + list(equip_pool)
+                eq_drops = (2 if random.random() < 0.55 else 3) if is_wb else (2 if (is_dg or random.random() < 0.35) else 1)
+                for _ in range(eq_drops):
+                    if boss_eq_cands:
+                        selected_item_ids.append(_pick_equip(boss_eq_cands))
+                selected_item_ids.append(_pick_active_fb())
+                if all_passive_fbs and random.random() < (0.85 if is_wb else (0.55 if is_dg else 0.38)):
+                    selected_item_ids.append(random.choice(all_passive_fbs))
+                if random.random() < (0.65 if is_wb else 0.35):
+                    selected_item_ids.append(_pick_spirit_stone(high_tier=True))
+                if is_wb or random.random() < 0.25:
                     selected_item_ids.append("mat_monolith_shard")
-                # Elite-Monster: ~48% Basis-Chance (mit Drop-Bonus bis 88%) auf 1–2 Drops (Ausrüstung & Upp-Items)
-                elite_gate = min(0.88, 0.48 * lvl_penalty * drop_bonus_mult)
-                if random.random() <= elite_gate:
-                    target_count = 2 if random.random() < 0.35 else 1
-                    passive_fb_pool = [f"fb_passive_{ps_id}" for ps_id in PASSIVE_SKILL_DEFS]
-                    for _ in range(target_count):
-                        roll = random.random()
-                        if roll < 0.18 and passive_fb_pool:
-                            selected_item_ids.append(random.choice(passive_fb_pool))
-                        elif roll < 0.46 and (equip_pool or tpl_equip):
-                            selected_item_ids.append(random.choice(list(equip_pool) + tpl_equip * 2))
-                        elif roll < 0.84:
-                            selected_item_ids.append(random.choice(list(upp_pool) + tpl_non_equip + ["scroll_blessing", "item_bonus_changer"]))
-                        elif tpl_drops:
-                            selected_item_ids.append(random.choice(tpl_drops))
-                        else:
-                            selected_item_ids.append(random.choice(upp_pool))
+                if (is_wb and random.random() < 0.32) or (not is_wb and random.random() < 0.06):
+                    selected_item_ids.append("mat_awakened_rift_core")
+                if is_wb:
+                    selected_item_ids.append("chest_monolith_legend")
+
+                # Boss-Spezialdrops: Low-Level (1–59) selten, High-Level (60–99) deutlich bessere Chancen + 1–5x Switcher/Adder
+                tier_f = 2.1 if is_wb else (1.45 if is_dg else 1.0)
+                segi_ch = (0.42 if is_high_lvl else 0.075) * tier_f
+                soul_ch = (0.38 if is_high_lvl else 0.065) * tier_f
+                sw_ch = (0.46 if is_high_lvl else 0.055) * tier_f
+                if random.random() < min(0.95, segi_ch * drop_bonus_mult):
+                    selected_item_ids.append("scroll_blessing")
+                if random.random() < min(0.95, soul_ch * drop_bonus_mult):
+                    selected_item_ids.append("mat_soul_stone")
+                if random.random() < min(0.95, sw_ch * drop_bonus_mult):
+                    sw_cnt = random.randint(2, 5) if (is_high_lvl and (is_wb or is_dg)) else (random.randint(1, 3) if is_high_lvl else random.randint(1, 2))
+                    for _ in range(sw_cnt):
+                        selected_item_ids.append(random.choice(["item_bonus_changer", "item_bonus_adder"]))
+
+                if is_wb:
+                    mono_id = mob.get("monolithBossOf")
+                    if mono_id and mono_id in self.monsters:
+                        self.monsters[mono_id]["activeWorldBossId"] = None
+                    self._emit_combat_event(
+                        mob["mapId"],
+                        "world_boss_defeated",
+                        mob["x"],
+                        mob["z"],
+                        {"bossId": mob["id"], "bossName": mob["name"], "killerName": killer["name"], "monolithId": mono_id},
+                    )
 
             else:
-                # Normale Monster: ~25% Basis-Chance (mit Drop-Bonus höher) auf Ausrüstung, Upp-Items, Passiv-FBs oder Tränke
-                monster_gate = min(0.68, 0.25 * lvl_penalty * drop_bonus_mult)
-                if random.random() <= monster_gate:
-                    target_count = 2 if (drop_bonus_mult >= 1.35 and random.random() < 0.20) else 1
-                    passive_fb_pool = [f"fb_passive_{ps_id}" for ps_id in PASSIVE_SKILL_DEFS]
-                    for _ in range(target_count):
-                        roll = random.random()
-                        if getattr(self, "world_event", {}).get("id") == "moonlight_chests" and random.random() < 0.14:
-                            selected_item_ids.append("chest_moonlight")
-                        elif roll < 0.11 and passive_fb_pool:
-                            # Monster droppen Passiv-Fertigkeitsbücher zum Erlernen & Steigern passiver Fertigkeiten!
-                            selected_item_ids.append(random.choice(passive_fb_pool))
-                        elif roll < 0.40 and (equip_pool or tpl_equip):
-                            # Monster droppen ab und zu passende Ausrüstung!
-                            selected_item_ids.append(random.choice(list(equip_pool) + tpl_equip * 2))
-                        elif roll < 0.84:
-                            # Monster droppen Upp-Items, Schriftrollen & nützliche Verbrauchsgüter
-                            selected_item_ids.append(random.choice(list(upp_pool) + tpl_non_equip))
-                        elif tpl_drops:
-                            selected_item_ids.append(random.choice(tpl_drops))
-                        else:
-                            selected_item_ids.append(random.choice(upp_pool))
+                # Normale & Elite-Monster: Strikt rassen- & mobspezifischer Drop-Pool!
+                # NIEMALS Segis, Switcher, Hinzufügen, Seelensteine, Passive FBs oder Pferdemedaillen!
+                is_el = bool(mob.get("isElite", False))
+                rate_scale = (1.35 if is_el else 1.0) * lvl_penalty * min(1.5, drop_bonus_mult)
 
-            # Harte Exklusivitäts-Garantie: Äthersiegel dropt NUR bei Instabilen (St. 2) & Erweckten (St. 3) Rissmonolithen!
-            if not (mob["kind"] == "metin" and mob.get("monolithState") in ("instabil", "erwacht")):
-                selected_item_ids = [iid for iid in selected_item_ids if iid != "item_aether_seal"]
+                # 1. Gezielte mobspezifische Materialien (Wolfskralle / Bärengalle / Tigerfell / Schmuckgegenstand / Map2-Exklusiv)
+                for mat_id, mat_ch in tpl_mats:
+                    if random.random() < min(0.75, mat_ch * 0.65 * rate_scale):
+                        selected_item_ids.append(mat_id)
+                        break
 
-            # -----------------------------------------------------------------
-            # SPEZIAL-DROPS (Bonus-System: Verstärken, Wandler, Segenskugel, Seelenstein, Äthersiegel)
-            # Normale Monster & Elite-Monster droppen diese NIE mehr.
-            # Rangfolge: Gebiets-Weltboss > Dungeonboss > normale Bosse > Rissmonolithen (geringste Chance)
-            # -----------------------------------------------------------------
-            sp_refill_pool = [iid for iid in (list(upp_pool) + tpl_non_equip) if iid not in SPECIAL_BONUS_DROP_ITEMS] or ["scroll_blessing"]
-            selected_item_ids = [
-                (random.choice(sp_refill_pool) if iid in SPECIAL_BONUS_DROP_ITEMS else iid) for iid in selected_item_ids
-            ]
-            if mob.get("isRiftWorldBoss"):
-                sp_tier = "world_boss"
-            elif mob.get("isDungeonBoss") or tpl.get("isDungeonBoss"):
-                sp_tier = "dungeon_boss"
-            elif mob.get("isBoss") or mob.get("isMonolithEliteBoss"):
-                sp_tier = "boss"
-            elif mob["kind"] == "metin":
-                sp_tier = "monolith"
-            else:
-                sp_tier = None
-            if sp_tier:
-                sp_mult = min(1.5, drop_bonus_mult)
-                if sp_tier == "monolith":
-                    # Innerhalb der Rissmonolithen: schlafend < instabil < erwacht (bleibt aber unter normalen Bossen)
-                    sp_mult *= {"schlafend": 0.6, "instabil": 1.0, "erwacht": 1.4}.get(mob.get("monolithState", "schlafend"), 0.6)
-                for sp_item, sp_chance, sp_min, sp_max in SPECIAL_BONUS_DROP_TABLE[sp_tier]:
-                    if sp_item == "item_aether_seal" and sp_tier == "monolith" and mob.get("monolithState", "schlafend") == "schlafend":
-                        continue  # Schlafende Rissmonolithen droppen weiterhin kein Äthersiegel
-                    if random.random() < min(0.95, sp_chance * sp_mult):
-                        for _ in range(random.randint(sp_min, sp_max)):
-                            selected_item_ids.append(sp_item)
+                # 2. Ausrüstung (+0 bis +4): Lv. 1–20 relativ oft, Lv. 30+ (inkl. DSS/FKS-Waffen) seltener
+                eq_base_ch = (0.14 if mob_lvl <= 20 else 0.075) * (1.45 if is_el else 1.0)
+                mob_eq_cands = list(tpl_equip) if tpl_equip else list(equip_pool)
+                if mob_eq_cands and random.random() < min(0.45, eq_base_ch * lvl_penalty * min(1.4, drop_bonus_mult)):
+                    selected_item_ids.append(_pick_equip(mob_eq_cands))
 
-            passive_fb_all = [f"fb_passive_{ps_id}" for ps_id in PASSIVE_SKILL_DEFS]
-            active_fb_all = [k for k, v in ITEM_TEMPLATES.items() if v.get("type") == "skill_book"]
+                # 3. Verbrauchsgegenstände & Erweckungssteine (Instabil ab und zu, Erweckt sehr selten)
+                if random.random() < 0.055 * rate_scale:
+                    selected_item_ids.append(random.choice(["potion_hp_medium", "potion_mp_medium", "potion_speed", "potion_atk_speed", "item_bravery_cape"]))
+                shard_mob_ch = 0.045 if (is_el or mob.get("isMonolithGuard")) else 0.014
+                if random.random() < shard_mob_ch * lvl_penalty:
+                    selected_item_ids.append("mat_monolith_shard")
+                if is_el and random.random() < 0.0018 * lvl_penalty:
+                    selected_item_ids.append("mat_awakened_rift_core")
+                if active_evt == "moonlight_chests" and random.random() < (0.09 if is_el else 0.045) * lvl_penalty:
+                    selected_item_ids.append("chest_moonlight")
+
+            is_boss_src = bool(mob.get("isRiftWorldBoss") or mob["isBoss"] or mob.get("isMonolithEliteBoss"))
             for idx, item_id in enumerate(selected_item_ids):
+                item_id = resolve_item_template_id(item_id)
+                if item_id == "pferdemedaille":
+                    continue
                 if item_id == "book_skill":
-                    fb_roll = random.random()
-                    if fb_roll < 0.55 and passive_fb_all:
-                        item_id = random.choice(passive_fb_all)
-                    elif fb_roll < 0.82 and active_fb_all:
-                        item_id = random.choice(active_fb_all)
+                    item_id = _pick_active_fb()
                 item_tpl = ITEM_TEMPLATES.get(item_id)
-                if not item_tpl:
+                if not item_tpl or item_tpl.get("craftOnly"):
                     continue
                 plus = 0
                 bonuses = []
+                drop_rarity = item_tpl.get("rarity", "common")
                 if item_tpl["type"] == "equipment":
-                    if mob["isBoss"] or is_rare_metin:
-                        plus = random.choice([1, 2, 2, 3, 3, 4])
-                    elif mob["kind"] == "metin" or mob.get("isElite", False):
-                        plus = random.choice([0, 1, 1, 2, 2, 3])
+                    # SSOT: Bosse +4..+6 | Instabile/Erweckte Monolithen +0..+6 | Schlafende Monolithen & Monster +0..+4
+                    if is_boss_src:
+                        plus = random.choices([4, 5, 6], weights=[45, 35, 20], k=1)[0]
+                    elif is_rare_metin:
+                        plus = random.choices([0, 1, 2, 3, 4, 5, 6], weights=[18, 20, 20, 16, 13, 8, 5], k=1)[0]
                     else:
-                        plus = random.choice([0, 0, 1, 1, 2, 3])
+                        plus = random.choices([0, 1, 2, 3, 4], weights=[34, 26, 19, 13, 8], k=1)[0]
 
-                    bonus_chance = 0.65 if (mob["isBoss"] or is_rare_metin) else (0.42 if mob["kind"] == "metin" else 0.24)
-                    if random.random() < bonus_chance:
-                        num_bonuses = 2 if (random.random() < 0.35 and (mob["isBoss"] or mob["kind"] == "metin")) else 1
-                        picked_b = random.sample(RUNE_BONUS_POOL, k=min(num_bonuses, len(RUNE_BONUS_POOL)))
-                        for b_choice in picked_b:
-                            bonuses.append(
-                                {
-                                    "id": b_choice["id"],
-                                    "name": b_choice["name"],
-                                    "value": random.choice(b_choice["values"][:4]),
-                                    "unit": b_choice["unit"],
-                                }
-                            )
+                    # SSOT Teil II Abs. 1: 5 Seltenheitsstufen (Gewöhnlich, Gut, Episch, Legendär, Instabil=Max-Roll!)
+                    rar_weights = [28.0, 32.0, 22.0, 13.5, 4.5] if (is_boss_src or is_rare_metin) else [58.0, 25.0, 11.0, 4.8, 1.2]
+                    drop_rarity = random.choices(["common", "rare", "epic", "legendary", "instabil"], weights=rar_weights, k=1)[0]
+                    is_max_roll = drop_rarity == "instabil"
+
+                    used_b_ids = set()
+                    if item_tpl.get("hasDssFks"):
+                        dss_v = random.randint(48, 55) if is_max_roll else max(-25, min(52, int(round(random.gauss(5, 11)))))
+                        fks_v = random.randint(18, 25) if is_max_roll else max(-18, min(24, int(round(-dss_v * 0.36 + random.gauss(1, 4)))))
+                        bonuses.append({"id": "bonus_dss", "name": "Durchschn. Schaden (DSS)", "value": dss_v, "maxValue": 55, "unit": "%"})
+                        bonuses.append({"id": "bonus_fks", "name": "Fertigkeitsschaden (FKS)", "value": fks_v, "maxValue": 25, "unit": "%"})
+                        used_b_ids.update(("bonus_dss", "bonus_fks"))
+
+                    target_std_cnt = (
+                        5 if is_max_roll
+                        else random.randint(3, 5) if drop_rarity == "legendary"
+                        else random.randint(2, 4) if drop_rarity == "epic"
+                        else random.randint(1, 3) if drop_rarity == "rare"
+                        else (1 if random.random() < 0.32 else 0)
+                    )
+                    eq_slot = item_tpl.get("slot", "weapon")
+                    while len(bonuses) < target_std_cnt:
+                        rb = roll_slot_bonus(eq_slot, used_b_ids, max_roll=is_max_roll)
+                        used_b_ids.add(rb["id"])
+                        bonuses.append(rb)
 
                 ang = (math.pi * 2.0 * idx) / max(1, len(selected_item_ids)) + random.uniform(-0.35, 0.35)
                 rad = random.uniform(1.0, 2.5)
                 did = f"drp_{uuid.uuid4().hex[:10]}"
-                d_name = f"{item_tpl['name']}{f' +{plus}' if plus > 0 else ''}"
+                rar_tag = " [INSTABIL]" if (item_tpl["type"] == "equipment" and drop_rarity == "instabil") else ""
+                d_name = f"{item_tpl['name']}{f' +{plus}' if plus > 0 else ''}{rar_tag}"
                 self.drops[did] = {
                     "id": did,
                     "mapId": mob["mapId"],
@@ -8645,7 +8827,7 @@ class WorldAuthority:
                     "templateId": item_tpl["id"],
                     "category": get_drop_filter_category(item_tpl["id"]),
                     "name": d_name,
-                    "rarity": item_tpl.get("rarity", "common"),
+                    "rarity": drop_rarity,
                     "plusLevel": plus,
                     "bonuses": bonuses,
                     "quantity": 1,
@@ -9580,8 +9762,7 @@ class WorldAuthority:
         if auto_sell:
             tpl = ITEM_TEMPLATES.get(dr["templateId"], {})
             base_sell = int(tpl.get("sellPrice", 80))
-            # Gemäß Bot-Balancing bal_prop_03: +15% Auto-Sell-Rückvergütung zur Deckung der Trank-Ökonomie
-            sell_yang = max(18, int(base_sell * 1.15 * (1.0 + 0.25 * int(dr.get("plusLevel", 0)))) * qty)
+            sell_yang = max(18, int(base_sell * (1.0 + 0.25 * int(dr.get("plusLevel", 0)))) * qty)
             self.drops.pop(drop_id, None)
             p["yang"] = int(p.get("yang", 0)) + sell_yang
             stats["dropsLooted"] = int(stats.get("dropsLooted", 0)) + 1
@@ -9600,7 +9781,12 @@ class WorldAuthority:
             return True, f"🪙 Auto-Filter verkauft: {dr['name']} (+{sell_yang:,} Gold)"
 
         ok, msg = self.db.add_item_to_inventory(
-            player_id, dr["templateId"], quantity=qty, plus_level=dr["plusLevel"], bonuses=dr["bonuses"]
+            player_id,
+            dr["templateId"],
+            quantity=qty,
+            plus_level=dr["plusLevel"],
+            bonuses=dr["bonuses"],
+            rarity=str(dr.get("rarity") or ""),
         )
         if not ok:
             # Wenn diese Inventar-Kategorie (120 Slots) komplett voll ist, Gegenstand automatisch in Gold umwandeln,
@@ -9682,10 +9868,6 @@ class WorldAuthority:
 
         lvl = int(p.get("level", 1))
         yang = int(p.get("yang", 0))
-        if is_bot and yang < 900:
-            yang = max(yang, 2500)
-            p["yang"] = yang
-
         bought_parts = []
         total_bought = 0
         total_cost = 0
@@ -9758,22 +9940,40 @@ class WorldAuthority:
             if hp_cnt <= 5 and af.get("autoBuyPotions", True):
                 self._auto_restock_potions(p, force=False, include_mp=False)
 
-        for pot_id in ("potion_hp_medium", "potion_hp_small"):
+        for pot_id in ("potion_hp_large", "potion_hp_medium", "potion_hp_small"):
             if self.db.consume_item_by_template(player_id, pot_id, 1):
-                heal = ITEM_TEMPLATES[pot_id]["healHp"]
-                p["hp"] = min(p["max_hp"], p["hp"] + heal)
+                tpl_pot = ITEM_TEMPLATES[pot_id]
+                regen_total = int(tpl_pot.get("regenHp") or tpl_pot.get("healHp", 320))
+                regen_dur   = float(tpl_pot.get("regenDuration", 8.0))
+                regen_rate  = regen_total / max(regen_dur, 1.0)
+                # Sofortiger erster Heil-Schluck (25% sofort) + Rest gleichmäßig über Zeit
+                instant_heal = min(max(0, p["max_hp"] - p["hp"]), max(40, int(regen_total * 0.25)))
+                p["hp"] = min(p["max_hp"], p["hp"] + instant_heal)
+                remaining_regen = max(0, regen_total - instant_heal)
+
+                # Trank-Regen aufstapeln (neuer Trank addiert ausstehende TP)
+                existing_rem = float(p.get("potionRegenRemaining", 0.0))
+                p["potionRegenRemaining"] = min(
+                    float(p["max_hp"]) - float(p["hp"]),
+                    existing_rem + remaining_regen,
+                )
+                p["potionRegenRate"] = max(
+                    regen_rate,
+                    float(p.get("potionRegenRate", 0.0)),
+                )
                 if "autofarm" in p and isinstance(p["autofarm"], dict):
                     st = self.ensure_autofarm_stats(p["autofarm"])
                     st["potionsUsed"] = int(st.get("potionsUsed", 0)) + 1
+                self.db.save_player_state(p)
                 self.refresh_player_from_db(player_id)
                 self._emit_combat_event(
                     p["map_id"],
                     "heal",
                     p["pos_x"],
                     p["pos_z"],
-                    {"playerId": player_id, "amount": heal, "skillName": "Heiltrank", "color": "#ef4444"},
+                    {"playerId": player_id, "amount": instant_heal, "skillName": "Heiltrank", "color": "#22c55e", "regen": True, "regenTotal": regen_total},
                 )
-                return True, f"Heiltrank verwendet (+{heal} TP)."
+                return True, f"Heiltrank verwendet – regeneriert {regen_total} TP (+{instant_heal} sofort, Rest über {int(regen_dur)}s)."
         return False, "Keine Heiltränke im Inventar!"
 
     def allocate_stat_point(self, player_id: str, stat_key: str, amount: int = 1) -> Tuple[bool, str]:
@@ -9828,7 +10028,7 @@ class WorldAuthority:
         if sk_info.get("special") and skill_id not in skills_dict:
             return False, f"⚠️ '{sk_info['name']}' ist noch gesperrt! Schalte sie zuerst mit der 'Schriftrolle der geheimen Künste' frei."
 
-        cur = int(skills_dict.get(skill_id, 0 if sk_info.get("special") else 1))
+        cur = int(skills_dict.get(skill_id, 0))
         if cur >= 20:
             return False, f"⚠️ '{sk_info['name']}' ist bereits Meister ({self.get_skill_stage_label(cur)})! Steigere sie mit Fertigkeitsbüchern weiter."
 
@@ -9928,6 +10128,8 @@ class WorldAuthority:
         p = self.players.get(player_id)
         if not p:
             return False, "Spieler nicht gefunden."
+        if str(player_id or "").startswith("bot_"):
+            return False, "🚫 Pferdemedaillen-Sperre aktiv (SSOT): Bis Affen hinzugefügt werden, steigert kein Bot sein Pferde-Level!"
         md = self._ensure_player_mount_data(p)
         cur_lvl = int(md.get("level", 1))
         if cur_lvl >= MAX_HORSE_LEVEL:
@@ -9985,6 +10187,8 @@ class WorldAuthority:
         p = self.players.get(player_id)
         if not p:
             return False, "Spieler nicht gefunden."
+        if str(player_id or "").startswith("bot_"):
+            return False, "🚫 Pferdemedaillen-Sperre aktiv (SSOT): Bots verteilen keine Sattel-Statuspunkte!"
         md = self._ensure_player_mount_data(p)
         avail = int(md.get("statPoints", 0))
         if avail <= 0:
@@ -10052,7 +10256,12 @@ class WorldAuthority:
         return True, f"🐎 Dein Reittier heißt nun '{clean}'!"
 
     def blacksmith_upgrade(
-        self, player_id: str, item_uid: str, use_blessing: bool = False, method: str = ""
+        self,
+        player_id: str,
+        item_uid: str,
+        use_blessing: bool = False,
+        method: str = "",
+        use_magic_metal: bool = False,
     ) -> Tuple[bool, str, bool]:
         """Serverseitiges Schmied-Upgrade (+0 bis +9) inkl. Methoden (Normaler Schmied, Segi, Magisches Metall)."""
         p = self.players.get(player_id)
@@ -10071,33 +10280,36 @@ class WorldAuthority:
             return False, "Dieser Gegenstand hat bereits die Höchststufe +9 erreicht!", False
 
         is_sa_smith = self._is_sa_player(p, player_id)
-        rate_info = BLACKSMITH_RATES[cur_plus]
-        cost_yang = 0 if is_sa_smith else rate_info["yang"]
+        rate_info = get_blacksmith_upgrade_req(target_item["templateId"], cur_plus)
+        cost_yang = 0 if is_sa_smith else int(rate_info["yang"])
         if not is_sa_smith and p["yang"] < cost_yang:
             return False, f"Nicht genug Gold! Benötigt: {cost_yang:,} Gold.", False
 
         mat_id = rate_info["matId"]
-        mat_count = rate_info["matCount"]
+        mat_count = int(rate_info["matCount"] or 0)
         if not is_sa_smith and mat_id and mat_count > 0:
             if not self.db.consume_item_by_template(player_id, mat_id, mat_count):
-                mat_name = ITEM_TEMPLATES[mat_id]["name"]
+                mat_name = ITEM_TEMPLATES.get(mat_id, {}).get("name", mat_id)
                 return False, f"Fehlendes Material: {mat_count}x {mat_name} benötigt!", False
 
-        eff_method = method or ("scroll" if use_blessing else "none")
+        eff_method = method or ("ritual" if use_magic_metal else ("scroll" if use_blessing else "none"))
         blessing_bonus = 0.0
         if not is_sa_smith:
             if eff_method == "scroll":
                 if not self.db.consume_item_by_template(player_id, "scroll_blessing", 1):
                     return False, "Keine Segensschriftrolle im Inventar!", False
                 blessing_bonus = 0.10
-            elif eff_method == "ritual":
-                if not self.db.consume_item_by_template(player_id, "item_soul_fragment", 1):
-                    if not self.db.consume_item_by_template(player_id, "scroll_blessing", 1):
-                        return False, "Kein Magisches Metall / Seelenstein im Inventar!", False
-                blessing_bonus = 0.15
+            elif eff_method in ("ritual", "metal", "magic_metal"):
+                eff_method = "ritual"
+                if not (
+                    self.db.consume_item_by_template(player_id, "item_magic_metal", 1)
+                    or self.db.consume_item_by_template(player_id, "item_soul_fragment", 1)
+                ):
+                    return False, "Kein Magisches Metall im Inventar!", False
+                blessing_bonus = 0.10
 
         p["yang"] = max(0, p["yang"] - cost_yang)
-        passive_smith = p.get("passives", {}).get("schmiedkunst", 0) * 0.015
+        passive_smith = p.get("passives", {}).get("schmiedkunst", 0) * 0.005
         final_chance = 1.0 if is_sa_smith else min(0.98, rate_info["chance"] + blessing_bonus + passive_smith)
         success = True if is_sa_smith else (random.random() <= final_chance)
 
@@ -10164,99 +10376,126 @@ class WorldAuthority:
             self.refresh_player_from_db(player_id)
             return True, f"🔒 Bonus '{bonuses[lock_idx]['name']}' mit Äthersiegel geschützt!"
 
-        if action == "add":
-            if len(bonuses) >= 4:
-                return False, "Dieser Gegenstand besitzt bereits 4 Standard-Boni! Nutze eine Segenskugel für den 5. Bonus."
-            if not self.db.consume_item_by_template(player_id, "item_bonus_adder", 1):
-                return False, "Du benötigst 1x 'Gegenstand verstärken' (für 1.–4. Bonus)!"
+        std_bonuses = [b for b in bonuses if b.get("id") != "socket_stone" and not b.get("isYellow67")]
+        socket_stones = [b for b in bonuses if b.get("id") == "socket_stone"]
+        yellow_bonuses = [b for b in bonuses if b.get("isYellow67")]
 
-            used_ids = {b["id"] for b in bonuses[:5]}
-            rolled = roll_slot_bonus(item_slot, used_ids)
-            bonuses.append(rolled)
-            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], bonuses, locked)
+        if action == "add":
+            if len(std_bonuses) >= 5:
+                return False, "Dieser Gegenstand besitzt bereits alle 5 grünen/weißen Standard-Boni!"
+            if not (
+                self.db.consume_item_by_template(player_id, "item_bonus_adder", 1)
+                or (len(std_bonuses) == 4 and self.db.consume_item_by_template(player_id, "item_blessing_orb", 1))
+            ):
+                return False, "Du benötigst 1x 'Bonus hinzufügen (Gegenstand verstärken)'!"
+
+            used_ids = {b["id"] for b in std_bonuses}
+            is_max = str(item.get("rarity") or "") == "instabil"
+            rolled = roll_slot_bonus(item_slot, used_ids, max_roll=is_max)
+            std_bonuses.append(rolled)
+            new_all = std_bonuses + yellow_bonuses + socket_stones
+            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_all, locked)
             self.refresh_player_from_db(player_id)
-            slot_num = len(bonuses)
+            slot_num = len(std_bonuses)
             val_str = f"+{rolled['value']}{rolled['unit']} " if rolled["id"] != "bonus_stun_immune" else ""
             return True, f"➕ {slot_num}. Standard-Bonus ({item_slot.upper()}) hinzugefügt: {val_str}{rolled['name']}!"
 
         if action == "add5":
-            if len(bonuses) < 4:
-                return False, f"Du benötigst zuerst 4 Standard-Boni ({len(bonuses)}/4 vorhanden), bevor der 5. Bonus freigeschaltet werden kann!"
-            if len(bonuses) >= 5:
-                return False, "Dieser Gegenstand besitzt bereits den 5. Bonusplatz (oder höher)!"
-            if not self.db.consume_item_by_template(player_id, "item_blessing_orb", 1):
-                return False, "Du benötigst 1x 'Segenskugel' für den 5. Bonus!"
+            if len(std_bonuses) < 4:
+                return False, f"Du benötigst zuerst 4 Standard-Boni ({len(std_bonuses)}/4 vorhanden), bevor der 5. Bonus freigeschaltet werden kann!"
+            if len(std_bonuses) >= 5:
+                return False, "Dieser Gegenstand besitzt bereits den 5. Bonusplatz!"
+            if not (
+                self.db.consume_item_by_template(player_id, "item_blessing_orb", 1)
+                or self.db.consume_item_by_template(player_id, "item_bonus_adder", 1)
+            ):
+                return False, "Du benötigst 1x 'Segenskugel' oder 'Bonus hinzufügen' für den 5. Bonus!"
 
-            used_ids = {b["id"] for b in bonuses[:5]}
-            rolled = roll_slot_bonus(item_slot, used_ids)
-            bonuses.append(rolled)
-            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], bonuses, locked)
+            used_ids = {b["id"] for b in std_bonuses}
+            is_max = str(item.get("rarity") or "") == "instabil"
+            rolled = roll_slot_bonus(item_slot, used_ids, max_roll=is_max)
+            std_bonuses.append(rolled)
+            new_all = std_bonuses + yellow_bonuses + socket_stones
+            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_all, locked)
             self.refresh_player_from_db(player_id)
             val_str = f"+{rolled['value']}{rolled['unit']} " if rolled["id"] != "bonus_stun_immune" else ""
             return True, f"🌟 5. Bonus freigeschaltet: {val_str}{rolled['name']}!"
 
         if action == "add67":
-            if len(bonuses) < 5:
-                return False, f"Du benötigst zuerst 5 Boni ({len(bonuses)}/5 vorhanden), bevor der gelbe 6. und 7. Endgame-Bonus freigeschaltet werden können!"
-            if len(bonuses) >= 7:
-                return False, "Dieser Gegenstand besitzt bereits das Maximum von 7/7 Seelen- & Runenboni!"
+            if len(std_bonuses) < 5:
+                return False, f"Du benötigst zuerst 5 Standard-Boni ({len(std_bonuses)}/5 vorhanden), bevor der goldene 6. und 7. Endgame-Bonus freigeschaltet werden können!"
+            if len(yellow_bonuses) >= 2:
+                return False, "Dieser Gegenstand besitzt bereits das Maximum von 2 goldenen Endgame-Boni (6. & 7. Bonus)!"
             if not (self.db.consume_item_by_template(player_id, "item_soul_fragment", 1) or self.db.consume_item_by_template(player_id, "mat_soul_stone", 1)):
-                return False, "Du benötigst 1x 'Seelenstein / Seelenfragment' für den gelben 6. bzw. 7. Endgame-Bonus!"
+                return False, "Du benötigst 1x 'Seelenstein / Seelenfragment' für den goldenen 6. bzw. 7. Endgame-Bonus!"
 
-            used_67_ids = {b["id"] for b in bonuses[5:]}
-            rolled = roll_67_bonus(used_67_ids)
-            bonuses.append(rolled)
-            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], bonuses, locked)
+            used_67_ids = {b["id"] for b in yellow_bonuses}
+            is_max = str(item.get("rarity") or "") == "instabil"
+            rolled = roll_67_bonus(used_67_ids, max_roll=is_max)
+            yellow_bonuses.append(rolled)
+            new_all = std_bonuses + yellow_bonuses + socket_stones
+            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_all, locked)
             self.refresh_player_from_db(player_id)
-            slot_num = len(bonuses)
-            return True, f"💛 {slot_num}. Gelber Endgame-Bonus freigeschaltet: +{rolled['value']}{rolled['unit']} {rolled['name']}!"
+            slot_num = 5 + len(yellow_bonuses)
+            return True, f"💛 {slot_num}. Goldener Endgame-Bonus freigeschaltet: +{rolled['value']}{rolled['unit']} {rolled['name']}!"
 
         if action == "reroll":
-            if not bonuses:
+            if not std_bonuses:
                 return False, "Füge zuerst mindestens einen Bonus hinzu."
             if not self.db.consume_item_by_template(player_id, "item_bonus_changer", 1):
                 return False, "Du benötigst 1x 'Bonuswandler (Verzaubern)'!"
-            new_bonuses = []
+            new_std = []
             used_ids = set()
-            if 0 <= locked < min(5, len(bonuses)):
-                used_ids.add(bonuses[locked]["id"])
+            is_max = str(item.get("rarity") or "") == "instabil"
+            if 0 <= locked < len(std_bonuses):
+                used_ids.add(std_bonuses[locked]["id"])
 
-            for idx, old_b in enumerate(bonuses):
-                if idx >= 5 or old_b.get("isYellow67"):
-                    # 6. & 7. Bonus werden beim normalen Switchen der ersten 5 Boni NIEMALS berührt!
-                    new_bonuses.append(old_b)
-                elif idx == locked:
-                    new_bonuses.append(old_b)
+            for idx, old_b in enumerate(std_bonuses):
+                if idx == locked:
+                    new_std.append(old_b)
+                elif tpl.get("hasDssFks") and old_b.get("id") in ("bonus_dss", "bonus_fks"):
+                    if old_b.get("id") == "bonus_dss":
+                        dss_v = random.randint(48, 55) if is_max else max(-25, min(52, int(round(random.gauss(5, 11)))))
+                        new_std.append({"id": "bonus_dss", "name": "Durchschn. Schaden (DSS)", "value": dss_v, "maxValue": 55, "unit": "%"})
+                        used_ids.add("bonus_dss")
+                    else:
+                        prev_dss = next((b["value"] for b in new_std if b.get("id") == "bonus_dss"), 0)
+                        fks_v = random.randint(18, 25) if is_max else max(-18, min(24, int(round(-prev_dss * 0.36 + random.gauss(1, 4)))))
+                        new_std.append({"id": "bonus_fks", "name": "Fertigkeitsschaden (FKS)", "value": fks_v, "maxValue": 25, "unit": "%"})
+                        used_ids.add("bonus_fks")
                 else:
-                    rolled = roll_slot_bonus(item_slot, used_ids)
+                    rolled = roll_slot_bonus(item_slot, used_ids, max_roll=is_max)
                     used_ids.add(rolled["id"])
-                    new_bonuses.append(rolled)
-            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_bonuses, locked)
+                    new_std.append(rolled)
+            new_all = new_std + yellow_bonuses + socket_stones
+            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_all, locked)
             self.refresh_player_from_db(player_id)
-            return True, f"🔮 1.–{min(5, len(bonuses))}. Bonus ({item_slot.upper()}-Pool) neu ausgewürfelt! (6./7. Bonus bleibt unberührt)"
+            return True, f"🔮 1.–{len(new_std)}. Bonus ({item_slot.upper()}-Pool) neu ausgewürfelt! (6./7. Bonus bleibt unberührt)"
 
         if action == "reroll67":
-            if len(bonuses) < 6:
+            if not yellow_bonuses:
                 return False, "Dieser Gegenstand besitzt noch keinen 6. oder 7. Endgame-Bonus zum Switchen!"
             if not (
                 self.db.consume_item_by_template(player_id, "item_soul_fragment", 1)
                 or self.db.consume_item_by_template(player_id, "mat_soul_stone", 1)
-                or self.db.consume_item_by_template(player_id, "item_bonus_changer", 1)
             ):
-                return False, "Du benötigst 1x Seelenfragment, Seelenstein oder Bonuswandler zum Switchen des 6./7. Bonus!"
-            new_bonuses = list(bonuses[:5])
+                return False, "Du benötigst 1x Seelenstein (oder Seelenfragment) zum Switchen des goldenen 6./7. Bonus!"
+            new_yel = []
             used_67_ids = set()
-            for idx in range(5, len(bonuses)):
-                if idx == locked:
-                    new_bonuses.append(bonuses[idx])
-                    used_67_ids.add(bonuses[idx]["id"])
+            is_max = str(item.get("rarity") or "") == "instabil"
+            for idx, old_yb in enumerate(yellow_bonuses):
+                abs_idx = len(std_bonuses) + idx
+                if abs_idx == locked:
+                    new_yel.append(old_yb)
+                    used_67_ids.add(old_yb["id"])
                 else:
-                    rolled = roll_67_bonus(used_67_ids)
+                    rolled = roll_67_bonus(used_67_ids, max_roll=is_max)
                     used_67_ids.add(rolled["id"])
-                    new_bonuses.append(rolled)
-            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_bonuses, locked)
+                    new_yel.append(rolled)
+            new_all = std_bonuses + new_yel + socket_stones
+            self.db.update_item_upgrade_and_bonuses(item_uid, item["plusLevel"], new_all, locked)
             self.refresh_player_from_db(player_id)
-            return True, "💛 Gelber 6./7. Endgame-Bonus neu ausgewürfelt (1.–5. Bonus blieb unangetastet)!"
+            return True, "💛 Goldener 6./7. Endgame-Bonus mit Seelenstein neu ausgewürfelt (1.–5. Bonus blieb unangetastet)!"
 
         return False, "Unbekannte Runen-Aktion."
 
@@ -10320,6 +10559,42 @@ class WorldAuthority:
             self.refresh_player_from_db(player_id)
             return True, msg
 
+        if item["type"] == "spirit_stone":
+            st_tpl = ITEM_TEMPLATES.get(tpl_id, {})
+            eq_target_slot = st_tpl.get("targetSlot", "weapon")
+            eq_item = (p.get("equipment") or {}).get(eq_target_slot)
+            if not eq_item:
+                slot_lbl = "Waffe" if eq_target_slot == "weapon" else "Rüstung"
+                return False, f"⚠️ Rüste zuerst eine {slot_lbl} aus, um diesen Geiststein zu sockeln!"
+            bonuses_eq = list(eq_item.get("bonuses") or [])
+            sockets = [b for b in bonuses_eq if b.get("id") == "socket_stone"]
+            st_fam = st_tpl.get("stoneFamily", tpl_id)
+            st_grade = int(st_tpl.get("stoneGrade", 0))
+            existing_fam = next((s for s in sockets if s.get("stoneFamily") == st_fam), None)
+            if existing_fam and int(existing_fam.get("stoneGrade", 0)) >= st_grade:
+                return False, f"⚠️ In {eq_item['name']} ist bereits ein gleichwertiger oder höherer {existing_fam.get('name', 'Geiststein')} gesockelt!"
+            if not existing_fam and len(sockets) >= 3:
+                return False, f"⚠️ {eq_item['name']} besitzt bereits das Maximum von 3 gesockelten Geiststeinen!"
+            if not self.db.consume_item_by_template(player_id, tpl_id, 1):
+                return False, "Geiststein nicht im Inventar."
+            if random.random() > 0.75:
+                self.refresh_player_from_db(player_id)
+                return False, f"💥 Das Sockeln von {st_tpl.get('name', tpl_id)} ist fehlgeschlagen – der Geiststein ist zersplittert!"
+            new_bonuses = [b for b in bonuses_eq if not (b.get("id") == "socket_stone" and b.get("stoneFamily") == st_fam)]
+            new_bonuses.append({
+                "id": "socket_stone",
+                "stoneId": tpl_id,
+                "stoneFamily": st_fam,
+                "stoneGrade": st_grade,
+                "stoneStat": st_tpl.get("stoneStat", "vsMonsterPct"),
+                "name": f"💎 {st_tpl.get('name', tpl_id)}",
+                "value": st_tpl.get("stoneValue", 0),
+                "unit": st_tpl.get("stoneUnit", "%"),
+            })
+            self.db.update_item_upgrade_and_bonuses(eq_item["uid"], eq_item["plusLevel"], new_bonuses, eq_item.get("lockedBonusIdx", -1))
+            self.refresh_player_from_db(player_id)
+            return True, f"💎 {st_tpl.get('name', tpl_id)} erfolgreich in {eq_item['name']} gesockelt (+{st_tpl.get('stoneValue')}{st_tpl.get('stoneUnit', '')} {st_tpl.get('bonusLabel', '')})!"
+
         if item["type"] == "consumable":
             if tpl_id == "potion_mp_medium":
                 if not self.db.consume_item_by_template(player_id, tpl_id, 1):
@@ -10332,28 +10607,30 @@ class WorldAuthority:
                 if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                     return False, "Kein Violetter Trank vorhanden."
                 p.setdefault("activeBuffs", {})["potion_speed"] = {
-                    "name": "Violetter Trank (+20% Tempo)",
+                    "name": "Violetter Trank (+15% Angriffs- & +20% Bewegungstempo)",
                     "atkPct": 0,
-                    "speedPct": 40,
+                    "atkSpeedPct": 15,
+                    "moveSpeedPct": 20,
                     "expiresAt": time.time() + 600.0,
                 }
                 self.compute_player_combat_stats(p)
                 self.db.save_player_state(p)
                 self.refresh_player_from_db(player_id)
-                return True, "🟣 Violetter Trank (G) aktiviert (+20% Bewegungstempo für 10 Min.)!"
+                return True, "🟣 Violetter Trank (G) aktiviert (+15% Angriffs- & +20% Bewegungsgeschwindigkeit für 10 Min.)!"
             if tpl_id == "potion_atk_speed":
                 if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                     return False, "Kein Grüner Trank vorhanden."
                 p.setdefault("activeBuffs", {})["potion_atk_speed"] = {
-                    "name": "Grüner Trank (+15% Angriffstempo)",
-                    "atkPct": 5,
-                    "speedPct": 15,
+                    "name": "Grüner Trank (+20% Bewegungstempo)",
+                    "atkPct": 0,
+                    "atkSpeedPct": 0,
+                    "moveSpeedPct": 20,
                     "expiresAt": time.time() + 600.0,
                 }
                 self.compute_player_combat_stats(p)
                 self.db.save_player_state(p)
                 self.refresh_player_from_db(player_id)
-                return True, "🟢 Grüner Trank (G) aktiviert (+15% Angriffstempo für 10 Min.)!"
+                return True, "🟢 Grüner Trank (G) aktiviert (+20% Bewegungsgeschwindigkeit für 10 Min.)!"
             if tpl_id == "orb_vwk":
                 if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                     return False, "Keine Verwandlungskugel vorhanden."
@@ -10369,7 +10646,7 @@ class WorldAuthority:
                 return True, "🔮 Verwandlungskugel (VWK) aktiviert (+25% AW & volle Zweihand-Angriffsgeschwindigkeit für 180 Sek.)!"
             if tpl_id == "arrow_bundle":
                 return True, "🏹 Köcher der Schattenpfeile im Inventar bereit (+15 Pfeil-AW für Bögen)."
-            if tpl_id == "cape_bravery":
+            if tpl_id in ("cape_bravery", "item_bravery_cape"):
                 if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                     return False, "Kein Tapferkeitsumhang vorhanden."
                 pulled = 0
@@ -10388,32 +10665,26 @@ class WorldAuthority:
             if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                 return False, "Truhe konnte nicht geöffnet werden."
             if tpl_id in ("chest_monolith_legend", "chest_bloodleaf"):
-                rewards = ["sword_msk", "sword_rsb", "scroll_blessing", "item_bonus_changer", "mat_soul_stone"]
+                rewards = ["wpn_ebenholz_sword", "wpn_ebenholz_greatsword", "scroll_blessing", "item_bonus_changer", "mat_soul_stone"]
             elif tpl_id == "chest_moonlight":
                 rewards = [
-                    "scroll_blessing",
-                    "item_bonus_changer",
-                    "item_bonus_adder",
+                    "potion_speed",
+                    "potion_atk_speed",
+                    "item_bravery_cape",
                     "book_skill",
                     "mat_soul_stone",
-                    "mat_white_pearl",
+                    "scroll_blessing",
                 ]
             else:
-                rewards = ["scroll_blessing", "item_bonus_changer", "item_bonus_adder", "potion_hp_medium"]
+                rewards = ["potion_speed", "potion_atk_speed", "potion_hp_large", "book_skill"]
             won_id = random.choice(rewards)
             plus = 4 if ITEM_TEMPLATES[won_id]["type"] == "equipment" else 0
             self.db.add_item_to_inventory(player_id, won_id, 1, plus_level=plus)
-            # Gemäß Bot-Balancing bal_prop_02: 18% Bonus-Dropchance auf eine zusätzliche Segensschriftrolle aus Truhen
-            bonus_blessing_txt = ""
-            if random.random() < 0.18:
-                self.db.add_item_to_inventory(player_id, "scroll_blessing", 1)
-                bonus_blessing_txt = " + 1x Segensschriftrolle"
-            p["yang"] += 1500
             self.db.save_player_state(p)
             self.refresh_player_from_db(player_id)
             won_name = ITEM_TEMPLATES[won_id]["name"]
-            self._log_player_drop(won_id, plus=plus, qty=1, yang_gain=1500, source=item["name"], player_id=player_id)
-            return True, f"🎁 {item['name']} geöffnet! Erhalten: {won_name}{f' +{plus}' if plus else ''}{bonus_blessing_txt} & 1.500 Gold!"
+            self._log_player_drop(won_id, plus=plus, qty=1, yang_gain=0, source=item["name"], player_id=player_id)
+            return True, f"🎁 {item['name']} geöffnet! Erhalten: {won_name}{f' +{plus}' if plus else ''}!"
 
         if tpl_id in ("mat_monolith_shard", "mat_awakened_rift_core"):
             res = self.interact_with_monolith(player_id, None, mode="awaken")
@@ -10440,18 +10711,13 @@ class WorldAuthority:
         if tpl_id in ("chest_skill_books", "book_skill"):
             if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                 return False, "Gegenstand nicht vorhanden."
-            passive_books = [k for k, v in ITEM_TEMPLATES.items() if v.get("type") == "passive_skill_book"]
             class_books = [k for k, v in ITEM_TEMPLATES.items() if v.get("type") == "skill_book" and v.get("classId") == p.get("class_id")]
             all_active_books = [k for k, v in ITEM_TEMPLATES.items() if v.get("type") == "skill_book"]
-            if passive_books and random.random() < 0.55:
-                won_fb = random.choice(passive_books)
-            else:
-                won_fb = random.choice(class_books if random.random() < 0.65 and class_books else all_active_books)
+            won_fb = random.choice(class_books if random.random() < 0.70 and class_books else all_active_books)
             self.db.add_item_to_inventory(player_id, won_fb, 1)
-            p["yang"] = p.get("yang", 0) + 1500
             self.db.save_player_state(p)
             self.refresh_player_from_db(player_id)
-            return True, f"📖 {item['name']} geöffnet! Erhalten: {ITEM_TEMPLATES[won_fb]['name']} & 1.500 Gold!"
+            return True, f"📖 {item['name']} geöffnet! Erhalten: {ITEM_TEMPLATES[won_fb]['name']}!"
 
         return False, "Dieser Gegenstand wird beim Schmied oder der Runenweberin verwendet."
 
@@ -10590,7 +10856,7 @@ class WorldAuthority:
             target_sk_id = skill_id
         else:
             book_item = next(
-                (i for i in inv if i.get("templateId", "").startswith("fb_") and int(i.get("quantity", 1)) > 0),
+                (i for i in inv if i.get("templateId", "").startswith("fb_") and not i.get("templateId", "").startswith("fb_passive_") and int(i.get("quantity", 1)) > 0),
                 None,
             )
             if not book_item:
@@ -11414,7 +11680,15 @@ class WorldAuthority:
             msg_text = f"{icon} Erhalten: {qty_str}{tpl['name']}{plus_str}{r_badge}{bonus_str}{yang_part}{src_str}"
         self.add_chat_message("Beute", msg_text, channel="drops", target_player_id=player_id)
 
-    def add_chat_message(self, sender: str, text: str, channel: str = "normal", target_player_id: Optional[str] = None):
+    def add_chat_message(
+        self,
+        sender: str,
+        text: str,
+        channel: str = "normal",
+        target_player_id: Optional[str] = None,
+        sender_player_id: Optional[str] = None,
+        is_bot: Optional[bool] = None,
+    ):
         if target_player_id and str(target_player_id).startswith("bot_"):
             return
         raw = (text or "").strip()[:240]
@@ -11425,7 +11699,7 @@ class WorldAuthority:
             ch = "normal"
 
         # Präfix-Erkennung wie in Projekt 1 & 2:
-        # ! = Global, $ = Handelschat, % = Gilde
+        # ! = Global, $ = Handelschat, % = Gilde, # = Gruppe
         if raw.startswith("!"):
             ch = "global"
             raw = raw[1:].strip()
@@ -11435,46 +11709,139 @@ class WorldAuthority:
         elif raw.startswith("%"):
             ch = "guild"
             raw = raw[1:].strip()
+        elif raw.startswith("#"):
+            ch = "party"
+            raw = raw[1:].strip()
 
         if not raw:
             return
 
         clean = self.expand_chat_smileys(raw)
-        if ch not in ("normal", "global", "trade", "guild", "system", "event", "drops"):
+        if ch not in ("normal", "global", "party", "trade", "guild", "bots", "system", "event", "drops"):
             ch = "normal"
+
+        sender_str = str(sender or "").strip()
+        sender_low = sender_str.lower()
+        spid_str = str(sender_player_id or "").strip()
+        detected_bot = bool(
+            is_bot
+            or spid_str.lower().startswith("bot_")
+            or sender_low.startswith("[bot]")
+            or sender_low.startswith("bot_")
+            or sender_low == "ki-evolution"
+            or (ch in ("system", "event") and "[bot]" in clean.lower())
+        )
 
         msg = {
             "id": f"msg_{uuid.uuid4().hex[:8]}",
-            "sender": sender,
+            "sender": sender_str,
             "channel": ch,
-            "isSA": sender.upper().startswith("[SA]"),
-            "isGM": sender.upper().startswith("[SA]") or sender.startswith("[GM]") or sender.startswith("[GA]"),
+            "isBot": detected_bot,
+            "isSA": sender_str.upper().startswith("[SA]"),
+            "isGM": sender_str.upper().startswith("[SA]") or sender_str.startswith("[GM]") or sender_str.startswith("[GA]"),
             "text": clean,
             "time": time.strftime("%H:%M"),
         }
+        if spid_str:
+            msg["senderPlayerId"] = spid_str
         if target_player_id:
             msg["targetPlayerId"] = str(target_player_id)
         self.chat_history.append(msg)
-        if len(self.chat_history) > 85:
-            self.chat_history = self.chat_history[-85:]
+        if len(self.chat_history) > 180:
+            self.chat_history = self.chat_history[-180:]
 
-        # ── Bot-Markt-Flüster-KI ──
-        # Wenn ein echtes Spieler-Konto im Global-/Handelschat "Suche X" oder "Kaufe X" schreibt,
-        # antwortet ein passender Bot per Flüstern mit seinem Angebot.
-        if ch in ("global", "trade") and not str(sender).startswith("bot_") and not str(sender).startswith("[Bot]"):
+        # ── Bot-Markt-Flüster-KI & Intelligente SSOT-Spieler-Auskunft ──
+        if ch in ("global", "trade", "normal") and not detected_bot and sender_low not in ("system", "welt-herold", "beute", "quest-chronist"):
             try:
-                self._check_bot_trade_whisper_reply(sender, clean, time.time())
+                if ch in ("global", "trade"):
+                    self._check_bot_trade_whisper_reply(sender, clean, time.time())
+                self._check_bot_public_qa_reply(sender_str, clean, ch, time.time())
             except Exception:
                 pass
 
         # ── Reaktive Emote-KI ──
-        # Wenn ein Spieler ein Emote benutzt (Text in *Asterisken* = Emote-Format),
-        # reagieren nahe Bots mit einem passenden Gegen-Emote nach 1–2s Verzögerung.
         if raw.startswith("*") and not str(sender).startswith("bot_"):
             try:
                 self._check_bot_emote_reaction(sender, clean, time.time())
             except Exception:
                 pass
+
+    def _record_bot_qa_telemetry(self, bot: dict, action_key: str, res: dict, now: float):
+        """SSOT Teil I Abs. 6: Bots testen & auditieren laufend die neuen Charaktermodelle, Animationen, Kombos & Skills."""
+        qa = getattr(self, "_bot_qa_telemetry", None)
+        if not isinstance(qa, dict):
+            qa = {"startedAt": now, "classes": {}, "totalSamples": 0, "lastSavedAt": 0.0}
+            self._bot_qa_telemetry = qa
+        cls_id = str(bot.get("class_id", "warrior"))
+        gender = str(bot.get("gender", "m"))
+        wpn = ((bot.get("equipment") or {}).get("weapon") or {})
+        wpn_tpl = ITEM_TEMPLATES.get(wpn.get("templateId", ""), {})
+        w_sub = str(wpn_tpl.get("weaponSubType") or "one_hand")
+        mounted_tag = "mounted" if bot.get("active_mount") else "foot"
+        rig_key = f"{cls_id}_{gender}_{w_sub}_{mounted_tag}"
+        entry = qa["classes"].setdefault(
+            rig_key,
+            {"classId": cls_id, "gender": gender, "weaponSubType": w_sub, "stance": mounted_tag, "actions": {}, "zeroHitSkills": 0},
+        )
+        act_st = entry["actions"].setdefault(action_key, {"casts": 0, "hits": 0, "crits": 0, "lastAt": 0.0})
+        act_st["casts"] = int(act_st["casts"]) + 1
+        hits_v = int(res.get("hits", 1 if res.get("damage") else 0) or 0)
+        act_st["hits"] = int(act_st["hits"]) + hits_v
+        if res.get("crit"):
+            act_st["crits"] = int(act_st["crits"]) + 1
+        if not action_key.startswith("combo_") and res.get("type") not in ("buff",) and not res.get("healed") and hits_v == 0:
+            entry["zeroHitSkills"] = int(entry["zeroHitSkills"]) + 1
+        act_st["lastAt"] = round(now, 1)
+        qa["totalSamples"] = int(qa["totalSamples"]) + 1
+        if now - float(qa.get("lastSavedAt", 0.0) or 0.0) >= 60.0:
+            qa["lastSavedAt"] = now
+            try:
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                qa_path = os.path.join(base_dir, "data", "bot_qa_reports.json")
+                os.makedirs(os.path.dirname(qa_path), exist_ok=True)
+                with open(qa_path, "w", encoding="utf-8") as fh:
+                    json.dump(qa, fh, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+
+    def _answer_ssot_handbook_question(self, txt_low: str) -> Optional[str]:
+        """Beantwortet Spielerfragen präzise anhand des offiziellen Aeryndor Master-Handbuchs (SSOT)."""
+        if any(k in txt_low for k in ("pferd", "medaille", "affen", "reittier level", "kampfpferd", "militärpferd")):
+            return "🐎 Pferde starten auf Stufe 1. Pferdemedaillen droppen später ausschließlich bei den Affen (aktuell noch gesperrt), ab Stufe 15 wird es ein Kampfpferd und ab Stufe 35 ein Militärpferd!"
+        if any(k in txt_low for k in ("wolfskralle", "bärengalle", "tigerfell", "schmuckgegenstand", "shuriken", "degenklinge", "schwarze uniform", "edelstein", "uppitem")):
+            return "📦 Upp-Items droppen gezielt nach Gebiet: Map 1 Wölfe/Keiler (Lv.1–8) -> Wolfskralle | Bären/Tiger (Lv.9–15) -> Bärengalle/Tigerfell | Eid-Kämpfer (Lv.16–22) -> Schmuckgegenstand | Map 2 (ab Lv.23) -> Stück Edelstein, Schwarze Uniform, Shuriken & Degenklingen!"
+        if any(k in txt_low for k in ("schmied", "uppen", "aufwerten", "magisches metall", "segensschrift", "segi")):
+            return "🔨 Beim Dorfschmied gilt: +0➔+9 mit steigenden Gold- & Materialkosten. Segensschriftrollen verhindern Zerstörung (Stufe sinkt bei Fehlschlag um -1), Magisches Metall schützt die Stufe zu 100%!"
+        if any(k in txt_low for k in ("skill", "fertigkeit", "meister", "großmeister", "seelenstein", "fb ", "fertigkeitsbuch")):
+            return "📘 Fertigkeiten starten auf 0: Mit 20 Punkten erreichst du M1, mit Fertigkeitsbüchern M1➔G1 (von Monolithen/Bossen), mit Seelensteinen G1➔P10 und mit einem Legendären Seelenstein P10➔L1!"
+        if any(k in txt_low for k in ("wo leveln", "map 2", "map2", "gebietswechsel", "exp ", "level 23", "level 38")):
+            return "🗺️ Level-Route: Lv. 1–22 auf Map 1 (Norden), ab Lv. 23 über die Steinbrücke (±760) nach Map 2 (Lv. 23–29 Anfangsgebiet, Lv. 30–38 Süd-Bakra). Ab Lv. 38 gibt es dort kaum noch EXP!"
+        if any(k in txt_low for k in ("stark gegen monster", "geiststein", "instabil", "max roll")):
+            return "💎 'Stark gegen Monster' wirkt ausschließlich auf normale Monster (nicht auf Bosse/Monolithen). Rissmonolithen droppen immer 1 FB + Geiststeine (+0..+4), und die Seltenheit 'Instabil' garantiert 100% Max-Boni!"
+        return None
+
+    def _check_bot_public_qa_reply(self, sender_name: str, text: str, channel: str, now: float):
+        if now - float(getattr(self, "_last_public_bot_qa_at", 0.0) or 0.0) < 12.0:
+            return
+        txt_low = text.lower().strip()
+        if "?" not in txt_low and not any(w in txt_low for w in ("wo ", "wie ", "woher ", "wann ", "was bringt")):
+            return
+        ans = self._answer_ssot_handbook_question(txt_low)
+        if not ans:
+            return
+        online_b = [p for pid, p in self.players.items() if str(pid).startswith("bot_") and p.get("online") and p.get("inWorld")]
+        if not online_b:
+            return
+        helper_b = random.choice(online_b)
+        self._last_public_bot_qa_at = now
+        reply_ch = "global" if channel == "global" else "normal"
+        self.add_chat_message(
+            helper_b.get("name", "[Bot]Veyron"),
+            f"@{sender_name}: {ans}",
+            channel=reply_ch,
+            sender_player_id=helper_b["player_id"],
+            is_bot=True,
+        )
 
     def _check_bot_trade_whisper_reply(self, sender_name: str, text: str, now: float):
         """Flüster-Handel-KI: Wenn Spieler 'Suche X' oder 'Kaufe X' im Global/Trade-Chat schreibt,
@@ -12328,11 +12695,16 @@ class WorldAuthority:
                     f"zu deiner Position ({int(sender_player['pos_x'])}, {int(sender_player['pos_z'])})! Lad mich gern in deine Gruppe ein."
                 )
 
+        # 1b. SSOT-Handbuch-Auskunft bei Fachfragen (Drops, Schmied, Skills, Pferd, Map-Wechsel)
+        ssot_ans = self._answer_ssot_handbook_question(txt_low)
+        if ssot_ans:
+            return f"📖 {b_name} (Lv. {b_lvl} {b_cls}): {ssot_ans}"
+
         # 2. Spieler fragt nach Position / Wo bist du / Was machst du
         if any(k in txt_low for k in ("wo ", "wo?", "pos", "koordinat", "ort", "machst", "farmst", "status")):
-            town_st = bot.get("_townErrand")
+            town_st = bot.get("townErrand")
             if isinstance(town_st, dict):
-                return f"🏛️ Ich bin gerade auf Stadtrundgang in {town_st.get('city', 'der Hauptstadt')} ({bx}, {bz}) beim Schmied & der Händlerin und kehre gleich auf meine Route zurück!"
+                return f"🏛️ Ich bin gerade auf Stadtrundgang ({bx}, {bz}) beim Quest-NPC, Schmied & der Händlerin und kehre gleich auf meine Route zurück!"
             return (
                 f"📍 Ich (Lv. {b_lvl} {b_cls}) bin gerade in {b_sec} bei ({bx}, {bz}) "
                 f"und kämpfe gegen {cur_mob_str}. Status: {bot.get('autoFarmStatus', 'Auf Patrouille')}."
@@ -13294,7 +13666,7 @@ class WorldAuthority:
                 b["map_id"] = caller_p["map_id"]
                 b["pos_x"] = tx
                 b["pos_z"] = tz
-                b["_townErrand"] = None
+                b.pop("townErrand", None)
                 af_b = b.setdefault("autofarm", {})
                 af_b["anchorX"] = tx
                 af_b["anchorZ"] = tz
@@ -13359,7 +13731,7 @@ class WorldAuthority:
                 ang = (idx_b / max(1, len(target_bots))) * math.pi * 2.0
                 b["pos_x"] = float(mono["x"]) + math.cos(ang) * 5.2
                 b["pos_z"] = float(mono["z"]) + math.sin(ang) * 5.2
-                b["_townErrand"] = None
+                b.pop("townErrand", None)
                 b["targetId"] = mono["id"]
                 b["autoFarmTargetId"] = mono["id"]
                 b["manualFocusTargetId"] = mono["id"]
@@ -13388,7 +13760,7 @@ class WorldAuthority:
                 b["map_id"] = boss["mapId"]
                 b["pos_x"] = float(boss["x"]) + math.cos(ang) * 5.5
                 b["pos_z"] = float(boss["z"]) + math.sin(ang) * 5.5
-                b["_townErrand"] = None
+                b.pop("townErrand", None)
                 b["targetId"] = boss["id"]
                 b["autoFarmTargetId"] = boss["id"]
                 b["manualFocusTargetId"] = boss["id"]
@@ -14133,7 +14505,7 @@ class WorldAuthority:
             "chat": [
                 m for m in self.chat_history
                 if not m.get("targetPlayerId") or (p and m.get("targetPlayerId") == p.get("player_id"))
-            ][-50:],
+            ][-100:],
             "offlineShops": shops,
             "worldEvent": self.world_event,
         }

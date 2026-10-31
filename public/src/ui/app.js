@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261030_v603';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v609';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -16,7 +16,7 @@ import {
   fadeOutIslandContent,
   popIsland,
   shakeElement,
-} from './iosUi.js?v=20261029_v600';
+} from './iosUi.js?v=20261031_v607';
 
 const CLASS_PORTRAITS = {
   warrior: './assets/client_ui/charackter/klingenwaechter_m.png',
@@ -439,9 +439,12 @@ class AeryndorMMOApp {
       protectMaterials: true,
     };
 
-    // Multi-Channel Chat (Normal, ! Global, $ Handelschat, % Gilde) & Messenger / GM-Liste
+    // Multi-Channel Chat (Allgemein, # Gruppe, % Gilde, System, $ Handel, Beute, Bots) & Messenger / GM-Liste
     this.chatChannel = 'normal';
-    this.chatFilter = 'all';
+    this.chatFilter = 'normal';
+    this.sessionChatMessages = [];
+    this.sessionChatIdSet = new Set();
+    this._clearedChatIdsByFilter = {};
     this.chatMinimized = true;
     this.chatSmileyOpen = false;
     this.lastChatSig = '';
@@ -3988,7 +3991,7 @@ class AeryndorMMOApp {
           fetch(`./index.html?_cb=${Date.now()}`, { cache: 'no-store' })
             .then((r) => r.text())
             .then((html) => {
-              if (html && !html.includes('v=v20261028_v581')) {
+              if (html && !html.includes('v=v20261031_v607')) {
                 window.location.reload();
               }
             })
@@ -4445,6 +4448,13 @@ class AeryndorMMOApp {
       this.engine.showTeamRankLabels = this.clientSettings?.showTeamRankLabels !== false;
       this.engine.showTeamGlow = this.clientSettings?.showTeamGlow !== false;
       this.engine.showTeamParticles = this.clientSettings?.showTeamParticles !== false;
+      const metaForDoc = CLASS_META[this.selfState?.class_id || activeChar?.classId || 'warrior'] || CLASS_META.warrior;
+      const docIdxForEngine = Number(activeChar?.doctrineIdx || 0);
+      const docObjForEngine = metaForDoc.doctrines[docIdxForEngine] || metaForDoc.doctrines[0];
+      if (snap?.player) {
+        snap.player.doctrine = docObjForEngine?.id || snap.player.doctrine || '';
+        snap.player.gender = activeChar?.gender || snap.player.gender || 'm';
+      }
       this.engine.syncSnapshot(snap);
     }
 
@@ -4785,34 +4795,151 @@ class AeryndorMMOApp {
     if (buffStrip) {
       const meta = CLASS_META[s.class_id] || CLASS_META.warrior;
       const docSkills = meta.doctrines[0]?.skills || [];
-      const auraSkillName = docSkills[3]?.name || 'Aura des Schwertes';
       const comp = s.computed || {};
+
+      const classBuffDefs = {
+        warrior: [
+          {
+            id: 'class_aura_sword',
+            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/aura_sword.png',
+            title: 'Aura des Schwerts (Klassen-Aura)',
+            sub: 'Dauerhafte Kampf-Aura • Aktiv (∞)',
+            bonuses: [
+              `✨ Physischer Angriffswert: +20%`,
+              `⚔️ Kritische Trefferkraft: +${comp.critChance || 8}%`,
+            ],
+            desc: 'Umhüllt deine Klinge mit konzentrierter Schwert-Aura und verstärkt alle Angriffe dauerhaft.',
+            dur: '∞',
+          },
+          {
+            id: 'class_berserk',
+            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/berserk.png',
+            title: 'Kampfrausch (Kampf-Haltung)',
+            sub: 'Wilder Kampfrausch • Aktiv (∞)',
+            bonuses: [
+              `⚡ Angriffsgeschwindigkeit: +15%`,
+              `🐎 Bewegungsgeschwindigkeit: +10%`,
+            ],
+            desc: 'Versetzt dich in einen rasenden Kampfrausch, der dein Angriffs- und Bewegungstempo stark erhöht.',
+            dur: '∞',
+          },
+        ],
+        sura: [
+          {
+            id: 'class_aura_blade',
+            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/enchanted_blade.png',
+            title: 'Verzauberte Klinge (Klassen-Aura)',
+            sub: 'Dauerhafte Runen-Aura • Aktiv (∞)',
+            bonuses: [
+              `✨ Magie- &amp; Physischer AW: +20%`,
+              `🩸 Lebensraub (TP-Absaugung): +8%`,
+            ],
+            desc: 'Verzaubert deine Klinge mit dunklen Runen, erhöht deinen Angriffswert und saugt Lebensenergie ab.',
+            dur: '∞',
+          },
+          {
+            id: 'class_armor',
+            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/enchanted_armor.png',
+            title: 'Verzauberte Rüstung (Schutz-Aura)',
+            sub: 'Spektrale Rüstung • Aktiv (∞)',
+            bonuses: [
+              `🛡️ Verteidigung &amp; Rüstung: +18%`,
+              `🔄 Nahkampf-Reflexion: +10%`,
+            ],
+            desc: 'Umhüllt dich mit einer widerstandsfähigen Schutzschicht und wirft gegnerische Treffer zurück.',
+            dur: '∞',
+          },
+        ],
+        shaman: [
+          {
+            id: 'class_dragon_help',
+            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/dragon_help.png',
+            title: 'Hilfe des Drachen (Klassen-Aura)',
+            sub: 'Heiliger Drachen-Segen • Aktiv (∞)',
+            bonuses: [
+              `✨ Magie-Angriffswert: +20%`,
+              `🎯 Kritische Trefferchance: +15%`,
+            ],
+            desc: 'Der Segen des Himmelsdrachen leitet astrale Kraft in deine Zauber und erhöht deine Krit-Chance.',
+            dur: '∞',
+          },
+          {
+            id: 'class_dragon_blessing',
+            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/dragon_blessing.png',
+            title: 'Segen (Schutz-Aura)',
+            sub: 'Göttlicher Schutzschild • Aktiv (∞)',
+            bonuses: [
+              `🛡️ Erlittener Nahkampfschaden: -20%`,
+              `✨ Verteidigung: +15%`,
+            ],
+            desc: 'Errichtet eine schützende Barriere aus Drachenlicht, die gegnerische Hiebe abdämpft.',
+            dur: '∞',
+          },
+        ],
+        ninja: [
+          {
+            id: 'class_shadow_step',
+            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/shadow_step.png',
+            title: 'Federschreiten (Klassen-Aura)',
+            sub: 'Schatten-Agilität • Aktiv (∞)',
+            bonuses: [
+              `🐎 Bewegungsgeschwindigkeit: +20%`,
+              `💨 Ausweichchance &amp; Kiting: +12%`,
+            ],
+            desc: 'Lässt deine Schritte leicht wie eine Feder werden und gewährt maximale Wendigkeit im Gefecht.',
+            dur: '∞',
+          },
+          {
+            id: 'class_stealth',
+            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/stealth.png',
+            title: 'Tarnung (Schatten-Haltung)',
+            sub: 'Verhüllte Präsenz • Aktiv (∞)',
+            bonuses: [
+              `🗡️ Hinterhalt-Schadensbonus: +30%`,
+              `👁️ Gegnerische Aggro-Reichweite: -25%`,
+            ],
+            desc: 'Hüllt dich in den Schatten des Windes und verstärkt verheerende Hinterhalt-Schläge.',
+            dur: '∞',
+          },
+        ],
+      };
+
+      const classBuffList = classBuffDefs[s.class_id] || classBuffDefs.warrior;
       const buffs = [
-        {
-          id: 'class_aura',
-          icon: docSkills[3]?.icon || './assets/icons/skills/krieger.png',
-          title: `${auraSkillName} (Klassen-Aura)`,
-          sub: 'Dauerhafte Kampf-Aura • Aktiv (∞)',
-          bonuses: [
-            `✨ Angriffswert &amp; Magieangriff: +20%`,
-            `⚔️ Kritische Trefferkraft: +${comp.critChance || 8}%`,
-          ],
-          desc: 'Umhüllt deine Waffe mit konzentrierter Äther-Energie und verstärkt alle Angriffe dauerhaft.',
-          dur: '∞',
-        },
-        {
-          id: 'metin_breaker',
-          icon: './assets/icons/skills/Passive/metinbrecher.png',
-          title: 'Rissmonolith-Brecher',
-          sub: 'Passive Meisterschaft • Aktiv',
-          bonuses: [
-            `✨ Stark gegen Rissmonolithen: +${Math.max(10, comp.vsMetinPct || 10)}%`,
-            '💎 Erhöhte Beute-Resonanz an Monolithen: +5%',
-          ],
-          desc: 'Durchdringt die kristalline Schale schlafender, instabiler und erwachter Rissmonolithen.',
-          dur: 'P',
-        },
+        ...classBuffList,
       ];
+
+      // 1. Sammel-Buff für alle passiven Fertigkeiten (nur sichtbar, wenn mindestens 1 FB gelernt wurde)
+      const learnedPassives = (PASSIVE_SKILLS || []).filter(
+        (ps) => Math.min(20, Number(s.passives?.[ps.id] || 0)) > 0
+      );
+      const totalPassivePts = learnedPassives.reduce(
+        (acc, ps) => acc + Math.min(20, Number(s.passives?.[ps.id] || 0)),
+        0
+      );
+
+      if (totalPassivePts > 0) {
+        const passiveBonusLines = learnedPassives.slice(0, 6).map((ps) => {
+          const curLv = Math.min(20, Number(s.passives[ps.id]));
+          const rawVal = curLv * (Number(ps.perLevel) || 1);
+          const valStr = Number.isInteger(rawVal) ? String(rawVal) : rawVal.toFixed(rawVal * 10 % 1 === 0 ? 1 : 2);
+          return `✨ ${ps.name} (St. ${curLv}/20): +${valStr}${ps.unit || ''}`;
+        });
+        if (learnedPassives.length > 6) {
+          passiveBonusLines.push(`➕ Und ${learnedPassives.length - 6} weitere passive Fertigkeiten (siehe [C])`);
+        }
+
+        buffs.push({
+          id: 'passive_masteries',
+          icon: './assets/icons/items/skill/skill_book.png',
+          title: `Passive Meisterschaften (${totalPassivePts} / 400)`,
+          sub: 'Gelehrte Fertigkeitsbücher • Permanent [C]',
+          bonuses: passiveBonusLines,
+          desc: 'Permanente Meisterungs-Boni durch eingelesene Fertigkeitsbücher (FBs). Gilt dauerhaft für alle Angriffe & Charakterwerte.',
+          dur: `${totalPassivePts} P`,
+        });
+      }
+
       if (s.active_mount) {
         buffs.push({
           id: 'active_mount',
@@ -4828,23 +4955,77 @@ class AeryndorMMOApp {
           dur: 'AN',
         });
       }
+
+      let activePetSkinKey = 'ridack_dragonpet';
       if (s.active_pet) {
-        const pLvl = s.petData?.level || 1;
-        const pName = s.petData?.customName || 'Grüner Smaragddrache';
+        const pd = s.petData || {};
+        const pLvl = Math.max(1, Math.min(120, Number(pd.level || 1)));
+        activePetSkinKey = this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet';
+        const petSkinMeta = this.engine?.getPetSkinConfig?.(activePetSkinKey) || { label: 'Grüner Smaragddrache', emoji: '🐉' };
+        const petName = (pd.customName && pd.customName !== 'Grüner Smaragddrache') ? pd.customName : (petSkinMeta.label || 'Grüner Smaragddrache');
+        const petEmoji = petSkinMeta.emoji || '🐾';
+
+        const vitVal = Math.max(1, Number(pd.vit ?? 1));
+        const strVal = Math.max(1, Number(pd.str ?? 1));
+        const dexVal = Math.max(1, Number(pd.dex ?? 1));
+        const intVal = Math.max(1, Number(pd.int ?? 1));
+        const herrschaftLv = Math.max(0, Number(pd.skills?.herrschaft || 0));
+        const jaegerLv = Math.max(0, Number(pd.skills?.jaeger || 0));
+        const dssLv = Math.max(0, Number(pd.skills?.zerstoerung_dss || 0));
+        const autoPickupLv = Math.max(0, Number(pd.skills?.auto_pickup || 0));
+        const heilungLv = Math.max(0, Number(pd.skills?.heilung || 0));
+        const erneuerungLv = Math.max(0, Number(pd.skills?.erneuerung || 0));
+
+        const petAtkTotal = strVal * 2 + herrschaftLv * 5 + Math.floor(pLvl * 1.5);
+        const petMagTotal = intVal * 2 + herrschaftLv * 5 + Math.floor(pLvl * 1.5);
+        const petPvmPctTotal = (jaegerLv * 1.0) + (dssLv * 0.5) + (pLvl * 0.15);
+
+        const petBonuses = [
+          '🌟 Basis-Aura: +6% Kritisch, +12% EXP & +350 TP',
+          `⚔️ Kampfkraft: +${petAtkTotal} AW / +${petMagTotal} Magie-AW / +${petPvmPctTotal.toFixed(1)}% PvM-DMG`,
+        ];
+
+        if (autoPickupLv > 0) {
+          petBonuses.push(`🧲 Auto-Pickup (St. ${autoPickupLv}/5): ${autoPickupLv * 10}m Sammelradius`);
+        }
+        if (jaegerLv > 0) {
+          petBonuses.push(`🎯 Jäger (St. ${jaegerLv}/20): +${(jaegerLv * 1.25).toFixed(1)}% Monster & Monolithen`);
+        }
+        if (heilungLv > 0) {
+          petBonuses.push(`🩹 Heilung (St. ${heilungLv}/5): +${(heilungLv * 400).toLocaleString('de-DE')} TP alle 45s`);
+        }
+        if (erneuerungLv > 0) {
+          petBonuses.push(`💚 Erneuerung (St. ${erneuerungLv}/5): Notfall-Rettung bei <20% TP`);
+        }
+
+        const petSkillsDefs = Array.isArray(this.config?.petSkills) && this.config.petSkills.length === 24
+          ? this.config.petSkills
+          : PET_SKILLS_CLIENT;
+        const otherSkills = (petSkillsDefs || []).filter(
+          (sk) => !['auto_pickup', 'jaeger', 'heilung', 'erneuerung'].includes(sk.id) &&
+                  Math.max(0, Number(pd.skills?.[sk.id] || 0)) > 0
+        );
+        for (const sk of otherSkills.slice(0, 3)) {
+          const curLv = Math.max(0, Number(pd.skills[sk.id]));
+          const rawVal = curLv * (Number(sk.perLevel) || 1);
+          const vStr = Number.isInteger(rawVal) ? String(rawVal) : rawVal.toFixed(1);
+          petBonuses.push(`🔹 ${sk.name} (St. ${curLv}): +${vStr}${sk.unit || ''}`);
+        }
+        if (otherSkills.length > 3) {
+          petBonuses.push(`➕ Und ${otherSkills.length - 3} weitere Begleiter-Skills (siehe [P])`);
+        }
+
         buffs.push({
           id: 'active_pet',
           icon: './assets/icons/items/pet/pet_seal.png',
-          title: `🐉 ${pName} (Stufe ${pLvl}/120)`,
+          title: `${petEmoji} ${petName} (Stufe ${pLvl}/120)`,
           sub: 'Treuer Begleiter • Aktiv [P]',
-          bonuses: [
-            `✨ Stark gegen Monster: +${10 + Math.floor(pLvl / 10)}%`,
-            `📈 Erfahrungs-Bonus (EXP): +${10 + Math.floor(pLvl / 15)}%`,
-            '🧲 Automatische Beute-Aufnahme im Umkreis',
-          ],
-          desc: 'Begleitet dich durch Aeryndor, sammelt automatisch Beute ein und stärkt deine Kampfkraft.',
+          bonuses: petBonuses,
+          desc: 'Begleitet dich treu durch Aeryndor, sammelt Beute ein und verstärkt deine Kampfkraft im Gefecht.',
           dur: `Lv.${pLvl}`,
         });
       }
+
       if (s.autofarm?.enabled) {
         buffs.push({
           id: 'autofarm_ai',
@@ -4861,7 +5042,8 @@ class AeryndorMMOApp {
         });
       }
       this._currentHudBuffs = buffs;
-      const buffSig = `${s.class_id}|${Boolean(s.active_mount)}|${Boolean(s.active_pet)}|${s.petData?.level || 1}|${Boolean(s.autofarm?.enabled)}`;
+      const pd = s.petData || {};
+      const buffSig = `${s.class_id}|${Boolean(s.active_mount)}|${Boolean(s.active_pet)}|${activePetSkinKey}|${pd.level || 1}|${pd.customName || ''}|${totalPassivePts}|${Boolean(s.autofarm?.enabled)}`;
       if (buffStrip.dataset.sig !== buffSig) {
         buffStrip.dataset.sig = buffSig;
         buffStrip.innerHTML = buffs
@@ -5937,38 +6119,47 @@ class AeryndorMMOApp {
       }
     }
 
-    if (wpEl) {
-      // Eigener Zielpunkt wird bereits links in der Kompass-Pille angezeigt -> keine doppelte Entfernungs-Anzeige
-      if (wpTarget && userWpDist === null) {
-        const distM = Math.round(Math.hypot(wpTarget.x - px, wpTarget.z - pz));
-        wpEl.classList.remove('hidden');
-        wpEl.classList.toggle('is-user-wp', userWpDist !== null);
-        wpEl.textContent = `◆ ${distM} m`;
-        wpEl.dataset.wpQuestId = wpTarget.questId || '';
-      } else {
-        wpEl.classList.add('hidden');
-        wpEl.classList.remove('is-user-wp');
-      }
+    // Questziel-Entfernung berechnen
+    let questDistM = null;
+    if (wpTarget && userWpDist === null) {
+      questDistM = Math.round(Math.hypot(wpTarget.x - px, wpTarget.z - pz));
     }
 
-    // Blickwinkel der Kamera (in Grad 0..360, wobei 0 = Norden (-Z), 90 = Osten (+X), 180 = Süden (+Z), 270 = Westen (-X))
+    if (wpEl) {
+      // Untere Anzeige ausblenden, da das Questziel nun links in der Kompass-Pille (Bild 2) liegt
+      wpEl.classList.add('hidden');
+      wpEl.classList.remove('is-user-wp');
+    }
+
+    // Blickwinkel der Kamera (wird für das Kompassband weiterhin berechnet)
     const camYaw = Number(this.engine?.cameraYaw ?? this.selfState.rot_y ?? 0);
     const lookDx = -Math.sin(camYaw);
     const lookDz = -Math.cos(camYaw);
     let headingDeg = (Math.atan2(lookDx, -lookDz) * 180) / Math.PI;
     headingDeg = ((headingDeg % 360) + 360) % 360;
 
+    // Linke Kompass-Pille: Blickrichtung entfernt -> Questziel (◆ ... m, Bild 2) oder eigener Wegpunkt (📍 ... m)
     if (headingEl) {
       if (userWpDist !== null) {
         headingEl.textContent = `📍 ${userWpDist} m`;
         headingEl.classList.add('is-user-wp');
+        headingEl.classList.remove('is-quest-wp');
         headingEl.title = `Zielpunkt: ${this.worldMapWaypoint?.name || 'Navigationsziel'} – Klicken: Weltkarte öffnen [M]`;
-      } else {
-        const dirs = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
-        const dirIdx = Math.round(headingDeg / 45) % 8;
-        headingEl.textContent = `${Math.round(headingDeg)}° ${dirs[dirIdx]}`;
+        headingEl.dataset.wpType = 'user';
+      } else if (questDistM !== null) {
+        headingEl.textContent = `◆ ${questDistM} m`;
+        headingEl.classList.add('is-quest-wp');
         headingEl.classList.remove('is-user-wp');
-        headingEl.title = 'Blickrichtung – Klicken: Weltkarte öffnen [M]';
+        headingEl.title = `Questziel: ${wpTarget?.label || 'Aktiv'} (${questDistM} m) – Klicken: Automatisch hinlaufen / Quests öffnen [L]`;
+        headingEl.dataset.wpType = 'quest';
+        headingEl.dataset.wpQuestId = wpTarget?.questId || '';
+      } else {
+        headingEl.textContent = `◆ --`;
+        headingEl.classList.remove('is-user-wp');
+        headingEl.classList.remove('is-quest-wp');
+        headingEl.title = 'Kein aktives Questziel auf dieser Karte – Klicken: Quests öffnen [L]';
+        headingEl.dataset.wpType = 'none';
+        headingEl.dataset.wpQuestId = '';
       }
     }
 
@@ -7323,6 +7514,7 @@ class AeryndorMMOApp {
       ['shoes', '👢 Schuhe'],
       ['gloves', '🧤 Handschuhe'],
       ['belt', '🎗️ Gürtel'],
+      ['talisman', '🔮 Talisman'],
     ];
 
     const rarityColorMap = {
@@ -7330,6 +7522,7 @@ class AeryndorMMOApp {
       rare: '#38bdf8',
       epic: '#c084fc',
       legendary: '#fde047',
+      instabil: '#22d3ee',
       mythic: '#f87171',
     };
 
@@ -7337,7 +7530,8 @@ class AeryndorMMOApp {
       .map(([slotKey, slotLabel]) => {
         const it = eqMap[slotKey];
         if (!it) return '';
-        const nameCol = rarityColorMap[it.rarity] || '#f4ead2';
+        const itRar = it.rarity || this.config?.items?.[it.templateId]?.rarity || 'common';
+        const nameCol = rarityColorMap[itRar] || '#f4ead2';
         const st = it.effectiveStats || it.baseStats || {};
         const statPills = [];
         if (st.atk) statPills.push(`⚔️ AW +${st.atk}`);
@@ -7536,15 +7730,22 @@ class AeryndorMMOApp {
     } else if (cfg.type === 'potion_mp') {
       const mpItem = (s.inventory || []).find((i) => /potion_mp/i.test(i.templateId || ''));
       if (mpItem) {
-        this.sendAction('use_item', { uid: mpItem.uid });
+        this.sendAction('equip_or_use_item', { itemUid: mpItem.uid });
       } else {
         this.sendAction('use_potion');
       }
     } else if (cfg.type === 'mount') {
       this.triggerMountToggle(cfg.mountId || 'mount_war_boar');
     } else if (cfg.type === 'item' && cfg.templateId) {
-      if (cfg.templateId === 'potion_hp_small' || cfg.templateId === 'potion_hp_medium') {
+      if (/^potion_hp_/i.test(cfg.templateId) || cfg.templateId === 'potion_hp') {
         this.sendAction('use_potion');
+        return;
+      }
+      if (/^potion_mp_/i.test(cfg.templateId) || cfg.templateId === 'potion_mp') {
+        const mpItem = (s.inventory || []).find((i) => /potion_mp/i.test(i.templateId || ''));
+        if (mpItem) {
+          this.sendAction('equip_or_use_item', { itemUid: mpItem.uid });
+        }
         return;
       }
       if (cfg.templateId === 'mount_war_boar') {
@@ -7556,10 +7757,8 @@ class AeryndorMMOApp {
         const tpl = this.config?.items?.[invItem.templateId] || invItem;
         if (invItem.type === 'mount_seal' || tpl.type === 'mount_seal') {
           this.triggerMountToggle(tpl.mountId || invItem.mountId || invItem.templateId || 'mount_war_boar');
-        } else if (invItem.type === 'equipment' || invItem.type === 'pet_seal' || tpl.type === 'pet_seal') {
-          this.sendAction('equip_or_use_item', { itemUid: invItem.uid });
         } else {
-          this.sendAction('use_item', { uid: invItem.uid });
+          this.sendAction('equip_or_use_item', { itemUid: invItem.uid });
         }
       } else {
         this.showToast('Kein passender Gegenstand mehr im Inventar.', 'warn');
@@ -7599,8 +7798,8 @@ class AeryndorMMOApp {
         .filter((i) => i.templateId === tplId)
         .reduce((acc, cur) => acc + (cur.quantity || 1), 0);
 
-    const potCount = countItem('potion_hp_small') + countItem('potion_hp_medium');
-    const mpPotCount = countItem('potion_mp_medium') + countItem('potion_mp_small');
+    const potCount = countItem('potion_hp_large') + countItem('potion_hp_medium') + countItem('potion_hp_small');
+    const mpPotCount = countItem('potion_mp_large') + countItem('potion_mp_medium') + countItem('potion_mp_small');
     const hbCfg = this.getHotbarConfig();
 
     const wrap = document.getElementById('hotbar-skill-slots');
@@ -7875,9 +8074,9 @@ class AeryndorMMOApp {
                   this.showToast('⚠️ Reine Schmied-Materialien können nicht in die Aktionsleiste gelegt werden.');
                   return;
                 }
-                if (invIt.templateId === 'potion_hp_small' || invIt.templateId === 'potion_hp_medium') {
+                if (invIt.templateId.startsWith('potion_hp_')) {
                   hbCfg[toIdx] = { type: 'potion_hp' };
-                } else if (invIt.templateId === 'potion_mp_small' || invIt.templateId === 'potion_mp_medium') {
+                } else if (invIt.templateId.startsWith('potion_mp_')) {
                   hbCfg[toIdx] = { type: 'potion_mp' };
                 } else if (invIt.type === 'mount_seal' || tpl.type === 'mount_seal' || invIt.templateId === 'mount_war_boar') {
                   hbCfg[toIdx] = { type: 'mount', mountId: tpl.mountId || invIt.mountId || 'mount_war_boar' };
@@ -7984,18 +8183,93 @@ class AeryndorMMOApp {
     const btn = document.getElementById('btn-chat-channel');
     if (!btn) return;
     const labels = {
-      normal: 'Normal',
+      normal: 'Allgemein',
+      party: '# Gruppe',
       global: '! Global',
       trade: '$ Handel',
       guild: '% Gilde',
+      bots: '🤖 Bots',
     };
-    btn.textContent = labels[this.chatChannel] || 'Normal';
+    btn.textContent = labels[this.chatChannel] || 'Allgemein';
     btn.className = `chat-channel-badge ch-${this.chatChannel}`;
+  }
+
+  isBotChatMessage(m) {
+    if (!m) return false;
+    if (m.isBot) return true;
+    const spid = String(m.senderPlayerId || '').trim().toLowerCase();
+    if (spid.startsWith('bot_')) return true;
+    const sender = String(m.sender || '').trim().toLowerCase();
+    if (sender.startsWith('[bot]') || sender.startsWith('bot_') || sender === 'ki-evolution') return true;
+    const ch = m.channel === 'world' ? 'normal' : (m.channel || 'normal');
+    if ((ch === 'system' || ch === 'event') && String(m.text || '').toLowerCase().includes('[bot]')) {
+      return true;
+    }
+    return false;
+  }
+
+  doesChatMessageMatchFilter(m, filterName = this.chatFilter) {
+    if (!m) return false;
+    const myPid = String(this.selfState?.player_id || '');
+    if (m.targetPlayerId) {
+      if (String(m.targetPlayerId).startsWith('bot_')) return false;
+      if (myPid && String(m.targetPlayerId) !== myPid) return false;
+    }
+
+    const f = filterName || 'normal';
+    const clearedSet = this._clearedChatIdsByFilter?.[f];
+    if (clearedSet && m.id && clearedSet.has(m.id)) return false;
+
+    const ch = m.channel === 'world' ? 'normal' : (m.channel || 'normal');
+    const isBotMsg = this.isBotChatMessage(m) || ch === 'bots';
+
+    // Strikte Exklusiv-Filterung:
+    // Im "Bots"-Filter NUR Bot-Nachrichten (sowie eigene Nachrichten im Kanal 'bots') anzeigen;
+    // in ALLEN anderen Filtern sind Bot-Nachrichten vollständig ausgeblendet!
+    if (f === 'bots') {
+      return isBotMsg;
+    }
+    if (isBotMsg) {
+      return false;
+    }
+
+    // Jede Nachricht gehört exakt zu ihrem Filter – alle anderen Nachrichten werden ausgeblendet
+    switch (f) {
+      case 'normal':
+        return ch === 'normal' || ch === 'global';
+      case 'party':
+        return ch === 'party';
+      case 'guild':
+        return ch === 'guild';
+      case 'system':
+        return ch === 'system' || ch === 'event';
+      case 'trade':
+        return ch === 'trade';
+      case 'drops':
+        return ch === 'drops';
+      default:
+        return ch === f;
+    }
   }
 
   updateChatBox(chatList, force = false) {
     if (Array.isArray(chatList)) {
-      this.latestChatList = chatList;
+      if (!this.sessionChatMessages) this.sessionChatMessages = [];
+      if (!this.sessionChatIdSet) this.sessionChatIdSet = new Set();
+      for (const m of chatList) {
+        if (!m || !m.id) continue;
+        if (!this.sessionChatIdSet.has(m.id)) {
+          this.sessionChatIdSet.add(m.id);
+          this.sessionChatMessages.push(m);
+        }
+      }
+      if (this.sessionChatMessages.length > 420) {
+        const removed = this.sessionChatMessages.splice(0, this.sessionChatMessages.length - 420);
+        for (const rm of removed) {
+          if (rm?.id) this.sessionChatIdSet.delete(rm.id);
+        }
+      }
+      this.latestChatList = this.sessionChatMessages;
     }
     const list = this.latestChatList || [];
 
@@ -8007,7 +8281,7 @@ class AeryndorMMOApp {
         if (!m || !m.id || this._seenChatBubbleMsgIds.has(m.id)) continue;
         this._seenChatBubbleMsgIds.add(m.id);
         const ch = m.channel === 'world' ? 'normal' : (m.channel || 'normal');
-        if (['normal', 'global', 'trade', 'guild'].includes(ch)) {
+        if (['normal', 'party', 'global', 'trade', 'guild', 'bots'].includes(ch)) {
           const isLocal = Boolean(
             (this.selfState?.player_id && String(m.senderPlayerId) === String(this.selfState.player_id)) ||
             (this.selfState?.name && (m.sender === this.selfState.name || m.sender?.includes(this.selfState.name)))
@@ -8021,7 +8295,8 @@ class AeryndorMMOApp {
       }
     }
 
-    const sig = `${this.chatFilter}_${list.map((m) => m.id).join(',')}`;
+    const clearedCount = this._clearedChatIdsByFilter?.[this.chatFilter]?.size || 0;
+    const sig = `${this.chatFilter}_${clearedCount}_${list.map((m) => m.id).join(',')}`;
     if (!force && sig === this.lastChatSig) return;
     this.lastChatSig = sig;
 
@@ -8029,37 +8304,46 @@ class AeryndorMMOApp {
     if (!box) return;
 
     const tagLabels = {
-      normal: 'Normal',
+      normal: 'Allgemein',
+      party: '# Gruppe',
       global: '! Global',
       trade: '$ Handel',
       guild: '% Gilde',
-      drops: '💎 Drops',
+      drops: '💎 Beute',
+      bots: '🤖 Bot',
       system: 'System',
       event: 'Event',
     };
 
-    const myPid = String(this.selfState?.player_id || '');
-    const filtered = list.filter((m) => {
-      if (m.targetPlayerId) {
-        if (String(m.targetPlayerId).startsWith('bot_')) return false;
-        if (myPid && String(m.targetPlayerId) !== myPid) return false;
-      }
-      const ch = m.channel === 'world' ? 'normal' : m.channel || 'normal';
-      if (this.chatFilter === 'all') return true;
-      if (this.chatFilter === 'drops') return ch === 'drops';
-      return ch === this.chatFilter || ch === 'system';
-    });
+    const filtered = list.filter((m) => this.doesChatMessageMatchFilter(m, this.chatFilter));
 
-    if (filtered.length === 0 && this.chatFilter === 'drops') {
-      box.innerHTML = `<div class="chat-line-drops"><span class="chat-ch-tag drops">💎 Drops</span>Noch keine Gegenstände in dieser Sitzung gedroppt oder aufgehoben.</div>`;
+    if (filtered.length === 0) {
+      const emptyPlaceholders = {
+        normal: `<div class="chat-line-normal" style="opacity:0.65;"><span class="chat-ch-tag normal">Allgemein</span>Keine Nachrichten im allgemeinen Spieler-Chat.</div>`,
+        party: `<div class="chat-line-party" style="opacity:0.65;"><span class="chat-ch-tag party"># Gruppe</span>Keine Nachrichten im Gruppen-Chat.</div>`,
+        guild: `<div class="chat-line-guild" style="opacity:0.65;"><span class="chat-ch-tag guild">% Gilde</span>Keine Nachrichten im Gilden-Chat.</div>`,
+        system: `<div class="chat-line-system" style="opacity:0.65;"><span class="chat-ch-tag system">System</span>Keine aktuellen System- oder Event-Meldungen.</div>`,
+        trade: `<div class="chat-line-trade" style="opacity:0.65;"><span class="chat-ch-tag trade">$ Handel</span>Keine aktuellen Angebote im Handels-Chat.</div>`,
+        drops: `<div class="chat-line-drops" style="opacity:0.75;"><span class="chat-ch-tag drops">💎 Beute</span>Noch keine Gegenstände in dieser Sitzung gedroppt oder aufgehoben.</div>`,
+        bots: `<div class="chat-line-bots" style="opacity:0.75;"><span class="chat-ch-tag bots">🤖 Bots</span>Noch keine Bot-Nachrichten in dieser Sitzung.</div>`,
+      };
+      box.innerHTML = emptyPlaceholders[this.chatFilter] || emptyPlaceholders.normal;
       return;
     }
 
     box.innerHTML = filtered
       .map((m) => {
-        const ch = m.channel === 'world' ? 'normal' : m.channel || 'normal';
+        const rawCh = m.channel === 'world' ? 'normal' : m.channel || 'normal';
+        const isBotMsg = this.isBotChatMessage(m);
+        const ch = isBotMsg ? 'bots' : rawCh;
         const lineCls = `chat-line-${ch}`;
-        const tagLbl = tagLabels[ch] || 'Normal';
+        let tagLbl = tagLabels[ch] || 'Allgemein';
+        if (isBotMsg) {
+          if (rawCh === 'trade') tagLbl = '🤖 Handel';
+          else if (rawCh === 'global') tagLbl = '🤖 Ruf';
+          else if (rawCh === 'system' || rawCh === 'event') tagLbl = '🤖 KI-Log';
+          else tagLbl = '🤖 Bot';
+        }
         const isSA = Boolean(m.isSA || String(m.sender || '').startsWith('[SA]'));
         const isGM = Boolean(m.isGM || isSA || String(m.sender || '').startsWith('[GM]') || String(m.sender || '').startsWith('[GA]'));
         const gmCrown = isSA
@@ -8070,14 +8354,14 @@ class AeryndorMMOApp {
         const isMentioned = Boolean(myName && rawTxt.toLowerCase().includes(myName) && m.sender !== this.selfState?.name);
         const mentionCls = isMentioned ? ' chat-line-mentioned' : '';
 
-        if (m.sender && m.sender !== this.selfState?.name) {
+        if (m.sender && m.sender !== this.selfState?.name && !isBotMsg) {
           this.lastWhisperSender = m.sender;
         }
         let txt = this.expandClientSmileys(this.escapeHtml(rawTxt));
         // Item-Links in Chatnachrichten formatieren z. B. [Giftschwert+9]
         txt = txt.replace(/\[([^\]]{2,32})\]/g, '<span class="chat-item-link">[$1]</span>');
         const senderHtml =
-          ch === 'system' || ch === 'event' || ch === 'drops'
+          rawCh === 'system' || rawCh === 'event' || rawCh === 'drops'
             ? `<strong>${this.escapeHtml(m.sender)}:</strong>`
             : `${gmCrown}<strong class="chat-sender-link" data-chat-whisper="${this.escapeHtml(m.sender)}" title="Klicken für Direkt-Konversation mit ${this.escapeHtml(m.sender)}">${this.escapeHtml(m.sender)}:</strong>`;
         return `<div class="${lineCls}${mentionCls}"><span class="chat-ch-tag ${ch}">${tagLbl}</span>[${m.time || ''}] ${senderHtml} ${txt}</div>`;
@@ -8977,7 +9261,26 @@ class AeryndorMMOApp {
 
     document.getElementById('hud-compass-heading')?.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      this.toggleWindow('worldmap');
+      const headingEl = document.getElementById('hud-compass-heading');
+      const wpType = headingEl?.dataset?.wpType;
+      const questId = headingEl?.dataset?.wpQuestId;
+      if (wpType === 'user') {
+        this.toggleWindow('worldmap');
+      } else if (wpType === 'quest' && questId) {
+        if (typeof this.navigateToQuest === 'function') {
+          this.navigateToQuest(questId);
+        } else {
+          this.openCharacterWindowTab('quests');
+        }
+      } else {
+        const quests = this.selfState?.activeQuests || [];
+        const tracked = quests.find((q) => !q.completed) || quests[0];
+        if (tracked && typeof this.navigateToQuest === 'function') {
+          this.navigateToQuest(tracked.id || tracked.questId);
+        } else {
+          this.openCharacterWindowTab('quests');
+        }
+      }
     });
 
     document.getElementById('hud-compass-wb-left')?.addEventListener('click', (ev) => {
@@ -9234,25 +9537,26 @@ class AeryndorMMOApp {
       }
     });
 
-    // Multi-Channel Chat-Filter-Tabs (Alle | Normal | ! Global | $ Handel | % Gilde)
+    // Multi-Channel Chat-Filter-Tabs (Allgemein | Gruppe | Gilde | System | Handel | Beute | Bots)
+    const sendableChannels = ['normal', 'party', 'guild', 'global', 'trade', 'bots'];
     document.querySelectorAll('[data-chat-filter]').forEach((tabBtn) => {
       tabBtn.addEventListener('click', () => {
-        const f = tabBtn.getAttribute('data-chat-filter') || 'all';
+        const f = tabBtn.getAttribute('data-chat-filter') || 'normal';
         this.chatFilter = f;
         document.querySelectorAll('[data-chat-filter]').forEach((b) => {
           b.classList.toggle('active', b.getAttribute('data-chat-filter') === f);
         });
-        if (f !== 'all') {
+        if (sendableChannels.includes(f)) {
           this.chatChannel = f;
           this.updateChatChannelBadgeUI();
         }
-        this.updateChatBox(this.latestChatList, true);
+        this.updateChatBox(null, true);
         document.getElementById('chat-input')?.focus();
       });
     });
 
-    // Kanal-Umschalter in der Eingabezeile (Normal -> ! Global -> $ Handel -> % Gilde)
-    const chOrder = ['normal', 'global', 'trade', 'guild'];
+    // Kanal-Umschalter in der Eingabezeile (Allgemein -> # Gruppe -> % Gilde -> ! Global -> $ Handel -> 🤖 Bots)
+    const chOrder = ['normal', 'party', 'guild', 'global', 'trade', 'bots'];
     document.getElementById('btn-chat-channel')?.addEventListener('click', () => {
       const idx = chOrder.indexOf(this.chatChannel);
       this.chatChannel = chOrder[(idx + 1) % chOrder.length];
@@ -9295,11 +9599,15 @@ class AeryndorMMOApp {
       chatInput?.focus();
     });
 
-    // Präfix-Schnellerkennung (! = Global, $ = Handelschat, % = Gilde)
+    // Präfix-Schnellerkennung (! = Global, # = Gruppe, $ = Handelschat, % = Gilde)
     chatInput?.addEventListener('input', () => {
       const val = chatInput.value;
       if (val === '!') {
         this.chatChannel = 'global';
+        chatInput.value = '';
+        this.updateChatChannelBadgeUI();
+      } else if (val === '#') {
+        this.chatChannel = 'party';
         chatInput.value = '';
         this.updateChatChannelBadgeUI();
       } else if (val === '$') {
@@ -9463,10 +9771,17 @@ class AeryndorMMOApp {
       smileyPopup?.classList.add('hidden');
 
       const low = rawText.toLowerCase();
-      // Slash-Befehle (/clear, /help, /w, /pn, /shout, /trade, /guild)
+      // Slash-Befehle (/clear, /help, /w, /pn, /shout, /party, /trade, /guild, /bots)
       if (low === '/clear') {
-        const box = document.getElementById('chat-messages');
-        if (box) box.innerHTML = `<div class="chat-line-system"><span class="chat-ch-tag system">System</span>Chatfenster geleert.</div>`;
+        if (!this._clearedChatIdsByFilter) this._clearedChatIdsByFilter = {};
+        const f = this.chatFilter || 'normal';
+        if (!this._clearedChatIdsByFilter[f]) this._clearedChatIdsByFilter[f] = new Set();
+        for (const m of this.latestChatList || []) {
+          if (m?.id && this.doesChatMessageMatchFilter(m, f)) {
+            this._clearedChatIdsByFilter[f].add(m.id);
+          }
+        }
+        this.updateChatBox(null, true);
         this.minimizeChatBox();
         return;
       }
@@ -9528,12 +9843,18 @@ class AeryndorMMOApp {
       if (text.startsWith('/shout ') || text.startsWith('/ruf ') || text.startsWith('/global ')) {
         targetChannel = 'global';
         text = text.replace(/^\/(?:shout|ruf|global)\s+/i, '');
+      } else if (text.startsWith('/party ') || text.startsWith('/gruppe ') || text.startsWith('/p ')) {
+        targetChannel = 'party';
+        text = text.replace(/^\/(?:party|gruppe|p)\s+/i, '');
       } else if (text.startsWith('/trade ') || text.startsWith('/handel ')) {
         targetChannel = 'trade';
         text = text.replace(/^\/(?:trade|handel)\s+/i, '');
       } else if (text.startsWith('/guild ') || text.startsWith('/gilde ')) {
         targetChannel = 'guild';
         text = text.replace(/^\/(?:guild|gilde)\s+/i, '');
+      } else if (text.startsWith('/bots ') || text.startsWith('/bot ')) {
+        targetChannel = 'bots';
+        text = text.replace(/^\/(?:bots|bot)\s+/i, '');
       }
 
       if (text.startsWith('/testbignotice') || text.startsWith('/testb ') || text === '/testb') {
@@ -9573,7 +9894,7 @@ class AeryndorMMOApp {
         }
         if (ev.key === 'Tab') {
           ev.preventDefault();
-          const chOrder = ['normal', 'global', 'trade', 'guild'];
+          const chOrder = ['normal', 'party', 'guild', 'global', 'trade', 'bots'];
           const idx = chOrder.indexOf(this.chatChannel);
           this.chatChannel = chOrder[(idx + 1) % chOrder.length];
           this.updateChatChannelBadgeUI();
@@ -11910,12 +12231,13 @@ class AeryndorMMOApp {
           : { x: fallbackNpcX, z: baseNpcZ };
 
       const rewardItemsResolved = (q.rewardItems || []).map((ri) => {
-        const itemDef = this.config?.items?.[ri.itemId] || { id: ri.itemId, name: ri.itemId };
+        const itemDef = this.config?.items?.[ri.itemId] || { id: ri.itemId, templateId: ri.itemId, name: ri.itemId };
         return {
           itemId: ri.itemId,
           qty: Number(ri.count || ri.qty || 1),
           name: itemDef.name || ri.itemId,
-          icon: itemDef.icon || './assets/icons/items/chest/mondlicht_truhe.png',
+          icon: itemDef.icon || ri.itemId,
+          itemDef,
         };
       });
 
@@ -12372,11 +12694,40 @@ class AeryndorMMOApp {
       }
 
       const itemRewardsHtml = (q.rewardItemsResolved || [])
-        .map((ri) => `<span class="nqm-rew-pill item">❖ ${ri.qty}x ${this.escapeHtml(ri.name)}</span>`)
+        .map((ri) => {
+          const itemDefObj = ri.itemDef || this.config?.items?.[ri.itemId] || { id: ri.itemId, templateId: ri.itemId, name: ri.name };
+          const iconMarkup = renderIconHTML(itemDefObj, 24, 24);
+          return `
+            <div class="nqm-reward-item-chip" title="${ri.qty}× ${this.escapeHtml(ri.name)}">
+              <div class="nqm-reward-icon-box">
+                ${iconMarkup}
+              </div>
+              <div class="nqm-reward-item-info">
+                <span class="nqm-item-qty">${ri.qty}×</span>
+                <span class="nqm-item-name">${this.escapeHtml(ri.name)}</span>
+              </div>
+            </div>`;
+        })
         .join('');
+
       const bioBonusPill = q.biologistBonus?.label
-        ? `<span class="nqm-rew-pill" style="background:rgba(16,185,129,0.22);border:1px solid #34d399;color:#6ee7b7;">✦ Dauerhaft: ${this.escapeHtml(q.biologistBonus.label)}</span>`
+        ? `<span class="nqm-rew-pill bio" title="Permanenter Charakter-Bonus"><span class="nqm-rew-sym">🧬</span> Dauerhaft: <b>${this.escapeHtml(q.biologistBonus.label)}</b></span>`
         : '';
+
+      const currencyPills = [];
+      if (q.rewardYang) {
+        currencyPills.push(`<span class="nqm-rew-pill gold" title="Gold-Belohnung"><span class="nqm-rew-sym">🪙</span> <b>${(q.rewardYang).toLocaleString('de-DE')}</b> Gold</span>`);
+      }
+      if (q.rewardExp) {
+        currencyPills.push(`<span class="nqm-rew-pill exp" title="Erfahrungs-Punkte"><span class="nqm-rew-sym">✨</span> <b>${(q.rewardExp).toLocaleString('de-DE')}</b> EXP</span>`);
+      }
+      if (q.rewardRep) {
+        currencyPills.push(`<span class="nqm-rew-pill rep" title="Reichs-Rangpunkte"><span class="nqm-rew-sym">⭐</span> <b>+${q.rewardRep}</b> Rang</span>`);
+      }
+      if (bioBonusPill) {
+        currencyPills.push(bioBonusPill);
+      }
+      const currenciesHtml = currencyPills.join('');
 
       const moreBlockHtml =
         isMoreOpen && q.dialogueMore
@@ -12397,21 +12748,21 @@ class AeryndorMMOApp {
           </div>
           <div class="nqm-qcard-desc">„${this.escapeHtml(dialogueText)}“</div>
           ${moreBlockHtml}
-          <div class="nqm-qcard-prog-row">
-            <span>Aufgabe: <b>${this.escapeHtml(q.targetPos?.label || q.mapName)}</b> (${q.progress} / ${q.required})</span>
-            <span class="nqm-qcard-pct">${pct}%</span>
-          </div>
-          <div class="nqm-qcard-bar"><div style="width:${pct}%;"></div></div>
-          <div class="nqm-qcard-bottom">
-            <div class="nqm-rew-list">
-              <span class="nqm-rew-pill gold">◆ ${(q.rewardYang || 0).toLocaleString('de-DE')} Gold</span>
-              <span class="nqm-rew-pill exp">✦ ${(q.rewardExp || 0).toLocaleString('de-DE')} EXP</span>
-              ${q.rewardRep ? `<span class="nqm-rew-pill rep">★ +${q.rewardRep} Rang</span>` : ''}
-              ${bioBonusPill}
-              ${itemRewardsHtml}
+          <div class="nqm-qcard-prog-wrap">
+            <div class="nqm-qcard-prog-row">
+              <span class="nqm-prog-label">🎯 Aufgabe: <b>${this.escapeHtml(q.targetPos?.label || q.mapName)}</b></span>
+              <span class="nqm-prog-count">${q.progress} / ${q.required} <span class="nqm-qcard-pct">(${pct}%)</span></span>
             </div>
-            <div class="nqm-qcard-actions">${actionBtnHtml}</div>
+            <div class="nqm-qcard-bar"><div style="width:${pct}%;"></div></div>
           </div>
+          <div class="nqm-qcard-rewards-box">
+            <div class="nqm-rewards-header">
+              <span class="nqm-rewards-title">🎁 Belohnung:</span>
+              <div class="nqm-rew-currencies">${currenciesHtml}</div>
+            </div>
+            ${itemRewardsHtml ? `<div class="nqm-rew-items-grid">${itemRewardsHtml}</div>` : ''}
+          </div>
+          <div class="nqm-qcard-actions">${actionBtnHtml}</div>
         </div>
       `;
     };
@@ -13595,13 +13946,18 @@ class AeryndorMMOApp {
           }
 
           const itemRewardsHtml = (selQ.rewardItemsResolved || [])
-            .map(
-              (ri) => `
-              <div class="cw-qd-rew-item">
-                <img src="./assets/icons/items/chest/mondlicht_truhe.png" alt="" />
-                <span style="color:#38bdf8;">${ri.qty}x ${this.escapeHtml(ri.name)}</span>
-              </div>`
-            )
+            .map((ri) => {
+              const itemDefObj = ri.itemDef || this.config?.items?.[ri.itemId] || { id: ri.itemId, templateId: ri.itemId, name: ri.name };
+              const iconMarkup = renderIconHTML(itemDefObj, 24, 24);
+              return `
+              <div class="cw-qd-rew-item" title="${ri.qty}× ${this.escapeHtml(ri.name)}">
+                <div class="cw-qd-rew-icon-wrap">
+                  ${iconMarkup}
+                </div>
+                <span style="color:#38bdf8;font-weight:800;font-size:11.5px;">${ri.qty}×</span>
+                <span style="color:#f1f5f9;font-weight:700;font-size:11px;">${this.escapeHtml(ri.name)}</span>
+              </div>`;
+            })
             .join('');
           const bioRewardHtml = selQ.biologistBonus?.label
             ? `<div class="cw-qd-rew-item" style="grid-column:1 / -1;background:rgba(16,185,129,0.15);border:1px solid rgba(52,211,153,0.4);">
@@ -14874,17 +15230,20 @@ class AeryndorMMOApp {
       { id: 'helmet', domKey: 'helmet', label: 'Helm', x: 76, y: 6, w: 50, h: 48, slotSize: 1, svg: equipSilhouettes.helmet },
       { id: 'armor', domKey: 'armor', label: 'Rüstung', x: 76, y: 60, w: 50, h: 56, slotSize: 2, svg: equipSilhouettes.armor },
       { id: 'gloves', domKey: 'gloves', label: 'Handschuhe', x: 76, y: 122, w: 50, h: 46, slotSize: 1, svg: equipSilhouettes.gloves },
-      { id: 'shield', domKey: 'belt', label: 'Gürtel / Schild', x: 64, y: 174, w: 74, h: 36, slotSize: 1, svg: equipSilhouettes.belt },
+      { id: 'belt', domKey: 'belt', label: 'Gürtel', x: 64, y: 174, w: 74, h: 36, slotSize: 1, svg: equipSilhouettes.belt },
       { id: 'earrings', domKey: 'earrings', label: 'Ohrringe', x: 148, y: 10, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.earrings },
       { id: 'necklace', domKey: 'necklace', label: 'Halskette', x: 148, y: 50, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.necklace },
-      { id: 'shield', domKey: 'ring1', label: 'Ring / Schild', x: 148, y: 90, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.shield },
+      { id: 'shield', domKey: 'ring1', label: 'Schild', x: 148, y: 90, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.shield },
       { id: 'bracelet', domKey: 'bracelet', label: 'Armband', x: 148, y: 130, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.bracelet },
-      { id: 'hmr', domKey: 'ring2', label: 'Talisman / Ring', x: 148, y: 170, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.ring2 },
+      { id: 'talisman', domKey: 'ring2', label: 'Talisman', x: 148, y: 170, w: 40, h: 36, slotSize: 1, svg: equipSilhouettes.ring2 },
     ];
 
     const equipSlotsHtml = slotCoords
       .map((sc) => {
-        const eqItem = sc.domKey === 'belt' ? (s.equipment?.belt || null) : s.equipment?.[sc.id];
+        const eqItem =
+          sc.id === 'talisman'
+            ? s.equipment?.talisman || s.equipment?.hmr || null
+            : s.equipment?.[sc.id] || null;
         if (!eqItem) {
           return `
             <div class="equip-slot-box nw-chamfer-slot slot-size-${sc.slotSize}"
@@ -14895,14 +15254,16 @@ class AeryndorMMOApp {
             </div>`;
         }
         const tpl = this.config.items?.[eqItem.templateId] || eqItem;
+        const eqRar = eqItem.rarity || tpl.rarity || 'common';
         const itemSlotSize = getItemSlotSize(tpl);
         const iconH = sc.slotSize === 3 ? (itemSlotSize === 3 ? 100 : itemSlotSize === 2 ? 68 : 34) : sc.slotSize === 2 ? 48 : 32;
+        const actualSlotKey = sc.id === 'talisman' && !s.equipment?.talisman && s.equipment?.hmr ? 'hmr' : sc.id;
         return `
-          <div class="equip-slot-box nw-chamfer-slot filled slot-size-${sc.slotSize} rarity-${eqItem.rarity || 'common'}"
+          <div class="equip-slot-box nw-chamfer-slot filled slot-size-${sc.slotSize} rarity-${eqRar}"
                style="left:${sc.x}px;top:${sc.y}px;width:${sc.w}px;height:${sc.h}px;"
                draggable="true"
-               data-target-slot="${sc.id}"
-               data-eq-slot="${sc.id}"
+               data-target-slot="${actualSlotKey}"
+               data-eq-slot="${actualSlotKey}"
                data-item-uid="${eqItem.uid}">
             ${renderIconHTML(tpl, 34, iconH)}
             ${itemSlotSize > 1 ? `<span class="item-size-badge">${itemSlotSize}S</span>` : ''}
@@ -15951,8 +16312,27 @@ class AeryndorMMOApp {
     const curPlus = Number(targetItem.plusLevel || 0);
     const isMax = curPlus >= 9;
     const nextPlus = Math.min(9, curPlus + 1);
-    const rateRow = this.config.blacksmithRates?.[curPlus] || { chance: 0.7, yang: 2320, matId: null, matCount: 0 };
     const tpl = this.config.items?.[targetItem.templateId] || targetItem;
+    const itemSlotKey = tpl.slot || targetItem.slot || 'weapon';
+    const itemReqLv = Number(tpl.levelReq || tpl.reqLevel || targetItem.reqLevel || 1);
+    const tierByLv =
+      itemReqLv >= 90 ? 'aetherium' :
+      itemReqLv >= 80 ? 'blaustahl' :
+      itemReqLv >= 70 ? 'schwarzstahl' :
+      itemReqLv >= 60 ? 'drachengold' :
+      itemReqLv >= 50 ? 'gold' :
+      itemReqLv >= 40 ? 'silber' :
+      itemReqLv >= 30 ? 'ebenholz' :
+      itemReqLv >= 20 ? 'eisen' :
+      itemReqLv >= 10 ? 'kupfer' : 'holz';
+    const effTierKey = tpl.tierKey || tierByLv;
+    const tierRates = this.config.blacksmithTierRates?.[effTierKey] || this.config.blacksmithRates || {};
+    const rawRateRow = tierRates[curPlus] || tierRates[String(curPlus)] || { chance: 0.7, yang: 2000, matId: null, matCount: 0 };
+    const resolvedMatId =
+      rawRateRow.matId === 'map2_slot'
+        ? this.config.map2UpgradeMatBySlot?.[itemSlotKey] || 'mat_gem_piece'
+        : rawRateRow.matId;
+    const rateRow = { ...rawRateRow, matId: resolvedMatId };
 
     const countInv = (tplId) =>
       (s.inventory || [])
@@ -15960,7 +16340,7 @@ class AeryndorMMOApp {
         .reduce((a, b) => a + (b.quantity || 1), 0);
 
     const scrollCount = countInv('scroll_blessing');
-    const ritualCount = countInv('item_soul_fragment');
+    const ritualCount = countInv('item_magic_metal') + countInv('item_soul_fragment');
 
     if (this.selectedSmithProtection === 'scroll' && scrollCount <= 0) {
       this.selectedSmithProtection = 'none';
@@ -15970,45 +16350,45 @@ class AeryndorMMOApp {
 
     const baseChancePct = Math.round((rateRow.chance || 0.7) * 100);
     const bonusChancePct =
-      this.selectedSmithProtection === 'ritual' ? 15 : this.selectedSmithProtection === 'scroll' ? 10 : 0;
-    const finalChance = isMax ? 100 : Math.min(100, baseChancePct + bonusChancePct);
+      this.selectedSmithProtection === 'ritual' ? 10 : this.selectedSmithProtection === 'scroll' ? 10 : 0;
+    const finalChance = isMax ? 100 : Math.min(98, baseChancePct + bonusChancePct);
     const chanceToneClass = finalChance >= 65 ? 'chance-high' : finalChance >= 40 ? 'chance-mid' : 'chance-low';
 
-    // Stat-Berechnung wie im Projekt-2-Referenzbild (Aktueller Angriffswert vs Nach Verbesserung)
-    const isWeapon = (tpl.slot || targetItem.slot) === 'weapon';
-    const basePrimary = Number(tpl.baseAtk || tpl.baseDef || (isWeapon ? 115 : 46));
-    const curPrimary = Math.round(basePrimary * (1 + curPlus * 0.14));
-    const nextPrimary = Math.round(basePrimary * (1 + nextPlus * 0.14));
-    const diffPrimary = Math.max(5, nextPrimary - curPrimary);
-
-    const curMagic = Math.round(curPrimary * 0.27);
-    const nextMagic = Math.round(nextPrimary * 0.27);
-    const diffMagic = Math.max(2, nextMagic - curMagic);
-    const atkSpd = isWeapon ? 6 + Math.floor(curPlus / 3) : 4 + Math.floor(curPlus / 3);
-    const nextAtkSpd = isWeapon ? 6 + Math.floor(nextPlus / 3) : 4 + Math.floor(nextPlus / 3);
-
-    // Materialien & Yang (wie in Projekt 2)
-    const reqMatId = rateRow.matId || (curPlus >= 3 ? 'mat_bloodleaf_resin' : 'mat_wolf_claw');
-    const matTpl = this.config.items?.[reqMatId] || {
-      name: curPlus >= 3 ? 'Blutlaubharz' : 'Wolfskralle',
-      icon: curPlus >= 3 ? 'bloodleaf_resin' : 'wolf_claw',
+    // Exakte SSOT +0 bis +9 lineare Interpolation aus baseStats & maxStats
+    const isWeapon = itemSlotKey === 'weapon';
+    const bStats = tpl.baseStats || targetItem.effectiveStats || {};
+    const mStats = tpl.maxStats || bStats;
+    const interpStat = (key, plusVal, fallback = 0) => {
+      const bV = Number(bStats[key] ?? fallback);
+      const mV = Number(mStats[key] ?? bV);
+      return Math.round(bV + ((mV - bV) * Math.max(0, Math.min(9, plusVal))) / 9);
     };
-    const needMat = Math.max(1, Number(rateRow.matCount || 1));
-    const haveMat = rateRow.matId ? countInv(rateRow.matId) : Math.max(1, countInv(reqMatId) || 1);
-    const hasEnoughMat = !rateRow.matId || haveMat >= needMat;
-    const costYang = Number(rateRow.yang || 2320);
+    const primaryKey = isWeapon ? 'atk' : bStats.def !== undefined ? 'def' : bStats.hp !== undefined ? 'hp' : 'atk';
+    const curPrimary = interpStat(primaryKey, curPlus, isWeapon ? 20 : 10);
+    const nextPrimary = interpStat(primaryKey, nextPlus, curPrimary);
+    const diffPrimary = Math.max(0, nextPrimary - curPrimary);
+
+    const secondaryKey = isWeapon ? 'magicAtk' : bStats.hp !== undefined && primaryKey !== 'hp' ? 'hp' : 'magicDef';
+    const curMagic = interpStat(secondaryKey, curPlus, 0);
+    const nextMagic = interpStat(secondaryKey, nextPlus, curMagic);
+    const diffMagic = Math.max(0, nextMagic - curMagic);
+    const spdKey = isWeapon ? 'atkSpeedPct' : 'moveSpeedPct';
+    const atkSpd = interpStat(spdKey, curPlus, Number(bStats.speedPct || 0));
+    const nextAtkSpd = interpStat(spdKey, nextPlus, atkSpd);
+
+    // Exakte SSOT Materialien & Goldkosten
+    const reqMatId = rateRow.matId || null;
+    const needMat = reqMatId ? Math.max(0, Number(rateRow.matCount || 0)) : 0;
+    const matTpl = reqMatId
+      ? this.config.items?.[reqMatId] || { name: reqMatId, icon: 'monolith_shards' }
+      : { name: 'Kein Material benötigt', icon: 'monolith_shards' };
+    const haveMat = reqMatId ? countInv(reqMatId) : 0;
+    const hasEnoughMat = !reqMatId || needMat <= 0 || haveMat >= needMat;
+    const costYang = Number(rateRow.yang || 1000);
     const hasEnoughYang = (s.yang || 0) >= costYang;
 
     const serverLockIdx = typeof targetItem.lockedBonusIdx === 'number' ? targetItem.lockedBonusIdx : -1;
-    const itemBonuses =
-      Array.isArray(targetItem.bonuses) && targetItem.bonuses.length > 0
-        ? targetItem.bonuses
-        : [
-            { name: 'Stark gegen Rissmonolithen', value: 25, unit: '%', locked: true },
-            { name: 'Stark gegen Bestien', value: 20, unit: '%' },
-            { name: 'Angriffswert', value: 25, unit: '' },
-            { name: 'Chance auf krit. Treffer', value: 5, unit: '%' },
-          ];
+    const itemBonuses = Array.isArray(targetItem.bonuses) ? targetItem.bonuses : [];
 
     const hasDss = typeof targetItem.dss === 'number';
     const hasFks = typeof targetItem.fks === 'number';
@@ -16120,7 +16500,6 @@ class AeryndorMMOApp {
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span class="p2-sec-label">METHODE</span>
         <div style="display:flex;gap:4px;">
-          <button type="button" class="ornate-btn small" id="btn-buy-scroll" style="height:18px;font-size:8.5px;padding:0 5px;">+ Segi (1.200 G)</button>
           <label style="font-size:8.5px;color:#cbd5e1;display:inline-flex;align-items:center;gap:3px;cursor:pointer;">
             <input type="checkbox" id="chk-upp-keep" ${this.uppKeepOpen !== false ? 'checked' : ''} style="width:11px;height:11px;accent-color:#fbbf24;" />
             Offen lassen
@@ -16148,7 +16527,7 @@ class AeryndorMMOApp {
         <button type="button" class="p2-method-card ${this.selectedSmithProtection === 'ritual' ? 'active' : ''}" data-smith-prot="ritual">
           <div class="p2-method-top">
             <strong>Magisches Metall (${ritualCount})</strong>
-            <span class="p2-method-tag mythic">+15 % Chance</span>
+            <span class="p2-method-tag mythic">+10 % Chance</span>
           </div>
           <small>100% Sicher • Kein Bruch &amp; kein Stufenverlust!</small>
         </button>
@@ -16207,10 +16586,6 @@ class AeryndorMMOApp {
       this.uppKeepOpen = ev.target.checked;
     });
 
-    body.querySelector('#btn-buy-scroll')?.addEventListener('click', () => {
-      this.sendAction('buy_npc_item', { templateId: 'scroll_blessing', quantity: 1 });
-    });
-
     body.querySelector('#btn-do-upgrade')?.addEventListener('click', () => {
       if (!targetItem || isMax) return;
       const effMethod =
@@ -16221,7 +16596,8 @@ class AeryndorMMOApp {
             : 'none';
       this.sendAction('blacksmith_upgrade', {
         itemUid: targetItem.uid,
-        useBlessing: effMethod !== 'none',
+        useBlessing: effMethod === 'scroll',
+        useMagicMetal: effMethod === 'ritual',
         method: effMethod,
       });
       if (this.uppKeepOpen === false) {
@@ -17584,7 +17960,7 @@ class AeryndorMMOApp {
       const navNodesCount = Number(botData.learnedGridNodes || 50) + Number((this.engine?.botLearnedNav?.trails?.size) || 0);
       const invArr = Array.isArray(s.inventory) ? s.inventory : [];
       const hpPotStock = invArr
-        .filter((it) => it && (it.templateId === 'potion_hp_small' || it.templateId === 'potion_hp_medium'))
+        .filter((it) => it && it.templateId && it.templateId.startsWith('potion_hp_'))
         .reduce((acc, it) => acc + Math.max(1, Number(it.quantity || 1)), 0);
       const mpPotStock = invArr
         .filter((it) => it && it.templateId === 'potion_mp_medium')
@@ -26010,18 +26386,43 @@ class AeryndorMMOApp {
     if (!tip || !item) return;
 
     const tpl = this.config?.items?.[item.templateId] || item;
-    const rarityInfo = this.config?.rarities?.[item.rarity || tpl.rarity || 'common'] || {
-      name: 'Gewöhnlich',
-      color: '#94a3b8',
+    const rawRarKey = item.rarity || tpl.rarity || 'common';
+    const rarityFallbackMap = {
+      common: { name: 'Gewöhnlich', color: '#94a3b8' },
+      rare: { name: 'Selten', color: '#38bdf8' },
+      epic: { name: 'Episch', color: '#c084fc' },
+      legendary: { name: 'Legendär', color: '#fbbf24' },
+      instabil: { name: 'Instabil (Max-Roll)', color: '#22d3ee' },
+      mythic: { name: 'Mythisch', color: '#ef4444' },
     };
+    const rarityInfo = this.config?.rarities?.[rawRarKey] || rarityFallbackMap[rawRarKey] || rarityFallbackMap.common;
+    const instabilBadgeHtml =
+      rawRarKey === 'instabil'
+        ? `<div style="margin:3px 0 5px 0;padding:2px 6px;border-radius:4px;background:rgba(6,182,212,0.18);border:1px solid rgba(34,211,238,0.65);color:#67e8f9;font-size:10px;font-weight:800;letter-spacing:0.3px;">⚡ INSTABIL • GARANTIERTE MAXIMALWERTE</div>`
+        : '';
 
     const stats = item.effectiveStats || tpl.baseStats || {};
     const statsLines = Object.entries(stats)
       .map(([k, v]) => `<div class="tt-stat">${Number(v) >= 0 ? '+' : ''}${v} ${STAT_LABELS[k] || k}</div>`)
       .join('');
 
+    const hasExplicitDss = (item.bonuses || []).some((b) => b?.id === 'bonus_avg_dmg' || b?.id === 'bonus_dss');
+    const hasExplicitFks = (item.bonuses || []).some((b) => b?.id === 'bonus_skill_dmg' || b?.id === 'bonus_fks');
+    const dssFksHtml = [
+      typeof item.dss === 'number' && !hasExplicitDss && stats.avgDmgPct === undefined
+        ? `<div class="tt-bonus" style="color:${item.dss >= 0 ? '#fbbf24' : '#f87171'};font-weight:700;">⚔️ Durchschn. Schaden (DSS): ${item.dss >= 0 ? '+' : ''}${item.dss}%</div>`
+        : '',
+      typeof item.fks === 'number' && !hasExplicitFks && stats.skillDmgPct === undefined
+        ? `<div class="tt-bonus" style="color:${item.fks >= 0 ? '#a78bfa' : '#f87171'};font-weight:700;">🔮 Fertigkeitsschaden (FKS): ${item.fks >= 0 ? '+' : ''}${item.fks}%</div>`
+        : '',
+    ].join('');
+
     const bonusLines = (item.bonuses || [])
       .map((b, idx) => {
+        if (b.id === 'socket_stone') {
+          const valText = `${Number(b.value) >= 0 ? '+' : ''}${b.value}${b.unit || '%'}`;
+          return `<div class="tt-bonus" style="color:#67e8f9;font-weight:700;">💎 [Geiststein] ${b.name}: ${valText}</div>`;
+        }
         const isYellow67 = idx >= 5 || Boolean(b.isYellow67);
         const valText = b.id === 'bonus_stun_immune' ? 'IMMUN ✓' : `${Number(b.value) >= 0 ? '+' : ''}${b.value}${b.unit || ''}`;
         if (isYellow67) {
@@ -26081,8 +26482,10 @@ class AeryndorMMOApp {
         ${tpl.name || item.name} ${item.plusLevel > 0 ? `+${item.plusLevel}` : ''}
       </div>
       <div class="tt-sub">${rarityInfo.name} • ${typeLabel}${slotTag} • ${tpl.reqLevel ? `Ab Lv. ${tpl.reqLevel}` : 'Alle Level'}</div>
+      ${instabilBadgeHtml}
       ${classesHtml}
       ${statsLines}
+      ${dssFksHtml}
       ${bonusLines}
       <div class="tt-desc">${tpl.description || ''}</div>
       ${compareHtml}
