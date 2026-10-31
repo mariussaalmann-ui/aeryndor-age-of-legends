@@ -1569,9 +1569,7 @@ class AeryndorMMOApp {
             }
             const acc = parsed[k];
             if (!acc || typeof acc !== 'object') continue;
-            if ( ['blackzimple', 'cryptel'].includes(k.trim().toLowerCase()) ) {
-              acc.isSA = true;
-            }
+            acc.isSA = Boolean(acc.isSA);
             if (Array.isArray(acc.characters)) {
               acc.characters = acc.characters.map((ch) => {
                 if (!ch || typeof ch !== 'object') return null;
@@ -1617,14 +1615,29 @@ class AeryndorMMOApp {
       // Fallback
     }
 
-    // Keine alten Testaccounts mehr als Seed!
+    // Standardmäßig für alle Spieler aktuell nur den öffentlichen 'test'-Account vorbefüllen (sofern nicht manuell per × gelöscht)
+    let hideDefaultTest = false;
+    try {
+      hideDefaultTest = localStorage.getItem('aeryndor_hide_default_test_v1') === '1';
+    } catch (_) {}
+    if (!hideDefaultTest) {
+      return {
+        test: {
+          username: 'test',
+          email: 'test@aeryndor.de',
+          deleteCode: '1234',
+          isSA: false,
+          characters: [null, null, null, null],
+        },
+      };
+    }
     return {};
   }
 
   isSaAccountName(accName) {
     const k = String(accName || '').trim().toLowerCase();
     if (!k || k === 'admin') return false;
-    if (k === 'blackzimple' || k === 'cryptel') return true;
+    // Krone & Goldschrift im Login nur, wenn der Account lokal bereits erfolgreich vom Server als SA authentifiziert wurde!
     const accObj = this.accounts?.[accName] || this.accounts?.[k];
     if (accObj?.isSA) return true;
     if (
@@ -1638,7 +1651,9 @@ class AeryndorMMOApp {
 
   loadSavedLogins() {
     const map = {};
+    let hideDefaultTest = false;
     try {
+      hideDefaultTest = localStorage.getItem('aeryndor_hide_default_test_v1') === '1';
       const raw = JSON.parse(localStorage.getItem('aeryndor_saved_logins_v1') || '{}');
       if (raw && typeof raw === 'object') {
         for (const [k, val] of Object.entries(raw)) {
@@ -1649,7 +1664,7 @@ class AeryndorMMOApp {
           map[key] = {
             username: uname,
             password: String(val.password || ''),
-            isSA: key === 'blackzimple' || key === 'cryptel' || Boolean(val.isSA),
+            isSA: Boolean(val.isSA),
             updatedAt: Number(val.updatedAt || Date.now()),
           };
         }
@@ -1660,16 +1675,26 @@ class AeryndorMMOApp {
       const clean = String(accName || '').trim();
       const key = clean.toLowerCase();
       if (!clean || key === 'admin') continue;
+      const accIsSa = Boolean(this.accounts?.[accName]?.isSA);
       if (!map[key]) {
         map[key] = {
           username: clean,
           password: ['test', 'test1', 'test2'].includes(key) ? '1234' : '',
-          isSA: this.isSaAccountName(clean),
-          updatedAt: Date.now(),
+          isSA: accIsSa,
+          updatedAt: key === 'test' ? 1 : Date.now(),
         };
-      } else if (this.isSaAccountName(clean)) {
+      } else if (accIsSa) {
         map[key].isSA = true;
       }
+    }
+    // Sicherstellen, dass bei neuen/anderen Spielern standardmäßig genau 'test' (+ der Button '+ Account') sichtbar ist
+    if (!hideDefaultTest && !map['test']) {
+      map['test'] = {
+        username: 'test',
+        password: '1234',
+        isSA: false,
+        updatedAt: 1,
+      };
     }
     try {
       localStorage.setItem('aeryndor_saved_logins_v1', JSON.stringify(map));
@@ -1717,6 +1742,11 @@ class AeryndorMMOApp {
     const uname = String(username || '').trim();
     const key = uname.toLowerCase();
     if (!uname || key === 'admin') return;
+    if (key === 'test') {
+      try {
+        localStorage.removeItem('aeryndor_hide_default_test_v1');
+      } catch (_) {}
+    }
     if (!this.savedLogins) this.savedLogins = {};
     const prev = this.savedLogins[key];
     this.savedLogins[key] = {
@@ -1732,6 +1762,11 @@ class AeryndorMMOApp {
     const uname = String(accName || '').trim();
     const key = uname.toLowerCase();
     if (!key) return;
+    if (key === 'test') {
+      try {
+        localStorage.setItem('aeryndor_hide_default_test_v1', '1');
+      } catch (_) {}
+    }
     if (this.savedLogins) {
       delete this.savedLogins[key];
       this.saveSavedLogins();
@@ -2710,7 +2745,7 @@ class AeryndorMMOApp {
         this.accounts[uname] = {
           username: uname,
           email: `${uname.toLowerCase()}@aeryndor.de`,
-          deleteCode: uname.toLowerCase() === 'blackzimple' ? '123' : '1234',
+          deleteCode: '1234',
           characters: [null, null, null, null],
           isSA: this.isSaAccountName(uname),
         };
@@ -2858,6 +2893,9 @@ class AeryndorMMOApp {
         localStorage.removeItem('aeryndor_auto_session_v1');
         if (this.savedLogins?.[uname.toLowerCase()]) {
           this.savedLogins[uname.toLowerCase()].password = '';
+          if (serverAccIsSa) {
+            this.savedLogins[uname.toLowerCase()].isSA = true;
+          }
           this.saveSavedLogins();
         }
       }
