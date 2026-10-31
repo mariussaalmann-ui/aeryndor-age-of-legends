@@ -68,6 +68,8 @@ from game_data import (
     get_reputation_rank,
     get_required_horse_medals,
     get_required_pet_exp,
+    get_doctrine_skills,
+    resolve_doctrine_id,
     roll_slot_bonus,
     roll_67_bonus,
 )
@@ -2183,6 +2185,7 @@ class WorldAuthority:
         tot_buff_def_pct = 0.0
         tot_buff_atk_spd_pct = 0.0
         tot_buff_move_spd_pct = 0.0
+        self.sanitize_player_doctrine_buffs(p)
         for buff_id, buff_data in list(p.get("activeBuffs", {}).items()):
             if buff_data["expiresAt"] > now:
                 if buff_id in ("orb_vwk", "vwk"):
@@ -2211,6 +2214,13 @@ class WorldAuthority:
                         "remaining": round(buff_data["expiresAt"] - now, 1),
                         "skillLevel": sk_lv,
                         "skillTier": sk_tier,
+                        "atkPct": int(round(float(buff_data.get("atkPct", 0)) * 0.25)),
+                        "magicAtkPct": int(round(float(buff_data.get("magicAtkPct", buff_data.get("atkPct", 0))) * 0.25)),
+                        "defPct": int(round(float(buff_data.get("defPct", 0)) * 0.22)),
+                        "hpAbsorbPct": round(float(buff_data.get("hpAbsorbPct", 0)) * 0.65, 1),
+                        "critPct": round(float(buff_data.get("critPct", 0)) * 0.30, 1),
+                        "atkSpeedPct": int(round(float(buff_data["atkSpeedPct"]) if "atkSpeedPct" in buff_data else float(buff_data.get("speedPct", 0)) * 0.35)),
+                        "moveSpeedPct": int(round(float(buff_data["moveSpeedPct"]) if "moveSpeedPct" in buff_data else float(buff_data.get("speedPct", 0)) * 0.25)),
                     }
                 )
             else:
@@ -4744,14 +4754,14 @@ class WorldAuthority:
 
             # Automatisch Fähigkeiten einsetzen (nutzt gelernte Bot-Synergien aus bot_knowledge_base.json & Evolution v5.0)
             if af.get("autoSkills", True) and (now - p.get("lastSkillCastTime", 0.0) >= 2.1):
-                cdef = CHARACTER_CLASSES.get(p["class_id"], CHARACTER_CLASSES["warrior"])
+                doc_skills_af = self.get_player_doctrine_skills(p)
                 active_buffs = p.get("activeBuffs", {})
 
-                # Gelernte Entdeckung (EisensturmBot & VeyronBot): Vorab-Aktivierung von Haupt-Buffs (Aura / Verzauberte Klinge / Drachenhilfe)
+                # Gelernte Entdeckung (EisensturmBot & VeyronBot): Vorab-Aktivierung von Haupt-Buffs (Aura / Verzauberte Klinge / Drachenhilfe / Starker Körper)
                 # auch bei berittenem Kampf (kurzes Absteigen -> Buff -> sofortiges Aufsitzen)
                 if p.get("active_mount"):
                     saved_mount = p["active_mount"]
-                    for sk in cdef["skills"]:
+                    for sk in doc_skills_af:
                         if sk.get("type") != "buff" or int(p.get("skills", {}).get(sk["id"], 0)) <= 0:
                             continue
                         existing_buff = active_buffs.get(sk["id"])
@@ -4779,7 +4789,7 @@ class WorldAuthority:
                                     return
                 else:
                     # Selbstlernende Build- & Rotations-Evolution v6.0 (SSOT):
-                    ordered_skills = list(cdef["skills"])
+                    ordered_skills = list(doc_skills_af)
                     evo_v3 = p.get("evolutionV3") if is_bot_player else None
                     rot_order = (evo_v3 or {}).get("activeRotationOrder")
                     if not rot_order and use_bot_ai and bot_sys_data:
@@ -7622,6 +7632,35 @@ class WorldAuthority:
             "cleaveHits": cleave_hits,
         }
 
+    def get_player_doctrine_skills(self, p: dict) -> list:
+        cls_id = str(p.get("class_id") or "warrior")
+        raw_doc = p.get("doctrine")
+        if raw_doc is None or raw_doc == "":
+            raw_doc = p.get("doctrineIdx")
+        if raw_doc is None:
+            raw_doc = (p.get("quests") or {}).get("__doctrine_idx__", 0)
+        doc_idx, doc_id = resolve_doctrine_id(cls_id, raw_doc)
+        p["doctrineIdx"] = doc_idx
+        p["doctrine"] = doc_id
+        return get_doctrine_skills(cls_id, doc_id)
+
+    def sanitize_player_doctrine_buffs(self, p: dict):
+        if not isinstance(p, dict):
+            return
+        doc_skills = self.get_player_doctrine_skills(p)
+        ab = p.get("activeBuffs")
+        if not isinstance(ab, dict) or not ab:
+            return
+        class_skill_map = {sk["id"]: sk for sk in doc_skills}
+        for bid, bdata in list(ab.items()):
+            sk_def = class_skill_map.get(bid)
+            if sk_def is not None:
+                if sk_def.get("type") != "buff":
+                    ab.pop(bid, None)
+                elif isinstance(bdata, dict) and bdata.get("name") != sk_def.get("name"):
+                    # Falls sich der Buff-Name durch Doktrin unterscheidet, veralteten Buff entfernen
+                    ab.pop(bid, None)
+
     def perform_player_skill(self, player_id: str, slot_num: int, target_id: Optional[str] = None) -> dict:
         p = self.players.get(player_id)
         if not p or p.get("isDead") or float(p.get("hp", 1)) <= 0:
@@ -7717,8 +7756,8 @@ class WorldAuthority:
             )
             return {"ok": True, "skill": h_skill["name"], "hits": hit_count, "crit": any_crit, "pierce": any_pierce}
 
-        cdef = CHARACTER_CLASSES.get(p["class_id"], CHARACTER_CLASSES["warrior"])
-        skill = next((s for s in cdef["skills"] if s["slot"] == slot_int), None)
+        doc_skills = self.get_player_doctrine_skills(p)
+        skill = next((s for s in doc_skills if s["slot"] == slot_int), None)
         if not skill:
             return {"ok": False, "error": "Fertigkeit nicht gefunden."}
 
@@ -7763,22 +7802,35 @@ class WorldAuthority:
         int_scale = 1.0 + max(0, int(p.get("int_stat", 10)) - 10) * 0.008 if p.get("class_id") in ("shaman", "sura") else 1.0
         p_cls = p.get("class_id", "warrior")
         p_gender = p.get("gender", "m")
-        p_doctrine = p.get("doctrine", "")
+        _p_doc_idx, p_doctrine = resolve_doctrine_id(p_cls, p.get("doctrine") or p.get("doctrineIdx", 0))
+        p["doctrineIdx"] = _p_doc_idx
+        p["doctrine"] = p_doctrine
 
-        # 1. Selbst-Buff (z. B. Aura des Schwerts, Federschreiten, Verzauberte Klinge, Hilfe des Drachen)
+        # 1. Selbst-Buff (z. B. Aura des Schwerts, Starker Körper, Federschreiten, Verzauberte Klinge, Hilfe des Drachen)
         if skill["type"] == "buff":
-            p["activeBuffs"][skill["id"]] = {
+            raw_atk_pct = float(skill.get("buffAtkPct", 0))
+            raw_matk_pct = float(skill.get("buffMagicAtkPct", raw_atk_pct))
+            raw_move_spd = float(skill.get("buffSpeedPct", 0))
+            raw_atk_spd = float(skill.get("buffAtkSpeedPct", 0))
+            buff_entry = {
                 "name": skill["name"],
                 "skillLevel": skill_lvl,
                 "skillTier": skill_tier,
-                "atkPct": int(skill.get("buffAtkPct", 30) * lvl_mult * int_scale),
-                "magicAtkPct": int(skill.get("buffMagicAtkPct", skill.get("buffAtkPct", 30)) * lvl_mult * int_scale),
+                "atkPct": int(raw_atk_pct * lvl_mult * int_scale),
+                "magicAtkPct": int(raw_matk_pct * lvl_mult * int_scale),
                 "hpAbsorbPct": round(float(skill.get("buffHpAbsorbPct", 0.0)) * lvl_mult, 1),
-                "defPct": int(skill.get("buffDefPct", 0) * lvl_mult * int_scale),
-                "critPct": int(skill.get("buffCritPct", 0) * lvl_mult),
-                "speedPct": int(skill.get("buffSpeedPct", 15) + skill.get("buffAtkSpeedPct", 0)),
+                "defPct": int(float(skill.get("buffDefPct", 0)) * lvl_mult * int_scale),
+                "critPct": int(float(skill.get("buffCritPct", 0)) * lvl_mult),
+                "speedPct": int(raw_move_spd + raw_atk_spd),
                 "expiresAt": now + skill.get("duration", 12.0),
             }
+            if raw_atk_spd > 0 and raw_move_spd > 0:
+                buff_entry["atkSpeedPct"] = int(raw_atk_spd)
+                buff_entry["moveSpeedPct"] = int(raw_move_spd)
+            elif raw_atk_spd > 0:
+                buff_entry["atkSpeedPct"] = int(raw_atk_spd)
+                buff_entry["moveSpeedPct"] = 0
+            p["activeBuffs"][skill["id"]] = buff_entry
             self.compute_player_combat_stats(p)
             self._emit_combat_event(
                 p["map_id"],
@@ -7861,7 +7913,9 @@ class WorldAuthority:
                 # Klassen-Fertigkeiten verursachen charakteristische Statusveränderungen
                 if mob["state"] != "dead" and mob["kind"] != "metin":
                     cid = p.get("class_id", "warrior")
-                    if skill["type"] == "dash_aoe":
+                    if skill.get("stunSec"):
+                        self._apply_status_effect_to_mob(mob, "stun", float(skill["stunSec"]), p)
+                    elif skill["type"] == "dash_aoe":
                         self._apply_status_effect_to_mob(mob, "stun", 1.8, p)
                     elif cid == "warrior":
                         self._apply_status_effect_to_mob(mob, "armor_break", 7.0, p)
@@ -10064,8 +10118,8 @@ class WorldAuthority:
         if p.get("skill_points", 0) <= 0:
             return False, "Keine Fertigkeitspunkte verfügbar."
 
-        cdef = CHARACTER_CLASSES.get(p.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
-        sk_info = next((s for s in cdef["skills"] if s["id"] == skill_id), None)
+        doc_skills = self.get_player_doctrine_skills(p)
+        sk_info = next((s for s in doc_skills if s["id"] == skill_id), None)
         if not sk_info:
             return False, "Fertigkeit gehört nicht zu deiner Klasse."
 
@@ -10894,7 +10948,7 @@ class WorldAuthority:
             return False, "Spieler nicht aktiv."
 
         cdef = CHARACTER_CLASSES.get(p.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
-        class_skills = {s["id"]: s for s in cdef.get("skills", [])}
+        class_skills = {s["id"]: s for s in self.get_player_doctrine_skills(p)}
         skills_dict = p.setdefault("skills", {})
 
         inv = p.get("inventory", [])
@@ -10973,8 +11027,7 @@ class WorldAuthority:
         if not stone_item:
             return False, "⚠️ Kein Seelenstein im Inventar vorhanden!"
 
-        cdef = CHARACTER_CLASSES.get(p.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
-        class_skills = {s["id"]: s["name"] for s in cdef.get("skills", [])}
+        class_skills = {s["id"]: s["name"] for s in self.get_player_doctrine_skills(p)}
         skills_dict = p.setdefault("skills", {})
 
         if skill_id:
@@ -11059,8 +11112,7 @@ class WorldAuthority:
         if not stone_item:
             return False, "⚠️ Kein 'Legendärer Seelenstein' im Inventar vorhanden!"
 
-        cdef = CHARACTER_CLASSES.get(p.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
-        class_skills = {s["id"]: s["name"] for s in cdef.get("skills", [])}
+        class_skills = {s["id"]: s["name"] for s in self.get_player_doctrine_skills(p)}
         skills_dict = p.setdefault("skills", {})
 
         if skill_id:
@@ -14220,7 +14272,7 @@ class WorldAuthority:
                 "role": team_rank if team_rank else op.get("role", "player"),
                 "classId": op["class_id"],
                 "className": op_cdef["name"],
-                "doctrine": op.get("doctrine", ""),
+                "doctrine": op.get("doctrine") or resolve_doctrine_id(op["class_id"], op.get("doctrineIdx", 0))[1],
                 "gender": op.get("gender", "male"),
                 "empire": op.get("empire", "solaria"),
                 "partyId": op.get("partyId"),

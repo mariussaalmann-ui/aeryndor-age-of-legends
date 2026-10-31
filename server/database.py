@@ -38,6 +38,7 @@ from game_data import (
     calculate_item_effective_stats,
     get_item_slot_size,
     get_required_pet_exp,
+    resolve_doctrine_id,
 )
 
 DB_LOCK = threading.RLock()
@@ -302,6 +303,8 @@ class GameDatabase:
             finally:
                 conn.close()
 
+    LEGITIMATE_SA_NAMES = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel", "[sa]evlon"}
+
     @staticmethod
     def _normalize_sa_char_name(raw_name: str) -> str:
         """Normalisiert ein SA-Präfix [SA] – fügt es aber NIEMALS automatisch hinzu, wenn es nicht bereits vorhanden ist."""
@@ -315,7 +318,7 @@ class GameDatabase:
 
     def _cleanup_unintended_sa_characters_conn(self, conn: sqlite3.Connection):
         """Bereinigt alle unautorisierten Charaktere mit eckigen Klammern [ ] oder Team-Tags (z.B. [GM]Test)."""
-        legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+        legitimate_sa_names = self.LEGITIMATE_SA_NAMES
         for acc_row in conn.execute("SELECT username_key, characters_json FROM accounts").fetchall():
             ukey = acc_row["username_key"]
             try:
@@ -399,13 +402,15 @@ class GameDatabase:
         delete_code: str,
         default_pid: str,
         char_name: str,
+        doctrine_idx: int = 0,
     ):
         """Richtet einen voll ausgestatteten SA-Admin-Account samt Klingenwächter-Charakter
-        (Lv. 99 Max-Level, Gilde 'Serverleitung', alle Körper-Skills L1 Legendär, alle Passiva 20/20,
+        (Lv. 99 Max-Level, Gilde 'Serverleitung', alle Klassen-Skills L1 Legendär, alle Passiva 20/20,
         Maximal-EQ +9, Militärgaul Lv. 50 Max-Level inkl. Pferde-Skills sowie Begleiter Lv. 120 Max-Level
         inkl. 120er Pet-Attributen und allen passiven & aktiven Pet-Skills auf Maximalstufe) ein."""
         now = time.time()
         char_name_lower = char_name.lower()
+        doc_idx_val, doc_id_val = resolve_doctrine_id("warrior", doctrine_idx)
 
         arow = conn.execute("SELECT * FROM accounts WHERE username_key = ?", (account_key,)).fetchone()
         existing_chars = [None, None, None, None]
@@ -422,7 +427,7 @@ class GameDatabase:
             if isinstance(ch, dict):
                 cpid = str(ch.get("playerId") or "").strip()
                 cname = str(ch.get("name") or "").strip().lower()
-                if cpid and (cpid == default_pid or cname == char_name_lower):
+                if cpid and (cpid == default_pid or cname == char_name_lower or (char_name_lower == "[sa]evlon" and cname == "evlon")):
                     pid = cpid
                     break
         else:
@@ -519,6 +524,8 @@ class GameDatabase:
             quests_data["__starter_shoes_v1__"] = True
             quests_data["__passives_reset_fb_only_v2__"] = True
             quests_data["__empire__"] = str(quests_data.get("__empire__") or "kaeryu")
+            quests_data["__doctrine_idx__"] = doc_idx_val
+            quests_data["__doctrine__"] = doc_id_val
             quests_data["__new_spawn_wall_v1__"] = True
             quests_data["__is_sa__"] = True
             quests_data["__guild_name__"] = "Serverleitung"
@@ -860,11 +867,22 @@ class GameDatabase:
                     ),
                 )
 
+        elif existing_q.get("__doctrine_idx__") != doc_idx_val or existing_q.get("__doctrine__") != doc_id_val:
+            existing_q["__doctrine_idx__"] = doc_idx_val
+            existing_q["__doctrine__"] = doc_id_val
+            existing_q["__is_sa__"] = True
+            existing_q["__guild_name__"] = "Serverleitung"
+            conn.execute(
+                "UPDATE players SET name = ?, quests_json = ?, updated_at = ? WHERE player_id = ?",
+                (char_name, json.dumps(existing_q, ensure_ascii=False), now, pid),
+            )
+
         sa_slot = {
             "playerId": pid,
             "name": char_name,
             "classId": "warrior",
-            "doctrineIdx": 0,
+            "doctrineIdx": doc_idx_val,
+            "doctrine": doc_id_val,
             "empire": "kaeryu",
             "gender": "male",
             "hairIndex": 3,
@@ -974,7 +992,8 @@ class GameDatabase:
 
     def _ensure_sa_cryptel_account_conn(self, conn: sqlite3.Connection):
         """Richtet den SA-Admin-Account 'cryptel' (Passwort '1234') samt Charakter '[SA]Cryptel'
-        (Klingenwächter Körper, Lv. 99 Max-Level, alle Körper-Skills L1 Legendär, Maximal-EQ +9, Max-Mount & Max-Pet) ein."""
+        (Klingenwächter Körper, Lv. 99) und '[SA]Evlon' (Klingenwächter Mental, Lv. 99) inkl. Maximal-EQ +9,
+        allen Passiv-Skills 20/20, L1-Skills, Max-Mount, Max-Pet und SA-Rechten ein."""
         self._provision_sa_max_warrior_conn(
             conn,
             account_key="cryptel",
@@ -984,6 +1003,18 @@ class GameDatabase:
             delete_code="1234",
             default_pid="hero_warrior_cryptel",
             char_name="[SA]Cryptel",
+            doctrine_idx=0,
+        )
+        self._provision_sa_max_warrior_conn(
+            conn,
+            account_key="cryptel",
+            account_username="cryptel",
+            account_password="1234",
+            account_email="cryptel@aeryndor.de",
+            delete_code="1234",
+            default_pid="hero_warrior_nhlyl",
+            char_name="[SA]Evlon",
+            doctrine_idx=1,
         )
 
     def _ensure_sa_admin_account_conn(self, conn: sqlite3.Connection):
@@ -1603,6 +1634,7 @@ class GameDatabase:
         class_id: str = "warrior",
         empire: str = "seiryu",
         is_sa: bool = False,
+        doctrine_idx: Optional[int] = None,
     ) -> dict:
         bot_prof = self.BOT_CANONICAL_PROFILES.get(str(player_id or ""))
         if bot_prof:
@@ -1611,7 +1643,7 @@ class GameDatabase:
             empire = bot_prof["empire"]
         clean_empire = "kaeryu" if str(empire or "").lower() == "kaeryu" else "seiryu"
         clean_name = (name or "AeryndorHeld").strip()[:28] or "AeryndorHeld"
-        legitimate_sa = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+        legitimate_sa = self.LEGITIMATE_SA_NAMES
         is_sa_char = bool(
             clean_name.lower() in legitimate_sa
             and not bot_prof
@@ -1678,6 +1710,11 @@ class GameDatabase:
                     default_quests["__starter_shoes_v1__"] = True
                     default_quests["__passives_reset_fb_only_v2__"] = True
                     default_quests["__empire__"] = clean_empire
+                    doc_idx_init, doc_id_init = resolve_doctrine_id(
+                        cdef["id"], doctrine_idx if doctrine_idx is not None else 0
+                    )
+                    default_quests["__doctrine_idx__"] = doc_idx_init
+                    default_quests["__doctrine__"] = doc_id_init
                     default_quests["__new_spawn_wall_v1__"] = True
                     if is_sa_char:
                         default_quests["__is_sa__"] = True
@@ -1827,9 +1864,10 @@ class GameDatabase:
                 (json.dumps(p["passives"]), json.dumps(p["quests"]), p["player_id"]),
             )
         p["autofarm"] = json.loads(p.pop("autofarm_json", "{}") or "{}")
+        raw_pname_low = str(p.get("name") or "").strip().strip("`").lower()
         is_sa_p = bool(
             not bot_prof
-            and str(p.get("name") or "").strip().lower() in ("`[sa]nemesis`", "[sa]nemesis", "[sa]serverleitung", "[sa]cryptel")
+            and raw_pname_low in self.LEGITIMATE_SA_NAMES
         )
         if is_sa_p:
             p["name"] = self._normalize_sa_char_name(p.get("name") or "Admin")
@@ -1896,6 +1934,37 @@ class GameDatabase:
                 )
         else:
             p["empire"] = p["quests"].get("__empire__") or ("kaeryu" if float(p.get("pos_x", 708.0)) < 0.0 else "seiryu")
+        raw_doc_val = p["quests"].get("__doctrine__")
+        if raw_doc_val is None:
+            raw_doc_val = p["quests"].get("__doctrine_idx__")
+        if raw_doc_val is None and not bot_prof:
+            for arow in conn.execute("SELECT characters_json FROM accounts").fetchall():
+                try:
+                    achars = json.loads(arow["characters_json"] or "[]")
+                except Exception:
+                    achars = []
+                if isinstance(achars, list):
+                    matched_ch = next(
+                        (
+                            c
+                            for c in achars
+                            if isinstance(c, dict) and str(c.get("playerId") or "").strip() == str(p.get("player_id") or "")
+                        ),
+                        None,
+                    )
+                    if matched_ch is not None:
+                        raw_doc_val = matched_ch.get("doctrineIdx", matched_ch.get("doctrine", 0))
+                        break
+        doc_idx_hyd, doc_id_hyd = resolve_doctrine_id(p.get("class_id", "warrior"), raw_doc_val if raw_doc_val is not None else 0)
+        p["doctrineIdx"] = doc_idx_hyd
+        p["doctrine"] = doc_id_hyd
+        if p["quests"].get("__doctrine_idx__") != doc_idx_hyd or p["quests"].get("__doctrine__") != doc_id_hyd:
+            p["quests"]["__doctrine_idx__"] = doc_idx_hyd
+            p["quests"]["__doctrine__"] = doc_id_hyd
+            conn.execute(
+                "UPDATE players SET quests_json = ? WHERE player_id = ?",
+                (json.dumps(p["quests"]), p["player_id"]),
+            )
         p["isDead"] = bool(p["quests"].get("__is_dead__", False)) or int(p.get("hp", 1)) <= 0
         p["deadAt"] = float(p["quests"].get("__dead_at__", 0.0) or 0.0)
         if p["isDead"] and p["deadAt"] <= 0.0:
@@ -2125,6 +2194,12 @@ class GameDatabase:
                     q_dict["__completed_dungeons__"] = list(p["completedDungeons"])
                 if "empire" in p and p["empire"]:
                     q_dict["__empire__"] = str(p["empire"])
+                doc_src = p.get("doctrine") if p.get("doctrine") else p.get("doctrineIdx", q_dict.get("__doctrine_idx__", 0))
+                doc_idx_sv, doc_id_sv = resolve_doctrine_id(p.get("class_id", "warrior"), doc_src)
+                p["doctrineIdx"] = doc_idx_sv
+                p["doctrine"] = doc_id_sv
+                q_dict["__doctrine_idx__"] = doc_idx_sv
+                q_dict["__doctrine__"] = doc_id_sv
                 q_dict["__is_dead__"] = bool(p.get("isDead", False))
                 q_dict["__dead_at__"] = float(p.get("deadAt", 0.0) or 0.0)
                 conn.execute(
@@ -3116,7 +3191,7 @@ class GameDatabase:
                         if not isinstance(ch, dict):
                             continue
                         cname = str(ch.get("name") or "").strip()
-                        legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+                        legitimate_sa_names = self.LEGITIMATE_SA_NAMES
                         if ukey in ("blackzimple", "cryptel") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                             cname = self._normalize_sa_char_name(cname)
                             ch["isSA"] = True
@@ -3156,7 +3231,7 @@ class GameDatabase:
                 dirty_chars = False
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
-                        legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+                        legitimate_sa_names = self.LEGITIMATE_SA_NAMES
                         if ukey in ("blackzimple", "cryptel") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
                             norm_n = self._normalize_sa_char_name(ch.get("name") or "Nemesis")
                             if ch.get("name") != norm_n or not ch.get("isSA"):
@@ -3174,7 +3249,7 @@ class GameDatabase:
                                 ch["guild"] = ""
                             dirty_chars = True
                         prow = conn.execute(
-                            "SELECT level, map_id, name, class_id FROM players WHERE player_id = ?",
+                            "SELECT level, map_id, name, class_id, quests_json FROM players WHERE player_id = ?",
                             (ch["playerId"],),
                         ).fetchone()
                         if prow:
@@ -3182,6 +3257,15 @@ class GameDatabase:
                             if ch.get("level") != new_lvl:
                                 ch["level"] = new_lvl
                                 dirty_chars = True
+                            try:
+                                pq = json.loads(prow["quests_json"] or "{}")
+                                if isinstance(pq, dict) and "__doctrine_idx__" in pq:
+                                    db_doc_idx = int(pq["__doctrine_idx__"])
+                                    if ch.get("doctrineIdx") != db_doc_idx:
+                                        ch["doctrineIdx"] = db_doc_idx
+                                        dirty_chars = True
+                            except Exception:
+                                pass
                             db_name = str(prow["name"] or "").strip()
                             if ukey in ("blackzimple", "cryptel") and db_name and db_name.upper().startswith("[SA]"):
                                 db_name = self._normalize_sa_char_name(db_name)
@@ -3250,7 +3334,25 @@ class GameDatabase:
                     cname = str(ch.get("name") or "").strip()[:28]
                     if not cpid or not cname:
                         continue
-                    legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+                    legitimate_sa_names = self.LEGITIMATE_SA_NAMES
+                    if ukey in ("blackzimple", "cryptel"):
+                        db_sa_row = conn.execute(
+                            "SELECT name, level, quests_json FROM players WHERE player_id = ?", (cpid,)
+                        ).fetchone()
+                        if db_sa_row and str(db_sa_row["name"] or "").strip().lower() in legitimate_sa_names:
+                            cname = self._normalize_sa_char_name(db_sa_row["name"])
+                            ch["name"] = cname
+                            ch["level"] = int(db_sa_row["level"] or MAX_PLAYER_LEVEL)
+                            ch["isSA"] = True
+                            ch["isGM"] = True
+                            ch["role"] = "SA"
+                            ch["guild"] = "Serverleitung"
+                            try:
+                                db_sq = json.loads(db_sa_row["quests_json"] or "{}")
+                                if isinstance(db_sq, dict) and "__doctrine_idx__" in db_sq:
+                                    ch["doctrineIdx"] = int(db_sq["__doctrine_idx__"])
+                            except Exception:
+                                pass
                     if ukey in ("blackzimple", "cryptel") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                         cname = self._normalize_sa_char_name(cname)
                         ch["isSA"] = True

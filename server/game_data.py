@@ -145,7 +145,7 @@ CHARACTER_CLASSES = {
                 "slot": 1,
                 "key": "1",
                 "name": "Aura des Schwerts",
-                "icon": "./assets/icons/skills/cropped/common.png",
+                "icon": "./assets/icons/skills/cropped/aura_sword.png",
                 "type": "buff",
                 "cooldown": 14.0,
                 "mpCost": 35,
@@ -283,7 +283,7 @@ CHARACTER_CLASSES = {
                 "slot": 1,
                 "key": "1",
                 "name": "Federschreiten",
-                "icon": "./assets/icons/skills/cropped/ninja.png",
+                "icon": "./assets/icons/skills/cropped/shadow_step.png",
                 "type": "buff",
                 "cooldown": 13.0,
                 "mpCost": 30,
@@ -422,7 +422,7 @@ CHARACTER_CLASSES = {
                 "slot": 1,
                 "key": "1",
                 "name": "Verzauberte Klinge",
-                "icon": "./assets/icons/skills/cropped/sura.png",
+                "icon": "./assets/icons/skills/cropped/enchanted_blade.png",
                 "type": "buff",
                 "cooldown": 14.0,
                 "mpCost": 40,
@@ -561,7 +561,7 @@ CHARACTER_CLASSES = {
                 "slot": 1,
                 "key": "1",
                 "name": "Hilfe des Drachen",
-                "icon": "./assets/icons/skills/cropped/shaman.png",
+                "icon": "./assets/icons/skills/cropped/dragon_help.png",
                 "type": "buff",
                 "cooldown": 15.0,
                 "mpCost": 42,
@@ -663,6 +663,288 @@ CHARACTER_CLASSES = {
         ],
     },
 }
+
+CLASS_DOCTRINE_IDS = {
+    "warrior": ["body", "mental"],
+    "ninja": ["blade", "archery"],
+    "sura": ["weaponry", "blackmagic"],
+    "shaman": ["dragon", "healing"],
+}
+
+DOCTRINE_SKILL_OVERRIDES = {
+    ("warrior", "mental"): {
+        "aura_sword": {
+            "name": "Durchschlag",
+            "icon": "./assets/icons/skills/cropped/spirit_strike.png",
+            "type": "burst",
+            "cooldown": 7.0,
+            "mpCost": 28,
+            "radius": 4.2,
+            "powerMult": 3.05,
+            "color": "#38bdf8",
+            "description": "Konzentrierter Mental-Durchschlag nach vorn mit 305% physischem Schaden.",
+        },
+        "whirlwind": {
+            "name": "Heftiges Schlagen",
+            "icon": "./assets/icons/skills/cropped/bash.png",
+            "type": "aoe",
+            "cooldown": 6.5,
+            "mpCost": 26,
+            "radius": 4.6,
+            "powerMult": 2.55,
+            "color": "#60a5fa",
+            "description": "Wuchtiger Mental-Hieb, der Gegner im Umkreis mit 255% Flächenschaden trifft.",
+        },
+        "three_way_cut": {
+            "name": "Stampfer",
+            "icon": "./assets/icons/skills/cropped/stump.png",
+            "type": "aoe",
+            "cooldown": 8.0,
+            "mpCost": 30,
+            "radius": 5.0,
+            "powerMult": 2.50,
+            "stunSec": 2.0,
+            "color": "#f59e0b",
+            "description": "Erschüttert den Boden rundherum mit 250% Flächenschaden und Betäubung.",
+        },
+        "dash_strike": {
+            "name": "Starker Körper",
+            "icon": "./assets/icons/skills/cropped/strong_body.png",
+            "type": "buff",
+            "cooldown": 15.0,
+            "mpCost": 35,
+            "duration": 18.0,
+            "powerMult": 1.0,
+            "buffDefPct": 45,
+            "color": "#38bdf8",
+            "description": "Stählt deinen Körper mit mentaler Kraft: +45% Verteidigung & Standfestigkeit für 18 Sek.",
+        },
+        "berserk": {
+            "name": "Schwertschlag",
+            "icon": "./assets/icons/skills/cropped/sword_strike.png",
+            "type": "burst",
+            "cooldown": 7.5,
+            "mpCost": 26,
+            "dashRange": 10.5,
+            "radius": 3.8,
+            "powerMult": 2.65,
+            "stunSec": 1.8,
+            "color": "#38bdf8",
+            "description": "Schleudert gebündelte Schwertenergie auf das Ziel (265% Schaden & Betäubung).",
+        },
+    },
+    ("ninja", "archery"): {
+        "ambush": {
+            "name": "Wiederholter Schuss",
+            "icon": "./assets/icons/skills/cropped/repetitive_shot.png",
+            "type": "burst",
+            "cooldown": 5.5,
+            "mpCost": 22,
+            "dashRange": 12.0,
+            "radius": 3.8,
+            "powerMult": 2.95,
+            "color": "#34d399",
+            "description": "Feuert eine schnelle Pfeilsalve auf das Ziel (295% Fernkampfschaden).",
+        },
+        "rolling_dagger": {
+            "name": "Pfeilregen",
+            "icon": "./assets/icons/skills/cropped/arrow_shower.png",
+            "type": "aoe",
+            "cooldown": 7.0,
+            "mpCost": 26,
+            "dashRange": 12.0,
+            "radius": 5.4,
+            "powerMult": 2.50,
+            "color": "#60a5fa",
+            "description": "Deckt mehrere Feinde mit einem Pfeilhagel ein (250% Flächenschaden).",
+        },
+        "poison_cloud": {
+            "name": "Feuerpfeil",
+            "icon": "./assets/icons/skills/cropped/fire_arrow.png",
+            "type": "aoe",
+            "cooldown": 9.0,
+            "mpCost": 32,
+            "dashRange": 12.0,
+            "radius": 5.0,
+            "powerMult": 2.95,
+            "color": "#f97316",
+            "description": "Explosiver Flammenpfeil mit 295% Feuerschaden im Zielbereich.",
+        },
+        "stealth": {
+            "name": "Giftpfeil",
+            "icon": "./assets/icons/skills/cropped/poison_arrow.png",
+            "type": "burst",
+            "cooldown": 8.5,
+            "mpCost": 30,
+            "dashRange": 12.0,
+            "radius": 4.0,
+            "powerMult": 2.65,
+            "stunSec": 1.8,
+            "color": "#22c55e",
+            "description": "Durchdringender Giftpfeil mit 265% Schaden, Vergiftung & Betäubung.",
+        },
+    },
+    ("sura", "blackmagic"): {
+        "enchanted_blade": {
+            "name": "Dunkler Schlag",
+            "icon": "./assets/icons/skills/cropped/dark_strike.png",
+            "type": "burst",
+            "cooldown": 5.5,
+            "mpCost": 26,
+            "dashRange": 10.5,
+            "radius": 3.8,
+            "powerMult": 2.80,
+            "color": "#a855f7",
+            "description": "Schleudert dunkle Magie auf das Ziel (280% Magieschaden).",
+        },
+        "finger_strike": {
+            "name": "Flammenschlag",
+            "icon": "./assets/icons/skills/cropped/flame_strike.png",
+            "type": "aoe",
+            "cooldown": 7.0,
+            "mpCost": 30,
+            "radius": 5.0,
+            "powerMult": 2.70,
+            "color": "#ef4444",
+            "description": "Entfesselt eine feurige Druckwelle um dich herum (270% Magie-Flächenschaden).",
+        },
+        "dragon_swirl": {
+            "name": "Geist der Flamme",
+            "icon": "./assets/icons/skills/cropped/flame_spirit.png",
+            "type": "buff",
+            "cooldown": 15.0,
+            "mpCost": 38,
+            "duration": 16.0,
+            "powerMult": 1.0,
+            "buffMagicAtkPct": 38,
+            "buffCritPct": 14,
+            "color": "#f97316",
+            "description": "Beschwört einen kreisenden Flammengeist: +38% Magischer AW & +14% Krit für 16 Sek.",
+        },
+        "dark_orb": {
+            "name": "Dunkler Schutz",
+            "icon": "./assets/icons/skills/cropped/dark_protection.png",
+            "type": "buff",
+            "cooldown": 16.0,
+            "mpCost": 36,
+            "duration": 18.0,
+            "powerMult": 1.0,
+            "buffDefPct": 42,
+            "color": "#7e22ce",
+            "description": "Hüllt dich in einen dunklen Magieschild: +42% Verteidigung & Schadensreduktion für 18 Sek.",
+        },
+        "enchanted_armor": {
+            "name": "Dunkler Stein",
+            "icon": "./assets/icons/skills/cropped/dark_orb.png",
+            "type": "burst",
+            "cooldown": 9.5,
+            "mpCost": 38,
+            "dashRange": 10.5,
+            "radius": 4.4,
+            "powerMult": 3.35,
+            "color": "#6b21a8",
+            "description": "Schleudert eine schwere Sphäre dunkler Materie auf das Ziel (335% Magieschaden).",
+        },
+    },
+    ("shaman", "healing"): {
+        "dragon_help": {
+            "name": "Blitzwurf",
+            "icon": "./assets/icons/skills/cropped/lightning_throw.png",
+            "type": "burst",
+            "cooldown": 5.5,
+            "mpCost": 26,
+            "dashRange": 11.5,
+            "radius": 3.8,
+            "powerMult": 2.75,
+            "color": "#38bdf8",
+            "description": "Schleudert einen grellen Blitzspeer auf das Ziel (275% Magieschaden).",
+        },
+        "dragon_roar": {
+            "name": "Blitz heraufbeschwören",
+            "icon": "./assets/icons/skills/cropped/lightning_summon.png",
+            "type": "aoe",
+            "cooldown": 7.5,
+            "mpCost": 34,
+            "dashRange": 11.0,
+            "radius": 5.2,
+            "powerMult": 2.85,
+            "stunSec": 1.8,
+            "color": "#60a5fa",
+            "description": "Ruft einen gewaltigen Blitzschlag herab (285% Flächenschaden & Betäubung).",
+        },
+        "lightning_claw": {
+            "name": "Blitzkralle",
+            "icon": "./assets/icons/skills/cropped/lightning_claw.png",
+            "type": "aoe",
+            "cooldown": 6.0,
+            "mpCost": 28,
+            "dashRange": 11.0,
+            "radius": 5.0,
+            "powerMult": 2.55,
+            "color": "#38bdf8",
+            "description": "Entlädt springende Kettenblitze zwischen nahen Gegnern (255% Magieschaden).",
+        },
+        "dragon_blessing": {
+            "name": "Schnelligkeit",
+            "icon": "./assets/icons/skills/cropped/swiftness.png",
+            "type": "buff",
+            "cooldown": 15.0,
+            "mpCost": 36,
+            "duration": 18.0,
+            "powerMult": 1.0,
+            "buffSpeedPct": 30,
+            "buffAtkSpeedPct": 20,
+            "color": "#38bdf8",
+            "description": "Verleiht Wind- & Zaubertempo: +30% Bewegungs- & +20% Angriffs-/Zaubertempo für 18 Sek.",
+        },
+    },
+}
+
+
+def resolve_doctrine_id(class_id: str, doctrine_or_idx=0):
+    cls = str(class_id or "warrior").strip().lower()
+    doc_ids = CLASS_DOCTRINE_IDS.get(cls, CLASS_DOCTRINE_IDS["warrior"])
+    if isinstance(doctrine_or_idx, str):
+        s = doctrine_or_idx.strip().lower()
+        if s in doc_ids:
+            idx = doc_ids.index(s)
+            return idx, doc_ids[idx]
+        if s in ("1", "true"):
+            return 1, doc_ids[1]
+        if s in ("0", "false", ""):
+            return 0, doc_ids[0]
+    try:
+        idx = 1 if int(doctrine_or_idx or 0) == 1 else 0
+    except Exception:
+        idx = 0
+    return idx, doc_ids[idx]
+
+
+def get_doctrine_skills(class_id: str, doctrine_or_idx=0) -> list:
+    cls = str(class_id or "warrior").strip().lower()
+    cdef = CHARACTER_CLASSES.get(cls, CHARACTER_CLASSES["warrior"])
+    _idx, doc_id = resolve_doctrine_id(cls, doctrine_or_idx)
+    overrides = DOCTRINE_SKILL_OVERRIDES.get((cdef["id"], doc_id))
+    base_skills = cdef.get("skills", [])
+    if not overrides:
+        return base_skills
+    resolved = []
+    for base_sk in base_skills:
+        sk_id = base_sk["id"]
+        ov = overrides.get(sk_id)
+        if not ov:
+            resolved.append(base_sk)
+        else:
+            merged = {
+                "id": sk_id,
+                "slot": base_sk["slot"],
+                "key": base_sk["key"],
+            }
+            if base_sk.get("special"):
+                merged["special"] = True
+            merged.update(ov)
+            resolved.append(merged)
+    return resolved
 
 # ============================================================================
 # 4. REGIONALE DUNGEONS & BOSS-KAMMERN

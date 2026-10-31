@@ -91,6 +91,7 @@ from game_data import (
     RUNE_BONUS_POOL,
     get_item_slot_size,
     equip_tier_for_level,
+    resolve_doctrine_id,
     resolve_item_template_id,
 )
 from world_server import WorldAuthority, SPECIAL_BONUS_DROP_TABLE
@@ -628,8 +629,12 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                         c_slot["guild"] = ""
 
         # 6. Charakter in der Datenbank anlegen
+        raw_create_doc = char_obj.get("doctrineIdx", char_obj.get("doctrine", payload.get("doctrineIdx", 0)))
+        create_doc_idx, _create_doc_id = resolve_doctrine_id(cls_id, raw_create_doc)
         try:
-            DB.load_or_create_player(new_pid, req_name, cls_id, empire=emp, is_sa=False)
+            DB.load_or_create_player(
+                new_pid, req_name, cls_id, empire=emp, is_sa=False, doctrine_idx=create_doc_idx
+            )
         except ValueError:
             return {
                 "ok": False,
@@ -723,11 +728,15 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         p["online"] = in_world_flag
         p["inWorld"] = in_world_flag
         p["lastSeen"] = time.time() if in_world_flag else 0.0
+        existing_db_name_key = str(p.get("name") or "").strip().lower()
+        existing_is_legit_sa = existing_db_name_key in DB.LEGITIMATE_SA_NAMES and account_key in ("blackzimple", "cryptel")
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
             # [SA]-Prefix nur normalisieren wenn der Name bereits [SA] hat und Account berechtigt ist
             if req_name.upper().startswith("[SA]") and account_key in ("blackzimple", "cryptel"):
                 req_name = DB._normalize_sa_char_name(req_name)
+            elif existing_is_legit_sa:
+                req_name = DB._normalize_sa_char_name(p.get("name") or req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
         # SA-Status beim Betreten der Welt:
@@ -758,12 +767,30 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             p["class_id"] = payload["classId"]
         if payload.get("empire"):
             p["empire"] = "kaeryu" if str(payload["empire"]).lower() == "kaeryu" else "seiryu"
+        raw_join_doc = payload.get("doctrine") if payload.get("doctrine") not in (None, "") else payload.get("doctrineIdx")
+        if str(p.get("name") or "").strip().lower() == "[sa]evlon":
+            raw_join_doc = 1
+        if raw_join_doc is not None:
+            j_doc_idx, j_doc_id = resolve_doctrine_id(p["class_id"], raw_join_doc)
+            p["doctrineIdx"] = j_doc_idx
+            p["doctrine"] = j_doc_id
+            p.setdefault("quests", {})["__doctrine_idx__"] = j_doc_idx
+            p["quests"]["__doctrine__"] = j_doc_id
         DB.ensure_class_starter_equipment(player_id, p["class_id"])
         fresh_p = DB.load_or_create_player(
-            player_id, p["name"], p["class_id"], empire=p.get("empire", "seiryu"), is_sa=is_sa_join
+            player_id,
+            p["name"],
+            p["class_id"],
+            empire=p.get("empire", "seiryu"),
+            is_sa=is_sa_join,
+            doctrine_idx=p.get("doctrineIdx"),
         )
         p["inventory"] = fresh_p["inventory"]
         p["equipment"] = fresh_p["equipment"]
+        if raw_join_doc is None:
+            p["doctrineIdx"] = fresh_p.get("doctrineIdx", p.get("doctrineIdx", 0))
+            p["doctrine"] = fresh_p.get("doctrine", p.get("doctrine", ""))
+        WORLD.sanitize_player_doctrine_buffs(p)
         if is_sa_join:
             cdef_sa = CHARACTER_CLASSES.get(p.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
             for sk_sa in cdef_sa.get("skills", []):
@@ -1343,8 +1370,12 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         new_cls = payload.get("classId", "warrior")
         if new_cls not in CHARACTER_CLASSES:
             return {"ok": False, "message": "Ungültige Klasse."}
+        existing_cc_name_key = str(p.get("name") or "").strip().lower()
+        existing_cc_legit_sa = existing_cc_name_key in DB.LEGITIMATE_SA_NAMES
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
+            if existing_cc_legit_sa and not req_name.upper().startswith("[SA]"):
+                req_name = DB._normalize_sa_char_name(p.get("name") or req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
         if payload.get("empire"):
@@ -1358,8 +1389,18 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
             p["teleportSeq"] = int(p.get("teleportSeq", 0)) + 1
         cdef = CHARACTER_CLASSES[new_cls]
         p["class_id"] = new_cls
+        raw_cc_doc = payload.get("doctrine") if payload.get("doctrine") not in (None, "") else payload.get("doctrineIdx")
+        if str(p.get("name") or "").strip().lower() == "[sa]evlon" and new_cls == "warrior":
+            raw_cc_doc = 1
+        if raw_cc_doc is not None:
+            cc_doc_idx, cc_doc_id = resolve_doctrine_id(new_cls, raw_cc_doc)
+            p["doctrineIdx"] = cc_doc_idx
+            p["doctrine"] = cc_doc_id
+            p.setdefault("quests", {})["__doctrine_idx__"] = cc_doc_idx
+            p["quests"]["__doctrine__"] = cc_doc_id
+        default_sk_lv = 1 if p.get("isSA") else 0
         p["skills"] = {
-            sk["id"]: p["skills"].get(sk["id"], 0 if sk.get("special") else 1)
+            sk["id"]: p["skills"].get(sk["id"], 0 if sk.get("special") else default_sk_lv)
             for sk in cdef["skills"]
             if not sk.get("special") or sk["id"] in p["skills"]
         }

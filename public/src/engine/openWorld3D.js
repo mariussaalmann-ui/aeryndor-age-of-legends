@@ -23662,9 +23662,10 @@ export class OpenWorld3DEngine {
         skillId,
         code,
         tier,
+        doctrine,
         isLSkill,
         loop: resolved.loop,
-        expiresAt: performance.now() + 60000,
+        graceUntil: performance.now() + 1800,
       });
       actor._metinLoopTimer = 0.35;
       this.applyActorWeaponAuraTintFromMetinLoop(actor);
@@ -23714,29 +23715,53 @@ export class OpenWorld3DEngine {
         const skLv = Number(b.skillLevel || (this.localPlayerSkills && this.localPlayerSkills[b.id]) || 1);
         const existing = actor._activeMetinBuffLoops.get(b.id);
         const newTier = getMetinSkillTier(skLv);
-        if (!existing || existing.tier !== newTier) {
+        if (!existing || existing.tier !== newTier || existing.doctrine !== doctrine) {
           const res = resolveMetinSkill(classId, b.id, doctrine, skLv, gender);
           if (res && res.loop) {
             actor._activeMetinBuffLoops.set(b.id, {
               skillId: b.id,
               code: res.code,
               tier: res.tier,
+              doctrine,
               isLSkill: res.isLSkill,
               loop: res.loop,
-              expiresAt: performance.now() + Number(b.remaining || 15) * 1000,
+              graceUntil: 0,
             });
+          } else {
+            actor._activeMetinBuffLoops.delete(b.id);
           }
-        } else {
-          existing.expiresAt = performance.now() + Number(b.remaining || 15) * 1000;
         }
       }
     }
+    const nowPerf = performance.now();
     for (const [k, v] of actor._activeMetinBuffLoops.entries()) {
-      if (!activeIds.has(k) && performance.now() > (v.expiresAt || 0)) {
+      if (!activeIds.has(k) && nowPerf > (v.graceUntil || 0)) {
         actor._activeMetinBuffLoops.delete(k);
       }
     }
     this.applyActorWeaponAuraTintFromMetinLoop(actor);
+  }
+
+  resetLocalCharacterState() {
+    this._scheduledMetinEvents = [];
+    this.hasActiveWeaponBuff = false;
+    this.localPlayerDoctrine = '';
+    this.localPlayerSkills = {};
+    this.customGuildName = '';
+    this.customPetSkin = null;
+    this.customMountSkin = null;
+    this.lastLocalLabelText = '';
+    if (this.localPlayerActor) {
+      if (this.localPlayerActor._activeMetinBuffLoops) {
+        this.localPlayerActor._activeMetinBuffLoops.clear();
+      }
+      this.localPlayerActor._activeSkillClip = null;
+      this.localPlayerActor._activeSkillTimer = 0;
+      if (this.localPlayerActor.mountGroup) this.localPlayerActor.mountGroup.visible = false;
+      if (this.localPlayerActor.petGroup) this.localPlayerActor.petGroup.visible = false;
+      if (this.localPlayerActor.auraRing) this.localPlayerActor.auraRing.visible = false;
+      this.applyActorWeaponAuraTintFromMetinLoop(this.localPlayerActor);
+    }
   }
 
   applyActorWeaponAuraTintFromMetinLoop(actor) {
@@ -26432,7 +26457,7 @@ export class OpenWorld3DEngine {
     if (cfg.name && cfg.level) {
       const rankName = cfg.rankName || 'Freundlich';
       const rankColor = cfg.rankColor || null;
-      const guild = cfg.guild !== undefined ? cfg.guild : (this.customGuildName || 'Drachenorden');
+      const guild = cfg.guild !== undefined ? cfg.guild : (this.customGuildName || '');
       const showGuild = this.showGuildNames !== false;
       const showPlayer = this.showPlayerNames !== false;
       const labelKey = `${cfg.level}|${rankName}|${rankColor || ''}|${cfg.name}|${guild}|${showGuild}`;
@@ -29979,15 +30004,11 @@ export class OpenWorld3DEngine {
     if (hasPetNow && this.localPlayerActor.petGroup) {
       const petLv = Math.max(1, Number(p.petData?.level || 1));
       this._lastPetLevel = petLv;
-      let chosenSkin = this.customPetSkin || 'ridack_dragonpet';
+      let chosenSkin = 'ridack_dragonpet';
       if (comp.hasCostumePetSkin && comp.petSkin) {
         chosenSkin = comp.petSkin;
       } else {
-        let localSaved = '';
-        try {
-          localSaved = localStorage.getItem('aeryndor_pet_skin_v1') || '';
-        } catch (_) {}
-        chosenSkin = localSaved || comp.petSkin || p.petData?.skinKey || chosenSkin;
+        chosenSkin = p.petData?.skinKey || comp.petSkin || this.customPetSkin || 'ridack_dragonpet';
         this.customPetSkin = chosenSkin;
       }
       const rawCustom = p.petData?.customName || '';
@@ -29999,12 +30020,25 @@ export class OpenWorld3DEngine {
       this.spawnRingWave(this.localPlayerPos.x, lpy + 0.18, this.localPlayerPos.z, 0x22c55e, 2.8);
       this.spawnRingWave(this.localPlayerPos.x, lpy + 0.35, this.localPlayerPos.z, 0x4ade80, 1.9);
     }
+    const curPid = String(p.player_id || p.id || '');
+    const curDoctrine = String(p.doctrine || '');
+    if (
+      (this._activeLocalPlayerId && curPid && this._activeLocalPlayerId !== curPid) ||
+      (this.localPlayerDoctrine && curDoctrine && this.localPlayerDoctrine !== curDoctrine)
+    ) {
+      if (this.localPlayerActor?._activeMetinBuffLoops) {
+        this.localPlayerActor._activeMetinBuffLoops.clear();
+      }
+      this.hasActiveWeaponBuff = false;
+      this.applyActorWeaponAuraTintFromMetinLoop(this.localPlayerActor);
+    }
+    if (curPid) this._activeLocalPlayerId = curPid;
     this.hasActiveWeaponBuff = Array.isArray(comp.activeBuffs) && comp.activeBuffs.length > 0;
     const localMaxPlus = Math.max(Number(comp.weaponPlus || 0), Number(comp.armorPlus || 0));
     this.localPlayerActor.auraRing.visible = localMaxPlus >= 7 || this.hasActiveWeaponBuff;
-    this.localPlayerClassId = p.classId || 'warrior';
+    this.localPlayerClassId = p.class_id || p.classId || 'warrior';
     this.localPlayerGender = p.gender || 'm';
-    this.localPlayerDoctrine = p.doctrine || '';
+    this.localPlayerDoctrine = curDoctrine;
     this.localPlayerSkills = p.skills || {};
     this.syncActorMetinBuffState(
       this.localPlayerActor,

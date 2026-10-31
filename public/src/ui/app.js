@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261031_v626';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261031_v627';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -47,26 +47,26 @@ const CLASS_META = {
         id: 'body',
         name: 'Körper-Kampf (Schwert-Aura & Kampfrausch)',
         skills: [
-          { id: 'aura_sword', name: 'Aura des Schwerts', icon: './assets/icons/skills/cropped/aura_sword.png' },
-          { id: 'whirlwind', name: 'Schwertwirbel', icon: './assets/icons/skills/cropped/whirlwind.png' },
-          { id: 'three_way_cut', name: 'Dreiwege-Schnitt', icon: './assets/icons/skills/cropped/three_way_cut.png' },
-          { id: 'dash_strike', name: 'Sausen', icon: './assets/icons/skills/cropped/dash_strike.png' },
-          { id: 'berserk', name: 'Kampfrausch', icon: './assets/icons/skills/cropped/berserk.png' },
-          { id: 'earthquake', name: 'Donnerschlag', icon: './assets/icons/skills/cropped/earthquake.png', special: true },
-          { id: 'sword_finisher', name: 'Klingenschlag', icon: './assets/icons/skills/cropped/sword_finisher.png', special: true },
+          { id: 'aura_sword', name: 'Aura des Schwerts', type: 'buff', icon: './assets/icons/skills/cropped/aura_sword.png', desc: 'Hüllt deine Klinge in glühende Schwert-Aura und steigert physischen Angriffswert sowie Angriffstempo.' },
+          { id: 'whirlwind', name: 'Schwertwirbel', type: 'aoe', icon: './assets/icons/skills/cropped/whirlwind.png', desc: '360°-Klingenwirbel, der allen Feinden im Umkreis wuchtigen physischen Flächenschaden zufügt.' },
+          { id: 'three_way_cut', name: 'Dreiwege-Schnitt', type: 'burst', icon: './assets/icons/skills/cropped/three_way_cut.png', desc: 'Drei vernichtende Schwerthiebe in schneller Folge mit hohem Gesamtschaden.' },
+          { id: 'dash_strike', name: 'Sausen', type: 'dash_aoe', icon: './assets/icons/skills/cropped/dash_strike.png', desc: 'Stürmt blitzschnell auf das Ziel zu und verursacht beim Aufprall Schockwellen-Schaden & Betäubung.' },
+          { id: 'berserk', name: 'Kampfrausch', type: 'buff', icon: './assets/icons/skills/cropped/berserk.png', desc: 'Entfesselt ungebremsten Kampfrausch für stark erhöhte Angriffs- und Bewegungsgeschwindigkeit.' },
+          { id: 'earthquake', name: 'Donnerschlag', type: 'aoe', icon: './assets/icons/skills/cropped/earthquake.png', special: true, desc: 'Erschüttert den Boden mit einem wuchtigen Sprungschlag (Flächenschaden & Betäubung).' },
+          { id: 'sword_finisher', name: 'Klingenschlag', type: 'burst', icon: './assets/icons/skills/cropped/sword_finisher.png', special: true, desc: 'Verheerender finaler Hieb mit der vollen Wucht der Klinge.' },
         ],
       },
       {
         id: 'mental',
         name: 'Mental-Kampf (Starker Körper & Durchschlag)',
         skills: [
-          { id: 'aura_sword', name: 'Durchschlag', icon: './assets/icons/skills/cropped/spirit_strike.png' },
-          { id: 'whirlwind', name: 'Heftiges Schlagen', icon: './assets/icons/skills/cropped/bash.png' },
-          { id: 'three_way_cut', name: 'Stampfer', icon: './assets/icons/skills/cropped/stump.png' },
-          { id: 'dash_strike', name: 'Starker Körper', icon: './assets/icons/skills/cropped/strong_body.png' },
-          { id: 'berserk', name: 'Schwertschlag', icon: './assets/icons/skills/cropped/sword_strike.png' },
-          { id: 'earthquake', name: 'Donnerschlag', icon: './assets/icons/skills/cropped/earthquake.png', special: true },
-          { id: 'sword_finisher', name: 'Klingenschlag', icon: './assets/icons/skills/cropped/sword_finisher.png', special: true },
+          { id: 'aura_sword', name: 'Durchschlag', type: 'burst', icon: './assets/icons/skills/cropped/spirit_strike.png', desc: 'Konzentrierter Mental-Durchschlag nach vorn mit durchdringendem physischem Schaden.' },
+          { id: 'whirlwind', name: 'Heftiges Schlagen', type: 'aoe', icon: './assets/icons/skills/cropped/bash.png', desc: 'Wuchtiger Mental-Hieb, der Gegner im Umkreis mit hoher Wucht trifft.' },
+          { id: 'three_way_cut', name: 'Stampfer', type: 'aoe', icon: './assets/icons/skills/cropped/stump.png', desc: 'Erschüttert den Boden rundherum mit Flächenschaden und Betäubung.' },
+          { id: 'dash_strike', name: 'Starker Körper', type: 'buff', icon: './assets/icons/skills/cropped/strong_body.png', desc: 'Stählt deinen Körper mit mentaler Kraft für massiv erhöhte Verteidigung und Standfestigkeit.' },
+          { id: 'berserk', name: 'Schwertschlag', type: 'burst', icon: './assets/icons/skills/cropped/sword_strike.png', desc: 'Schleudert gebündelte Schwertenergie auf das Ziel und betäubt es.' },
+          { id: 'earthquake', name: 'Donnerschlag', type: 'aoe', icon: './assets/icons/skills/cropped/earthquake.png', special: true, desc: 'Erschüttert den Boden mit einem wuchtigen Sprungschlag (Flächenschaden & Betäubung).' },
+          { id: 'sword_finisher', name: 'Klingenschlag', type: 'burst', icon: './assets/icons/skills/cropped/sword_finisher.png', special: true, desc: 'Verheerender finaler Hieb mit der vollen Wucht der Klinge.' },
         ],
       },
     ],
@@ -85,26 +85,26 @@ const CLASS_META = {
         id: 'blade',
         name: 'Nahkampf-Assassine (Hinterhalt & Degenwirbel)',
         skills: [
-          { id: 'shadow_step', name: 'Federschreiten', icon: './assets/icons/skills/cropped/shadow_step.png' },
-          { id: 'ambush', name: 'Hinterhalt', icon: './assets/icons/skills/cropped/ambush.png' },
-          { id: 'rolling_dagger', name: 'Degenwirbel', icon: './assets/icons/skills/cropped/rolling_dagger.png' },
-          { id: 'poison_cloud', name: 'Giftwolke', icon: './assets/icons/skills/cropped/poison_cloud.png' },
-          { id: 'stealth', name: 'Tarnung', icon: './assets/icons/skills/cropped/stealth.png' },
-          { id: 'lightning_strike_ninja', name: 'Blitzangriff', icon: './assets/icons/skills/cropped/lightning_strike_ninja.png', special: true },
-          { id: 'spark_slash', name: 'Funkenschlag', icon: './assets/icons/skills/cropped/spark_slash.png', special: true },
+          { id: 'shadow_step', name: 'Federschreiten', type: 'buff', icon: './assets/icons/skills/cropped/shadow_step.png', desc: 'Lässt deine Schritte federleicht werden und steigert Bewegungsgeschwindigkeit sowie Wendigkeit.' },
+          { id: 'ambush', name: 'Hinterhalt', type: 'burst', icon: './assets/icons/skills/cropped/ambush.png', desc: 'Lautloser Präzisionsstoß mit verheerendem Einzeltrefferschaden.' },
+          { id: 'rolling_dagger', name: 'Degenwirbel', type: 'aoe', icon: './assets/icons/skills/cropped/rolling_dagger.png', desc: 'Akrobatischer Klingenwirbel durch alle umstehenden Gegner.' },
+          { id: 'poison_cloud', name: 'Giftwolke', type: 'aoe', icon: './assets/icons/skills/cropped/poison_cloud.png', desc: 'Entfesselt eine toxische Wolke, die Feinde im Umkreis schädigt und vergiftet.' },
+          { id: 'stealth', name: 'Tarnung', type: 'buff', icon: './assets/icons/skills/cropped/stealth.png', desc: 'Verhüllt deine Präsenz im Schatten und erhöht deine kritische Trefferchance stark.' },
+          { id: 'lightning_strike_ninja', name: 'Blitzangriff', type: 'dash_aoe', icon: './assets/icons/skills/cropped/lightning_strike_ninja.png', special: true, desc: 'Teleportiert blitzartig zum Ziel und hinterlässt tödlichen Schnittschaden.' },
+          { id: 'spark_slash', name: 'Funkenschlag', type: 'burst', icon: './assets/icons/skills/cropped/spark_slash.png', special: true, desc: 'Überraschungshieb mit blendenden Klingenfunken.' },
         ],
       },
       {
         id: 'archery',
         name: 'Fernkampf-Schütze (Feuerpfeil & Pfeilregen)',
         skills: [
-          { id: 'shadow_step', name: 'Federschreiten', icon: './assets/icons/skills/cropped/shadow_step.png' },
-          { id: 'ambush', name: 'Wiederholter Schuss', icon: './assets/icons/skills/cropped/repetitive_shot.png' },
-          { id: 'rolling_dagger', name: 'Pfeilregen', icon: './assets/icons/skills/cropped/arrow_shower.png' },
-          { id: 'poison_cloud', name: 'Feuerpfeil', icon: './assets/icons/skills/cropped/fire_arrow.png' },
-          { id: 'stealth', name: 'Giftpfeil', icon: './assets/icons/skills/cropped/poison_arrow.png' },
-          { id: 'lightning_strike_ninja', name: 'Blitzangriff', icon: './assets/icons/skills/cropped/lightning_strike_ninja.png', special: true },
-          { id: 'spark_slash', name: 'Funkenschlag', icon: './assets/icons/skills/cropped/spark_slash.png', special: true },
+          { id: 'shadow_step', name: 'Federschreiten', type: 'buff', icon: './assets/icons/skills/cropped/shadow_step.png', desc: 'Lässt deine Schritte federleicht werden für optimales Kiting auf Distanz.' },
+          { id: 'ambush', name: 'Wiederholter Schuss', type: 'burst', icon: './assets/icons/skills/cropped/repetitive_shot.png', desc: 'Feuert eine blitzschnelle Pfeilsalve auf das anvisierte Ziel.' },
+          { id: 'rolling_dagger', name: 'Pfeilregen', type: 'aoe', icon: './assets/icons/skills/cropped/arrow_shower.png', desc: 'Deckt mehrere Feinde im Zielbereich mit einem Pfeilhagel ein.' },
+          { id: 'poison_cloud', name: 'Feuerpfeil', type: 'aoe', icon: './assets/icons/skills/cropped/fire_arrow.png', desc: 'Entzündet einen explosiven Flammenpfeil mit hohem Flächenschaden.' },
+          { id: 'stealth', name: 'Giftpfeil', type: 'burst', icon: './assets/icons/skills/cropped/poison_arrow.png', desc: 'Durchdringender Giftpfeil mit Vergiftung und Betäubung.' },
+          { id: 'lightning_strike_ninja', name: 'Blitzangriff', type: 'dash_aoe', icon: './assets/icons/skills/cropped/lightning_strike_ninja.png', special: true, desc: 'Mächtiger Sturmschuss mit konzentrierter Windenergie.' },
+          { id: 'spark_slash', name: 'Funkenschlag', type: 'burst', icon: './assets/icons/skills/cropped/spark_slash.png', special: true, desc: 'Blendender Energieschuss mit hohem Durchschlag.' },
         ],
       },
     ],
@@ -123,26 +123,26 @@ const CLASS_META = {
         id: 'weaponry',
         name: 'Waffen-Sura (Verzauberte Klinge & TP-Absaugung)',
         skills: [
-          { id: 'enchanted_blade', name: 'Verzauberte Klinge', icon: './assets/icons/skills/cropped/enchanted_blade.png' },
-          { id: 'finger_strike', name: 'Fingerschlag', icon: './assets/icons/skills/cropped/finger_strike.png' },
-          { id: 'dragon_swirl', name: 'Drachenwirbel', icon: './assets/icons/skills/cropped/dragon_swirl.png' },
-          { id: 'dark_orb', name: 'Dunkler Stein', icon: './assets/icons/skills/cropped/dark_orb.png' },
-          { id: 'enchanted_armor', name: 'Verzauberte Rüstung', icon: './assets/icons/skills/cropped/enchanted_armor.png' },
-          { id: 'flame_strike', name: 'Flammenschlag', icon: './assets/icons/skills/cropped/flame_strike.png', special: true },
-          { id: 'hell_lord', name: 'Höllenfürst', icon: './assets/icons/skills/cropped/hell_lord.png', special: true },
+          { id: 'enchanted_blade', name: 'Verzauberte Klinge', type: 'buff', icon: './assets/icons/skills/cropped/enchanted_blade.png', desc: 'Tränkt das Schwert in Runenmacht: erhöht Angriffswert, Magie-AW und gewährt TP-Absaugung.' },
+          { id: 'finger_strike', name: 'Fingerschlag', type: 'burst', icon: './assets/icons/skills/cropped/finger_strike.png', desc: 'Entlädt gebündelte dunkle Ätherenergie präzise auf das Ziel.' },
+          { id: 'dragon_swirl', name: 'Drachenwirbel', type: 'aoe', icon: './assets/icons/skills/cropped/dragon_swirl.png', desc: 'Erzeugt einen magischen Sturmwirbel, der alle Feinde im Umkreis erfasst.' },
+          { id: 'dark_orb', name: 'Dunkler Stein', type: 'aoe', icon: './assets/icons/skills/cropped/dark_orb.png', desc: 'Schleudert eine Sphäre aus Leerenmagie, die beim Aufprall explodiert.' },
+          { id: 'enchanted_armor', name: 'Verzauberte Rüstung', type: 'buff', icon: './assets/icons/skills/cropped/enchanted_armor.png', desc: 'Härtet den Körper mit Dämonenrunen für erhöhte Verteidigung und Nahkampf-Reflexion.' },
+          { id: 'flame_strike', name: 'Flammenschlag', type: 'aoe', icon: './assets/icons/skills/cropped/flame_strike.png', special: true, desc: 'Entfesselt eine Eruption dunkler Flammen aus dem Boden.' },
+          { id: 'hell_lord', name: 'Höllenfürst', type: 'burst', icon: './assets/icons/skills/cropped/hell_lord.png', special: true, desc: 'Beschwört die Urgewalt des Dämonenabgrunds auf das Ziel.' },
         ],
       },
       {
         id: 'blackmagic',
         name: 'Magie-Sura (Zaubergeschwindigkeit & FKS)',
         skills: [
-          { id: 'enchanted_blade', name: 'Dunkler Schlag', icon: './assets/icons/skills/cropped/dark_strike.png' },
-          { id: 'finger_strike', name: 'Flammenschlag', icon: './assets/icons/skills/cropped/flame_strike.png' },
-          { id: 'dragon_swirl', name: 'Geist der Flamme', icon: './assets/icons/skills/cropped/flame_spirit.png' },
-          { id: 'dark_orb', name: 'Dunkler Schutz', icon: './assets/icons/skills/cropped/dark_protection.png' },
-          { id: 'enchanted_armor', name: 'Dunkler Stein', icon: './assets/icons/skills/cropped/dark_orb.png' },
-          { id: 'flame_strike', name: 'Flammenschlag', icon: './assets/icons/skills/cropped/flame_strike.png', special: true },
-          { id: 'hell_lord', name: 'Höllenfürst', icon: './assets/icons/skills/cropped/hell_lord.png', special: true },
+          { id: 'enchanted_blade', name: 'Dunkler Schlag', type: 'burst', icon: './assets/icons/skills/cropped/dark_strike.png', desc: 'Schleudert konzentrierte dunkle Magie mit kurzer Abklingzeit auf das Ziel.' },
+          { id: 'finger_strike', name: 'Flammenschlag', type: 'aoe', icon: './assets/icons/skills/cropped/flame_strike.png', desc: 'Entfesselt eine feurige Druckwelle um dich herum.' },
+          { id: 'dragon_swirl', name: 'Geist der Flamme', type: 'buff', icon: './assets/icons/skills/cropped/flame_spirit.png', desc: 'Beschwört einen kreisenden Flammengeist, der Magie-AW und Kritische Trefferchance erhöht.' },
+          { id: 'dark_orb', name: 'Dunkler Schutz', type: 'buff', icon: './assets/icons/skills/cropped/dark_protection.png', desc: 'Hüllt dich in einen dunklen Magieschild für hohe Verteidigung und Schadensreduktion.' },
+          { id: 'enchanted_armor', name: 'Dunkler Stein', type: 'burst', icon: './assets/icons/skills/cropped/dark_orb.png', desc: 'Schleudert eine schwere Sphäre dunkler Materie mit massivem Magieschaden.' },
+          { id: 'flame_strike', name: 'Flammenschlag', type: 'aoe', icon: './assets/icons/skills/cropped/flame_strike.png', special: true, desc: 'Entfesselt eine Eruption dunkler Flammen aus dem Boden.' },
+          { id: 'hell_lord', name: 'Höllenfürst', type: 'burst', icon: './assets/icons/skills/cropped/hell_lord.png', special: true, desc: 'Beschwört die Urgewalt des Dämonenabgrunds auf das Ziel.' },
         ],
       },
     ],
@@ -161,26 +161,26 @@ const CLASS_META = {
         id: 'dragon',
         name: 'Drachenmacht (Hilfe des Drachen & Segen)',
         skills: [
-          { id: 'dragon_help', name: 'Hilfe des Drachen', icon: './assets/icons/skills/cropped/dragon_help.png' },
-          { id: 'dragon_roar', name: 'Drachengebrüll', icon: './assets/icons/skills/cropped/dragon_roar.png' },
-          { id: 'lightning_claw', name: 'Blitzkralle', icon: './assets/icons/skills/cropped/lightning_claw.png' },
-          { id: 'natures_heal', name: 'Kurieren', icon: './assets/icons/skills/cropped/natures_heal.png' },
-          { id: 'dragon_blessing', name: 'Segen', icon: './assets/icons/skills/cropped/dragon_blessing.png' },
-          { id: 'thunderstorm', name: 'Gewittersturm', icon: './assets/icons/skills/cropped/thunderstorm.png', special: true },
-          { id: 'meteor_shower', name: 'Meteorschauer', icon: './assets/icons/skills/cropped/meteor_shower.png', special: true },
+          { id: 'dragon_help', name: 'Hilfe des Drachen', type: 'buff', icon: './assets/icons/skills/cropped/dragon_help.png', desc: 'Segen des Himmelsdrachen: steigert Offensivkraft, Magie-AW und Tempo.' },
+          { id: 'dragon_roar', name: 'Drachengebrüll', type: 'aoe', icon: './assets/icons/skills/cropped/dragon_roar.png', desc: 'Feurige Drachenexplosion im Umkreis mit hohem Magie-Flächenschaden.' },
+          { id: 'lightning_claw', name: 'Blitzkralle', type: 'aoe', icon: './assets/icons/skills/cropped/lightning_claw.png', desc: 'Entfesselt springende Himmelsblitze auf mehrere Ziele.' },
+          { id: 'natures_heal', name: 'Kurieren', type: 'heal', icon: './assets/icons/skills/cropped/natures_heal.png', desc: 'Stellt sofort Lebenspunkte (TP) wieder her und läutert negative Effekte.' },
+          { id: 'dragon_blessing', name: 'Segen', type: 'buff', icon: './assets/icons/skills/cropped/dragon_blessing.png', desc: 'Astraler Schutzschild des Drachen zur Reduktion erlittenen Schadens.' },
+          { id: 'thunderstorm', name: 'Gewittersturm', type: 'aoe', icon: './assets/icons/skills/cropped/thunderstorm.png', special: true, desc: 'Beschwört gewaltige Blitze aus dem Himmel auf alle Gegner im Umkreis.' },
+          { id: 'meteor_shower', name: 'Meteorschauer', type: 'aoe', icon: './assets/icons/skills/cropped/meteor_shower.png', special: true, desc: 'Lässt brennende Meteore in einem kosmischen Flächeninferno niedergehen.' },
         ],
       },
       {
         id: 'healing',
         name: 'Heilung & Blitz (Kurieren & Schnelligkeit)',
         skills: [
-          { id: 'dragon_help', name: 'Blitzwurf', icon: './assets/icons/skills/cropped/lightning_throw.png' },
-          { id: 'dragon_roar', name: 'Blitz heraufbeschwören', icon: './assets/icons/skills/cropped/lightning_summon.png' },
-          { id: 'lightning_claw', name: 'Blitzkralle', icon: './assets/icons/skills/cropped/lightning_claw.png' },
-          { id: 'natures_heal', name: 'Kurieren', icon: './assets/icons/skills/cropped/natures_heal.png' },
-          { id: 'dragon_blessing', name: 'Schnelligkeit', icon: './assets/icons/skills/cropped/swiftness.png' },
-          { id: 'thunderstorm', name: 'Gewittersturm', icon: './assets/icons/skills/cropped/thunderstorm.png', special: true },
-          { id: 'meteor_shower', name: 'Meteorschauer', icon: './assets/icons/skills/cropped/meteor_shower.png', special: true },
+          { id: 'dragon_help', name: 'Blitzwurf', type: 'burst', icon: './assets/icons/skills/cropped/lightning_throw.png', desc: 'Schleudert einen grellen Blitzspeer auf das anvisierte Ziel.' },
+          { id: 'dragon_roar', name: 'Blitz heraufbeschwören', type: 'aoe', icon: './assets/icons/skills/cropped/lightning_summon.png', desc: 'Ruft einen gewaltigen Blitzschlag herab (Flächenschaden & Betäubung).' },
+          { id: 'lightning_claw', name: 'Blitzkralle', type: 'aoe', icon: './assets/icons/skills/cropped/lightning_claw.png', desc: 'Entlädt springende Kettenblitze zwischen nahen Gegnern.' },
+          { id: 'natures_heal', name: 'Kurieren', type: 'heal', icon: './assets/icons/skills/cropped/natures_heal.png', desc: 'Stellt sofort Lebenspunkte (TP) wieder her und läutert negative Effekte.' },
+          { id: 'dragon_blessing', name: 'Schnelligkeit', type: 'buff', icon: './assets/icons/skills/cropped/swiftness.png', desc: 'Verleiht Wind- & Zaubertempo für erhöhte Bewegungs- und Zaubergeschwindigkeit.' },
+          { id: 'thunderstorm', name: 'Gewittersturm', type: 'aoe', icon: './assets/icons/skills/cropped/thunderstorm.png', special: true, desc: 'Beschwört gewaltige Blitze aus dem Himmel auf alle Gegner im Umkreis.' },
+          { id: 'meteor_shower', name: 'Meteorschauer', type: 'aoe', icon: './assets/icons/skills/cropped/meteor_shower.png', special: true, desc: 'Lässt brennende Meteore in einem kosmischen Flächeninferno niedergehen.' },
         ],
       },
     ],
@@ -1578,7 +1578,7 @@ class AeryndorMMOApp {
                   dirtyPurge = true;
                   return null;
                 }
-                const legitimateSaNames = ['[sa]nemesis', '[sa]serverleitung', '[sa]cryptel'];
+                const legitimateSaNames = ['[sa]nemesis', '[sa]serverleitung', '[sa]cryptel', '[sa]evlon'];
                 if (!legitimateSaNames.includes(rawCleanName.toLowerCase())) {
                   rawCleanName = rawCleanName.replace(/\[.*?\]/g, '').replace(/[\[\]]/g, '').trim();
                   if (!rawCleanName) rawCleanName = `Held_${String(ch.playerId || '').slice(-4)}`;
@@ -2427,10 +2427,14 @@ class AeryndorMMOApp {
   }
 
   showLoginPortal(animateCards = true) {
+    const wasInWorld = Boolean(this.inWorld);
     if (this.inWorld || this._isAccountLoggedIn) {
       this.notifyServerLogout();
     }
     this.inWorld = false;
+    if (wasInWorld) {
+      this.resetCharacterSwitchHudState();
+    }
     this.portalMode = 'login';
     this.audio?.setBgmContext?.('login');
     this.disposeShowcase3D();
@@ -3093,14 +3097,74 @@ class AeryndorMMOApp {
     });
   }
 
+  getActiveDoctrineInfo(classIdOverride = null, charOverride = null) {
+    const activeChar = charOverride || this.getActiveCharacter();
+    const clsId = classIdOverride || this.selfState?.class_id || activeChar?.classId || this.playerClassId || 'warrior';
+    const meta = CLASS_META[clsId] || CLASS_META.warrior;
+    let docIdx = 0;
+    if (
+      activeChar &&
+      (!this.playerId || !activeChar.playerId || activeChar.playerId === this.playerId) &&
+      activeChar.doctrineIdx !== undefined &&
+      activeChar.doctrineIdx !== null
+    ) {
+      docIdx = Number(activeChar.doctrineIdx) === 1 ? 1 : 0;
+    } else if (this.selfState?.doctrineIdx !== undefined && this.selfState?.doctrineIdx !== null) {
+      docIdx = Number(this.selfState.doctrineIdx) === 1 ? 1 : 0;
+    } else if (this.selfState?.doctrine) {
+      const foundIdx = (meta.doctrines || []).findIndex((d) => d && d.id === this.selfState.doctrine);
+      docIdx = foundIdx >= 0 ? foundIdx : 0;
+    }
+    const docObj =
+      meta.doctrines?.[docIdx] ||
+      meta.doctrines?.[0] || { id: '', name: meta.aeryndorName || 'Lehre', skills: [] };
+    const docSkills = Array.isArray(docObj.skills) ? docObj.skills : [];
+    const doctrineShortName = (docObj.name || '').split('(')[0].trim() || meta.aeryndorName || 'Lehre';
+    return {
+      clsId,
+      meta,
+      docIdx,
+      docId: docObj.id || '',
+      docObj,
+      docSkills,
+      doctrineShortName,
+    };
+  }
+
+  resetCharacterSwitchHudState() {
+    this.selfState = null;
+    this.snapshot = null;
+    this.latestSnapshot = null;
+    this._currentHudBuffs = [];
+    this._optimisticMountState = null;
+    this._optimisticMountUntil = 0;
+    this._optimisticRespawnUntil = 0;
+    this.hideItemTooltip?.();
+    const buffStrip = document.getElementById('hud-buff-strip');
+    if (buffStrip) {
+      buffStrip.innerHTML = '';
+      buffStrip.dataset.sig = '';
+    }
+    const hotbarWrap = document.getElementById('hotbar-skill-slots');
+    if (hotbarWrap) {
+      hotbarWrap.innerHTML = '';
+      hotbarWrap.dataset.sig = '';
+    }
+    this.engine?.resetLocalCharacterState?.();
+  }
+
   // ==========================================================================
   // 0C. CHARAKTERAUSWAHL AUF DER RUNENTERRASSE (3-ZONEN LAYOUT + 3D-PODEST)
   // ==========================================================================
   showCharSelectPortal(animateCards = true) {
+    const wasInWorld = Boolean(this.inWorld);
     if (this.inWorld) {
       this.notifyServerLeaveWorld();
     }
     this.inWorld = false;
+    if (wasInWorld) {
+      this.resetCharacterSwitchHudState();
+    }
     this.portalMode = 'charselect';
     this.audio?.setBgmContext?.('select');
     this.disposeShowcase3D();
@@ -4089,6 +4153,7 @@ class AeryndorMMOApp {
 
     try {
       this.disposeShowcase3D();
+      this.resetCharacterSwitchHudState();
       const loader = this.renderWorldLoadingPortal(activeChar);
 
       // Kurz warten, damit der Ladebildschirm + Funken-Animation sofort sichtbar gerendert werden
@@ -4102,6 +4167,7 @@ class AeryndorMMOApp {
       this.playerName = activeChar.name;
       this.playerClassId = activeChar.classId;
       this.playerEmpire = activeChar.empire || 'seiryu';
+      const activeDocInfo = this.getActiveDoctrineInfo(activeChar.classId, activeChar);
       const isNewSpawn = Boolean(activeChar.isNewCharSpawn);
       if (isNewSpawn) {
         activeChar.isNewCharSpawn = false;
@@ -4117,6 +4183,8 @@ class AeryndorMMOApp {
         this.engine.hasInitialServerPos = false;
         this.engine.customGender = activeChar.gender || 'male';
         this.engine.customHairIndex = activeChar.hairIndex || 0;
+        const charGuild = activeChar.guild && activeChar.guild !== 'Keine Gilde' ? activeChar.guild : '';
+        this.engine.customGuildName = charGuild;
         this.engine.setLocalPlayerAppearance({
           classId: activeChar.classId,
           gender: activeChar.gender || 'male',
@@ -4124,6 +4192,7 @@ class AeryndorMMOApp {
           weaponPlus: 3,
           name: activeChar.name,
           level: activeChar.level || 1,
+          guildName: charGuild,
         });
       }
 
@@ -4141,7 +4210,7 @@ class AeryndorMMOApp {
         forceWorld: true,
       });
 
-      // Mit Server synchronisieren (Name, Klasse, Reich & exklusive Account-Session setzen)
+      // Mit Server synchronisieren (Name, Klasse, Lehre, Reich & exklusive Account-Session setzen)
       if (this.wsConnected && this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(
           JSON.stringify({
@@ -4152,6 +4221,8 @@ class AeryndorMMOApp {
             inWorld: true,
             name: this.playerName,
             classId: this.playerClassId,
+            doctrineIdx: activeDocInfo.docIdx,
+            doctrine: activeDocInfo.docId,
             empire: this.playerEmpire,
             isNewSpawn,
           })
@@ -4159,6 +4230,8 @@ class AeryndorMMOApp {
       }
       const joinRes = await this.sendAction('change_class', {
         classId: this.playerClassId,
+        doctrineIdx: activeDocInfo.docIdx,
+        doctrine: activeDocInfo.docId,
         name: this.playerName,
         empire: this.playerEmpire,
         isNewSpawn,
@@ -4436,6 +4509,7 @@ class AeryndorMMOApp {
         this._hadWsConnectionOnce = true;
         this.wsConnected = true;
         if (this.inWorld) {
+          const activeDocInfo = this.getActiveDoctrineInfo();
           const joinPayload = {
             action: 'join',
             playerId: this.playerId,
@@ -4444,6 +4518,8 @@ class AeryndorMMOApp {
             inWorld: true,
             name: this.playerName,
             classId: this.playerClassId || 'warrior',
+            doctrineIdx: activeDocInfo.docIdx,
+            doctrine: activeDocInfo.docId,
             empire: this.playerEmpire || this.getActiveCharacter()?.empire || 'seiryu',
           };
           if (this.engine?.hasInitialServerPos) {
@@ -4756,6 +4832,7 @@ class AeryndorMMOApp {
         const now = performance.now();
         if (!this._lastWsPlayerResyncAt || now - this._lastWsPlayerResyncAt > 400) {
           this._lastWsPlayerResyncAt = now;
+          const activeDocInfo = this.getActiveDoctrineInfo();
           this.ws.send(
             JSON.stringify({
               action: 'join',
@@ -4765,6 +4842,8 @@ class AeryndorMMOApp {
               inWorld: true,
               name: this.playerName,
               classId: this.playerClassId,
+              doctrineIdx: activeDocInfo.docIdx,
+              doctrine: activeDocInfo.docId,
               empire: this.playerEmpire || this.selectedEmpire || 'seiryu',
             })
           );
@@ -4776,6 +4855,7 @@ class AeryndorMMOApp {
       if (this._lastServerBootId && this._lastServerBootId !== snap.serverBootId) {
         this._lastServerBootId = snap.serverBootId;
         if (this.inWorld && this.ws && this.ws.readyState === WebSocket.OPEN) {
+          const activeDocInfo = this.getActiveDoctrineInfo();
           const rejoinPayload = {
             action: 'join',
             playerId: this.playerId,
@@ -4784,6 +4864,8 @@ class AeryndorMMOApp {
             inWorld: true,
             name: this.playerName,
             classId: this.playerClassId || 'warrior',
+            doctrineIdx: activeDocInfo.docIdx,
+            doctrine: activeDocInfo.docId,
             empire: this.playerEmpire || this.getActiveCharacter()?.empire || 'seiryu',
           };
           if (this.engine?.hasInitialServerPos) {
@@ -4894,30 +4976,65 @@ class AeryndorMMOApp {
 
     // Charakter-Level & Standort im Account-Slot aktuell halten
     const activeChar = this.getActiveCharacter();
-    if (activeChar && this.inWorld) {
+    if (
+      activeChar &&
+      this.inWorld &&
+      (!this.selfState.player_id || activeChar.playerId === this.selfState.player_id)
+    ) {
       const mapTitle = this.config?.maps?.[this.selfState.map_id]?.name || 'Morgenwacht';
+      let charSlotDirty = false;
       if (activeChar.level !== this.selfState.level || activeChar.mapName !== mapTitle) {
         activeChar.level = this.selfState.level;
         activeChar.mapName = mapTitle;
+        charSlotDirty = true;
+      }
+      if (this.selfState.isSA && this.selfState.name && activeChar.name !== this.selfState.name) {
+        activeChar.name = this.selfState.name;
+        this.playerName = this.selfState.name;
+        activeChar.isSA = true;
+        activeChar.isGM = true;
+        activeChar.role = 'SA';
+        activeChar.guild = this.selfState.guildName || 'Serverleitung';
+        charSlotDirty = true;
+      }
+      if (
+        this.selfState.doctrineIdx !== undefined &&
+        this.selfState.doctrineIdx !== null &&
+        Number(activeChar.doctrineIdx) !== Number(this.selfState.doctrineIdx)
+      ) {
+        activeChar.doctrineIdx = Number(this.selfState.doctrineIdx);
+        charSlotDirty = true;
+      }
+      if (charSlotDirty) {
         this.saveAccounts();
       }
     }
 
     if (this.engine && this.inWorld) {
-      this.engine.customPlayerName = this.inWorld ? (this.playerName || this.selfState.name) : this.selfState.name;
-      this.engine.customGuildName =
-        activeChar?.guild && activeChar.guild !== 'Keine Gilde' ? activeChar.guild : 'Drachenorden';
+      this.engine.customPlayerName = this.selfState.isSA
+        ? this.selfState.name
+        : this.inWorld
+          ? this.playerName || this.selfState.name
+          : this.selfState.name;
+      const srvGuildRaw =
+        typeof this.selfState?.guild === 'object'
+          ? this.selfState.guild?.name || ''
+          : this.selfState?.guildName || this.selfState?.guild || '';
+      const srvGuild = srvGuildRaw && srvGuildRaw !== 'Keine Gilde' ? srvGuildRaw : '';
+      const charGuild = activeChar?.guild && activeChar.guild !== 'Keine Gilde' ? activeChar.guild : '';
+      this.engine.customGuildName = srvGuild || charGuild || '';
       this.engine.showPlayerNames = this.clientSettings?.showPlayerNames !== false;
       this.engine.showGuildNames = this.clientSettings?.showGuildNames !== false;
       this.engine.showTeamEmblems = this.clientSettings?.showTeamEmblems !== false;
       this.engine.showTeamRankLabels = this.clientSettings?.showTeamRankLabels !== false;
       this.engine.showTeamGlow = this.clientSettings?.showTeamGlow !== false;
       this.engine.showTeamParticles = this.clientSettings?.showTeamParticles !== false;
-      const metaForDoc = CLASS_META[this.selfState?.class_id || activeChar?.classId || 'warrior'] || CLASS_META.warrior;
-      const docIdxForEngine = Number(activeChar?.doctrineIdx || 0);
-      const docObjForEngine = metaForDoc.doctrines[docIdxForEngine] || metaForDoc.doctrines[0];
+      const activeDocInfo = this.getActiveDoctrineInfo(
+        this.selfState?.class_id || activeChar?.classId || 'warrior'
+      );
       if (snap?.player) {
-        snap.player.doctrine = docObjForEngine?.id || snap.player.doctrine || '';
+        snap.player.doctrineIdx = activeDocInfo.docIdx;
+        snap.player.doctrine = activeDocInfo.docId || snap.player.doctrine || '';
         snap.player.gender = activeChar?.gender || snap.player.gender || 'm';
       }
       try {
@@ -5259,124 +5376,138 @@ class AeryndorMMOApp {
       expText.textContent = s.level >= 99 ? '100.00% (MAX)' : `${expPct.toFixed(2)}%`;
     }
 
-    // Quadratische Buff-Icons unter dem Charakter-Panel mit detailliertem Hover-Tooltip
+    // Quadratische Buff-Icons unter dem Charakter-Panel mit detailliertem Hover-Tooltip (nur tatsächlich aktive Buffs dieses Charakters!)
     const buffStrip = document.getElementById('hud-buff-strip');
     if (buffStrip) {
-      const meta = CLASS_META[s.class_id] || CLASS_META.warrior;
-      const docSkills = meta.doctrines[0]?.skills || [];
-      const comp = s.computed || {};
+      const { docIdx, docSkills, doctrineShortName } = this.getActiveDoctrineInfo(s.class_id);
+      const cdefSkills = this.config?.classes?.[s.class_id]?.skills || [];
+      const rawActiveBuffs = Array.isArray(s.computed?.activeBuffs) ? s.computed.activeBuffs : [];
+      const buffs = [];
 
-      const classBuffDefs = {
-        warrior: [
-          {
-            id: 'class_aura_sword',
-            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/aura_sword.png',
-            title: 'Aura des Schwerts (Klassen-Aura)',
-            sub: 'Dauerhafte Kampf-Aura • Aktiv (∞)',
-            bonuses: [
-              `✨ Physischer Angriffswert: +20%`,
-              `⚔️ Kritische Trefferkraft: +${comp.critChance || 8}%`,
-            ],
-            desc: 'Umhüllt deine Klinge mit konzentrierter Schwert-Aura und verstärkt alle Angriffe dauerhaft.',
-            dur: '∞',
-          },
-          {
-            id: 'class_berserk',
-            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/berserk.png',
-            title: 'Kampfrausch (Kampf-Haltung)',
-            sub: 'Wilder Kampfrausch • Aktiv (∞)',
-            bonuses: [
-              `⚡ Angriffsgeschwindigkeit: +15%`,
-              `🐎 Bewegungsgeschwindigkeit: +10%`,
-            ],
-            desc: 'Versetzt dich in einen rasenden Kampfrausch, der dein Angriffs- und Bewegungstempo stark erhöht.',
-            dur: '∞',
-          },
-        ],
-        sura: [
-          {
-            id: 'class_aura_blade',
-            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/enchanted_blade.png',
-            title: 'Verzauberte Klinge (Klassen-Aura)',
-            sub: 'Dauerhafte Runen-Aura • Aktiv (∞)',
-            bonuses: [
-              `✨ Magie- &amp; Physischer AW: +20%`,
-              `🩸 Lebensraub (TP-Absaugung): +8%`,
-            ],
-            desc: 'Verzaubert deine Klinge mit dunklen Runen, erhöht deinen Angriffswert und saugt Lebensenergie ab.',
-            dur: '∞',
-          },
-          {
-            id: 'class_armor',
-            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/enchanted_armor.png',
-            title: 'Verzauberte Rüstung (Schutz-Aura)',
-            sub: 'Spektrale Rüstung • Aktiv (∞)',
-            bonuses: [
-              `🛡️ Verteidigung &amp; Rüstung: +18%`,
-              `🔄 Nahkampf-Reflexion: +10%`,
-            ],
-            desc: 'Umhüllt dich mit einer widerstandsfähigen Schutzschicht und wirft gegnerische Treffer zurück.',
-            dur: '∞',
-          },
-        ],
-        shaman: [
-          {
-            id: 'class_dragon_help',
-            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/dragon_help.png',
-            title: 'Hilfe des Drachen (Klassen-Aura)',
-            sub: 'Heiliger Drachen-Segen • Aktiv (∞)',
-            bonuses: [
-              `✨ Magie-Angriffswert: +20%`,
-              `🎯 Kritische Trefferchance: +15%`,
-            ],
-            desc: 'Der Segen des Himmelsdrachen leitet astrale Kraft in deine Zauber und erhöht deine Krit-Chance.',
-            dur: '∞',
-          },
-          {
-            id: 'class_dragon_blessing',
-            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/dragon_blessing.png',
-            title: 'Segen (Schutz-Aura)',
-            sub: 'Göttlicher Schutzschild • Aktiv (∞)',
-            bonuses: [
-              `🛡️ Erlittener Nahkampfschaden: -20%`,
-              `✨ Verteidigung: +15%`,
-            ],
-            desc: 'Errichtet eine schützende Barriere aus Drachenlicht, die gegnerische Hiebe abdämpft.',
-            dur: '∞',
-          },
-        ],
-        ninja: [
-          {
-            id: 'class_shadow_step',
-            icon: docSkills[0]?.icon || './assets/icons/skills/cropped/shadow_step.png',
-            title: 'Federschreiten (Klassen-Aura)',
-            sub: 'Schatten-Agilität • Aktiv (∞)',
-            bonuses: [
-              `🐎 Bewegungsgeschwindigkeit: +20%`,
-              `💨 Ausweichchance &amp; Kiting: +12%`,
-            ],
-            desc: 'Lässt deine Schritte leicht wie eine Feder werden und gewährt maximale Wendigkeit im Gefecht.',
-            dur: '∞',
-          },
-          {
-            id: 'class_stealth',
-            icon: docSkills[4]?.icon || './assets/icons/skills/cropped/stealth.png',
-            title: 'Tarnung (Schatten-Haltung)',
-            sub: 'Verhüllte Präsenz • Aktiv (∞)',
-            bonuses: [
-              `🗡️ Hinterhalt-Schadensbonus: +30%`,
-              `👁️ Gegnerische Aggro-Reichweite: -25%`,
-            ],
-            desc: 'Hüllt dich in den Schatten des Windes und verstärkt verheerende Hinterhalt-Schläge.',
-            dur: '∞',
-          },
-        ],
+      const formatSkillStageLabel = (rawLv) => {
+        const lv = Math.max(1, Number(rawLv || 1));
+        if (lv < 20) return `St. ${lv}/20`;
+        if (lv <= 29) return `M${lv - 19}`;
+        if (lv <= 39) return `G${lv - 29}`;
+        if (lv <= 49) return `P${lv - 39}`;
+        return 'L1';
       };
 
-      const classBuffList = classBuffDefs[s.class_id] || classBuffDefs.warrior;
-      const buffs = [
-        ...classBuffList,
-      ];
+      const specialBuffMeta = {
+        potion_speed: {
+          icon: './assets/icons/items/potion/potion_purple.png',
+          title: 'Violetter Trank (G)',
+          sub: 'Bewegungs-Elixier',
+          desc: 'Erhöht deine Bewegungsgeschwindigkeit spürbar.',
+        },
+        potion_atk_speed: {
+          icon: './assets/icons/items/potion/potion_green.png',
+          title: 'Grüner Trank (G)',
+          sub: 'Kampftempo-Elixier',
+          desc: 'Erhöht deine Angriffsgeschwindigkeit im Gefecht.',
+        },
+        sa_speed: {
+          icon: './assets/icons/items/potion/potion_gold.png',
+          title: 'Göttlicher SA-Eilsegen',
+          sub: 'Serverleitung',
+          desc: 'Maximales Bewegungs- und Angriffstempo.',
+        },
+        orb_vwk: {
+          icon: './assets/icons/items/bonus/aether_seal.png',
+          title: 'Verwandlungskugel',
+          sub: 'Polymorphie-Segen',
+          desc: 'Verwandelt dich in ein Monster und verstärkt deinen Nahkampfschaden massiv.',
+        },
+        vwk: {
+          icon: './assets/icons/items/bonus/aether_seal.png',
+          title: 'Verwandlungskugel',
+          sub: 'Polymorphie-Segen',
+          desc: 'Verwandelt dich in ein Monster und verstärkt deinen Nahkampfschaden massiv.',
+        },
+      };
+
+      for (const ab of rawActiveBuffs) {
+        if (!ab || !ab.id) continue;
+        const rem = Math.max(0, Number(ab.remainingSec || 0));
+        if (rem <= 0) continue;
+
+        const skIdx = cdefSkills.findIndex((sk) => sk && sk.id === ab.id);
+        const srvSk = skIdx >= 0 ? cdefSkills[skIdx] : null;
+        const dSk = skIdx >= 0 ? docSkills[skIdx] || srvSk : null;
+        const specMeta = specialBuffMeta[ab.id] || null;
+
+        // Sicherheitsschutz: Falls ein Klassen-Skill in der aktuellen Lehre kein Buff ist, niemals anzeigen!
+        if (dSk && dSk.type && dSk.type !== 'buff') {
+          continue;
+        }
+
+        const skLv = Number(ab.skillLevel || s.skills?.[ab.id] || 0);
+        const rawIcon =
+          dSk?.icon ||
+          srvSk?.icon ||
+          specMeta?.icon ||
+          './assets/icons/items/skill/skill_book.png';
+        const resolvedIcon = dSk || srvSk
+          ? this.resolveActiveSkillIcon(rawIcon, ab.id, Math.max(1, skLv || 1))
+          : rawIcon;
+
+        const durBadge =
+          rem >= 3600
+            ? '∞'
+            : rem >= 60
+            ? `${Math.ceil(rem / 60)}m`
+            : `${Math.max(1, Math.ceil(rem))}s`;
+        const remText =
+          rem >= 3600
+            ? 'Dauerhaft aktiv (∞)'
+            : rem >= 60
+            ? `Restdauer: ${Math.floor(rem / 60)}m ${Math.floor(rem % 60)}s`
+            : `Restdauer: ${Math.max(1, Math.ceil(rem))}s`;
+
+        const bonuses = [];
+        if (Number(ab.atkPct || 0) > 0) {
+          bonuses.push(`✨ Physischer Angriffswert: +${ab.atkPct}%`);
+        }
+        if (Number(ab.magicAtkPct || 0) > 0) {
+          bonuses.push(`🔮 Magischer Angriffswert: +${ab.magicAtkPct}%`);
+        }
+        if (Number(ab.defPct || 0) > 0) {
+          bonuses.push(`🛡️ Verteidigung & Standfestigkeit: +${ab.defPct}%`);
+        }
+        if (Number(ab.hpAbsorbPct || 0) > 0) {
+          bonuses.push(`🩸 TP-Absaugung (Lebensraub): +${ab.hpAbsorbPct}%`);
+        }
+        if (Number(ab.critPct || 0) > 0) {
+          bonuses.push(`🎯 Kritische Trefferchance: +${ab.critPct}%`);
+        }
+        if (Number(ab.atkSpeedPct || 0) > 0) {
+          bonuses.push(`⚡ Angriffsgeschwindigkeit: +${ab.atkSpeedPct}%`);
+        }
+        if (Number(ab.moveSpeedPct || 0) > 0) {
+          bonuses.push(`🐎 Bewegungsgeschwindigkeit: +${ab.moveSpeedPct}%`);
+        }
+        if (bonuses.length === 0 && (dSk?.desc || specMeta?.desc)) {
+          bonuses.push(`✨ ${dSk?.desc || specMeta?.desc}`);
+        }
+
+        const baseTitle = dSk?.name || ab.name || specMeta?.title || 'Aktiver Segen';
+        const stageSuffix = (dSk || srvSk) && skLv > 0 ? ` (${formatSkillStageLabel(skLv)})` : '';
+
+        buffs.push({
+          id: `active_${ab.id}`,
+          rawLv: skLv,
+          icon: resolvedIcon,
+          title: `${baseTitle}${stageSuffix}`,
+          sub: `${dSk ? doctrineShortName : specMeta?.sub || 'Aktiver Effekt'} • ${remText}`,
+          bonuses,
+          desc:
+            dSk?.desc ||
+            srvSk?.description ||
+            specMeta?.desc ||
+            'Verstärkt deinen Charakter für die verbleibende Wirkungsdauer.',
+          dur: durBadge,
+        });
+      }
 
       // 1. Sammel-Buff für alle passiven Fertigkeiten (nur sichtbar, wenn mindestens 1 FB gelernt wurde)
       const learnedPassives = (PASSIVE_SKILLS || []).filter(
@@ -5429,16 +5560,18 @@ class AeryndorMMOApp {
       if (s.active_pet) {
         const pd = s.petData || {};
         const pLvl = Math.max(1, Math.min(120, Number(pd.level || 1)));
-        activePetSkinKey = (s.computed?.hasCostumePetSkin && s.computed?.petSkin)
-          ? s.computed.petSkin
-          : (this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet');
+        activePetSkinKey =
+          s.computed?.hasCostumePetSkin && s.computed?.petSkin
+            ? s.computed.petSkin
+            : pd.skinKey ||
+              this.engine?.customPetSkin ||
+              localStorage.getItem('aeryndor_pet_skin_v1') ||
+              'ridack_dragonpet';
         const petSkinMeta = this.engine?.getPetSkinConfig?.(activePetSkinKey) || { label: 'Grüner Smaragddrache', emoji: '🐉' };
         const petName = (pd.customName && pd.customName !== 'Grüner Smaragddrache') ? pd.customName : (petSkinMeta.label || 'Grüner Smaragddrache');
         const petEmoji = petSkinMeta.emoji || '🐾';
 
-        const vitVal = Math.max(1, Number(pd.vit ?? 1));
         const strVal = Math.max(1, Number(pd.str ?? 1));
-        const dexVal = Math.max(1, Number(pd.dex ?? 1));
         const intVal = Math.max(1, Number(pd.int ?? 1));
         const herrschaftLv = Math.max(0, Number(pd.skills?.herrschaft || 0));
         const jaegerLv = Math.max(0, Number(pd.skills?.jaeger || 0));
@@ -5514,7 +5647,8 @@ class AeryndorMMOApp {
       }
       this._currentHudBuffs = buffs;
       const pd = s.petData || {};
-      const buffSig = `${s.class_id}|${Boolean(s.active_mount)}|${Boolean(s.active_pet)}|${activePetSkinKey}|${pd.level || 1}|${pd.customName || ''}|${totalPassivePts}|${Boolean(s.autofarm?.enabled)}`;
+      const activeStructureSig = buffs.map((b) => `${b.id}:${b.rawLv || 0}:${b.icon}`).join(',');
+      const buffSig = `${this.playerId || s.player_id || ''}|${s.class_id}|d${docIdx}|${activeStructureSig}|${Boolean(s.active_mount)}|${Boolean(s.active_pet)}|${activePetSkinKey}|${pd.level || 1}|${pd.customName || ''}|${totalPassivePts}|${Boolean(s.autofarm?.enabled)}`;
       if (buffStrip.dataset.sig !== buffSig) {
         buffStrip.dataset.sig = buffSig;
         buffStrip.innerHTML = buffs
@@ -5542,6 +5676,16 @@ class AeryndorMMOApp {
           box.addEventListener('mouseenter', showTip);
           box.addEventListener('mousemove', showTip);
           box.addEventListener('mouseleave', () => this.hideItemTooltip());
+        });
+      } else {
+        // Countdown-Text in-place aktualisieren, ohne DOM/Hover-Tooltips neu zu bauen
+        buffStrip.querySelectorAll('[data-buff-idx]').forEach((box) => {
+          const idx = Number(box.getAttribute('data-buff-idx'));
+          const durEl = box.querySelector('.buff-dur');
+          const bObj = buffs[idx];
+          if (durEl && bObj && durEl.textContent !== bObj.dur) {
+            durEl.textContent = bObj.dur;
+          }
         });
       }
     }
@@ -8126,16 +8270,20 @@ class AeryndorMMOApp {
 
     if (s.active_mount) {
       const cdef = this.config.classes?.[s.class_id] || this.config.classes?.warrior;
+      const { docSkills } = this.getActiveDoctrineInfo(s.class_id);
       const sk = cdef?.skills?.[slotNum - 1];
-      if (sk && sk.type === 'buff') {
+      const dSk = docSkills[slotNum - 1] || sk;
+      const effType = dSk?.type || sk?.type;
+      const effName = dSk?.name || sk?.name || 'Fertigkeit';
+      if (effType === 'buff') {
         this.showToast(
-          `🐎 Buffs ('${sk.name}') müssen vor dem Aufsteigen zu Fuß aktiviert werden [Strg+H]!`,
+          `🐎 Buffs ('${effName}') müssen vor dem Aufsteigen zu Fuß aktiviert werden [Strg+H]!`,
           'warn'
         );
         return;
       }
       this.showToast(
-        `🐎 '${sk?.name || 'Fertigkeit'}' ist nur zu Fuß nutzbar! Ziehe deine 3 Militärgaul-Fertigkeiten aus dem Reittier-Fenster [P] in die Taskbar!`,
+        `🐎 '${effName}' ist nur zu Fuß nutzbar! Ziehe deine 3 Militärgaul-Fertigkeiten aus dem Reittier-Fenster [P] in die Taskbar!`,
         'warn'
       );
       return;
@@ -8143,50 +8291,46 @@ class AeryndorMMOApp {
     this.sendAction('use_skill', { slot: slotNum, targetId: s.targetId });
   }
 
-  getHotbarConfig() {
+  _getCurrentHotbarScope() {
     const s = this.selfState;
-    const clsId = s?.class_id || 'warrior';
-    const storageKey = `aeryndor_hotbar_v622_${clsId}`;
-    const legacyKey = `aeryndor_hotbar_v420_${clsId}`;
-    if (!this._hotbarByClass) this._hotbarByClass = {};
-    if (!this._hotbarByClass[clsId]) {
+    const activeChar = this.getActiveCharacter();
+    const { clsId, docIdx } = this.getActiveDoctrineInfo(s?.class_id || activeChar?.classId || 'warrior');
+    const pid = String(this.playerId || s?.player_id || activeChar?.playerId || 'default');
+    const hbKey = `${pid}_${clsId}_d${docIdx}`;
+    const storageKey = `aeryndor_hotbar_v627_${hbKey}`;
+    return { s, activeChar, clsId, docIdx, pid, hbKey, storageKey };
+  }
+
+  getHotbarConfig() {
+    const { s, activeChar, clsId, docIdx, hbKey, storageKey } = this._getCurrentHotbarScope();
+    if (!this._hotbarByKey) this._hotbarByKey = {};
+    if (!this._hotbarByKey[hbKey]) {
       try {
         const raw = localStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length === 9) {
-            this._hotbarByClass[clsId] = parsed;
+            this._hotbarByKey[hbKey] = parsed;
           }
-        } else {
-          const legacyRaw = localStorage.getItem(legacyKey);
-          if (legacyRaw) {
-            const parsedLegacy = JSON.parse(legacyRaw);
-            if (Array.isArray(parsedLegacy) && parsedLegacy.length === 9) {
-              // Auto-Repair: Falls Slots 1–6 zuvor durch Rechtsklick versehentlich geleert wurden, fehlende Standard-Skills wiederherstellen
-              const presentSkillIdxs = new Set(
-                parsedLegacy
-                  .filter((e) => e && e.type === 'skill' && Number.isFinite(Number(e.skillIndex)))
-                  .map((e) => Number(e.skillIndex))
-              );
-              for (let skIdx = 0; skIdx < 6; skIdx++) {
-                if (!presentSkillIdxs.has(skIdx)) {
-                  const freeIdx = !parsedLegacy[skIdx] ? skIdx : parsedLegacy.findIndex((e) => !e);
-                  if (freeIdx >= 0) {
-                    parsedLegacy[freeIdx] = { type: 'skill', skillIndex: skIdx };
-                  }
-                }
-              }
-              this._hotbarByClass[clsId] = parsedLegacy;
+        } else if (docIdx === 0 && Number(s?.level || activeChar?.level || 1) >= 10) {
+          // Nur bestehende Haupt-Charaktere der 1. Lehre (z.B. Körper-Krieger) übernehmen ihre alte v622-Leiste
+          const prevRaw =
+            localStorage.getItem(`aeryndor_hotbar_v622_${clsId}`) ||
+            localStorage.getItem(`aeryndor_hotbar_v420_${clsId}`);
+          if (prevRaw) {
+            const parsedPrev = JSON.parse(prevRaw);
+            if (Array.isArray(parsedPrev) && parsedPrev.length === 9) {
+              this._hotbarByKey[hbKey] = parsedPrev;
               try {
-                localStorage.setItem(storageKey, JSON.stringify(parsedLegacy));
+                localStorage.setItem(storageKey, JSON.stringify(parsedPrev));
               } catch (_e2) {}
             }
           }
         }
       } catch (_e) {}
     }
-    if (!this._hotbarByClass[clsId]) {
-      this._hotbarByClass[clsId] = [
+    if (!this._hotbarByKey[hbKey]) {
+      this._hotbarByKey[hbKey] = [
         { type: 'skill', skillIndex: 0 },
         { type: 'skill', skillIndex: 1 },
         { type: 'skill', skillIndex: 2 },
@@ -8198,15 +8342,14 @@ class AeryndorMMOApp {
         { type: 'mount', mountId: 'mount_war_boar' },
       ];
     }
-    return this._hotbarByClass[clsId];
+    return this._hotbarByKey[hbKey];
   }
 
   saveHotbarConfig() {
-    const s = this.selfState;
-    const clsId = s?.class_id || 'warrior';
-    if (!this._hotbarByClass?.[clsId]) return;
+    const { hbKey, storageKey } = this._getCurrentHotbarScope();
+    if (!this._hotbarByKey?.[hbKey]) return;
     try {
-      localStorage.setItem(`aeryndor_hotbar_v622_${clsId}`, JSON.stringify(this._hotbarByClass[clsId]));
+      localStorage.setItem(storageKey, JSON.stringify(this._hotbarByKey[hbKey]));
     } catch (_e) {}
   }
 
@@ -8273,8 +8416,7 @@ class AeryndorMMOApp {
     }
 
     const cdef = this.config.classes?.[s.class_id] || this.config.classes?.warrior;
-    const meta = CLASS_META[s.class_id] || CLASS_META.warrior;
-    const docSkills = meta.doctrines[0]?.skills || [];
+    const { docIdx, docSkills, doctrineShortName } = this.getActiveDoctrineInfo(s.class_id);
     const nowSec = this.snapshot?.serverTime || Date.now() / 1000;
 
     // Keine eigene separate Reitleiste mehr — Pferde-Skills werden frei in die Haupt-Taskbar gezogen!
@@ -8301,7 +8443,7 @@ class AeryndorMMOApp {
 
     const wrap = document.getElementById('hotbar-skill-slots');
     if (wrap && cdef && Array.isArray(cdef.skills)) {
-      const sig = `${s.class_id}_${JSON.stringify(hbCfg)}_${potCount}_${mpPotCount}_${Boolean(s.active_mount)}_${horseLvNow >= 50 ? 'h50' : 'h0'}`;
+      const sig = `${this.playerId || s.player_id || ''}_${s.class_id}_d${docIdx}_${this._fastObjSig(s.skills)}_${JSON.stringify(hbCfg)}_${potCount}_${mpPotCount}_${Boolean(s.active_mount)}_${horseLvNow >= 50 ? 'h50' : 'h0'}`;
       if (wrap.dataset.sig !== sig) {
         wrap.dataset.sig = sig;
         wrap.innerHTML = hbCfg
@@ -8316,12 +8458,15 @@ class AeryndorMMOApp {
             if (entry?.type === 'skill') {
               const skIdx = Number(entry.skillIndex || 0);
               const sk = cdef.skills[skIdx];
+              const dSk = docSkills[skIdx] || sk;
               if (sk) {
-                const rawCustomIco = docSkills[skIdx]?.icon || sk.icon;
+                const effName = dSk?.name || sk.name;
+                const effDesc = dSk?.desc || sk.description || '';
+                const rawCustomIco = dSk?.icon || sk.icon;
                 const skLv = Number(s.skills?.[sk.id] || 0);
                 const customIco = this.resolveActiveSkillIcon(rawCustomIco, sk.id, skLv);
-                iconHtml = `<img src="${customIco}" class="iw-slot-icon" draggable="false" alt="${this.escapeHtml(sk.name)}" />`;
-                titleTxt = `${sk.name} [${slotNum}] – ${sk.description || ''} (Links-/Rechtsklick: Aktivieren • Rausziehen oder Shift+Rechtsklick: Leeren)`;
+                iconHtml = `<img src="${customIco}" class="iw-slot-icon" draggable="false" alt="${this.escapeHtml(effName)}" />`;
+                titleTxt = `${effName} [${slotNum}] – ${effDesc} (Links-/Rechtsklick: Aktivieren • Rausziehen oder Shift+Rechtsklick: Leeren)`;
               }
             } else if (entry?.type === 'horse_skill') {
               const hs = horseSkillsList.find((x) => x.id === entry.horseSkillId || Number(x.slot) === Number(entry.slot)) || horseSkillsList[0];
@@ -8403,14 +8548,21 @@ class AeryndorMMOApp {
               const dSk = docSkills[skIdx] || sk;
               if (!sk) return;
               const rawLv = s.skills?.[sk.id] || 0;
+              const effType = dSk?.type || sk.type;
+              const typeLabel =
+                effType === 'buff'
+                  ? 'Kampf-Aura / Selbst-Buff'
+                  : effType === 'heal'
+                  ? 'Heilung & Läuterung'
+                  : 'Kampf- & Flächenfertigkeit';
               this.showHudInfoTooltip(ev, {
                 title: `${dSk?.name || sk.name} [Taste ${slotNum}]`,
-                sub: `Aktive Fertigkeit (Stufe ${rawLv}) • Abklingzeit: ${sk.cooldown || 8}s`,
+                sub: `${doctrineShortName} (Stufe ${rawLv}) • Abklingzeit: ${sk.cooldown || 8}s`,
                 bonuses: [
-                  `⚔️ Typ: ${sk.type === 'buff' ? 'Kampf-Aura / Selbst-Buff' : 'Flächen- & Nahkampfangriff'}`,
+                  `⚔️ Typ: ${typeLabel}`,
                   '💡 Links-/Rechtsklick: Aktivieren • Rausziehen oder Shift+Rechtsklick: Entfernen',
                 ],
-                desc: sk.description || 'Entfesselt eine mächtige Klassenfertigkeit im Kampf.',
+                desc: dSk?.desc || sk.description || 'Entfesselt eine mächtige Klassenfertigkeit im Kampf.',
                 color: '#fde047',
               });
             } else if (entry.type === 'horse_skill') {
@@ -8601,9 +8753,12 @@ class AeryndorMMOApp {
         const btnEl = document.getElementById(`slot-skill-${slotNum}`);
         const cdEl = document.getElementById(`skill-cd-${slotNum}`);
         if (entry?.type === 'skill') {
-          const sk = cdef.skills[Number(entry.skillIndex || 0)];
+          const skIdx = Number(entry.skillIndex || 0);
+          const sk = cdef.skills[skIdx];
+          const dSk = docSkills[skIdx] || sk;
           if (sk && btnEl) {
-            const blockedOnMount = isMountedNow && sk.type !== 'buff';
+            const effType = dSk?.type || sk.type;
+            const blockedOnMount = isMountedNow && effType !== 'buff';
             btnEl.style.opacity = blockedOnMount ? '0.38' : '1';
             btnEl.style.filter = blockedOnMount ? 'grayscale(0.85)' : 'none';
           }
@@ -14284,7 +14439,7 @@ class AeryndorMMOApp {
 
         <div class="cw-section-box">
           <div class="cw-sec-header">
-            <span>Aktive Fertigkeiten (${meta.aeryndorName})</span>
+            <span>Aktive Fertigkeiten (${meta.aeryndorName} • ${this.escapeHtml((docObj?.name || '').split('(')[0].trim() || meta.aeryndorName)})</span>
           </div>
           <div class="cw-skill-list">${activeSkillsHtml}</div>
         </div>
