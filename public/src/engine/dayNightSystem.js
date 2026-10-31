@@ -1616,13 +1616,15 @@ export class PostProcessingComposer {
       `,
     });
 
-    // 2A. Unreal-Bloom Threshold & 9-Tap Karis Downsample
+    // 2A. Unreal-Bloom Threshold & 9-Tap Karis Downsample (inkl. Nächtlicher HDR-Spitzenregulierung & Gezieltem Kern-Bloom)
     this.bloomExtractMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uSceneTex: { value: this.sceneTarget.texture },
         uTexelSize: { value: new THREE.Vector2(1.0 / w, 1.0 / h) },
         uThreshold: { value: 0.82 },
         uSoftKnee: { value: 0.38 },
+        uNightFactor: { value: 0.0 },
+        uSkillHdrLoad: { value: 0.0 },
       },
       depthWrite: false,
       depthTest: false,
@@ -1638,16 +1640,31 @@ export class PostProcessingComposer {
         uniform vec2 uTexelSize;
         uniform float uThreshold;
         uniform float uSoftKnee;
+        uniform float uNightFactor;
+        uniform float uSkillHdrLoad;
         varying vec2 vUv;
 
         vec3 extractBright(vec3 c) {
           c = min(c, vec3(12.0)); // Clamp gegen extreme Fireflies
+          // Nächtliche HDR-Spitzen-Kompression: Helle Magiekerne leuchten kontrolliert intensiv,
+          // ohne dass gleißende Zauber bei Nacht Details/Runen zu einem weißen Fleck überstrahlen!
+          float effThreshold = mix(uThreshold, 0.74, uNightFactor * 0.55) + uSkillHdrLoad * 0.22;
+          float effKneeRatio = uSoftKnee + uNightFactor * 0.10 + uSkillHdrLoad * 0.14;
           float br = max(c.r, max(c.g, c.b));
-          float knee = uThreshold * uSoftKnee + 0.0001;
-          float soft = clamp(br - uThreshold + knee, 0.0, 2.0 * knee);
+          float knee = effThreshold * effKneeRatio + 0.0001;
+          float soft = clamp(br - effThreshold + knee, 0.0, 2.0 * knee);
           soft = (soft * soft) / (4.0 * knee);
-          float contrib = max(soft, br - uThreshold) / max(br, 0.0001);
-          return c * max(0.0, contrib);
+          float contrib = max(soft, br - effThreshold) / max(br, 0.0001);
+          vec3 bloomRgb = c * max(0.0, contrib);
+          // Farbtreue Reinhard-Shoulder-Dämpfung auf extremen Nacht-Spitzen erhält tiefe Magiefarben (Arkan-Blau / Feuer-Rot) im Bloom
+          float shoulderStrength = 0.08 + uNightFactor * 0.20 + uSkillHdrLoad * 0.24;
+          float peakB = max(bloomRgb.r, max(bloomRgb.g, bloomRgb.b));
+          if (peakB > 1.15) {
+            float excess = peakB - 1.15;
+            float compressedPeak = 1.15 + excess / (1.0 + excess * shoulderStrength);
+            bloomRgb *= compressedPeak / peakB;
+          }
+          return bloomRgb;
         }
 
         void main() {
@@ -1698,7 +1715,7 @@ export class PostProcessingComposer {
       `,
     });
 
-    // 3. Final Composite Pass (9-Tap Depth-Bilateral GTAO + Unreal-Bloom + AMD CAS Sharpening + ACES ToneMapping)
+    // 3. Final Composite Pass (9-Tap Depth-Bilateral GTAO + Unreal-Bloom + AMD CAS Sharpening + Nächtliche HDR-Spitzenregulierung + ACES ToneMapping)
     this.compositeMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uSceneTex: { value: this.sceneTarget.texture },
@@ -1711,6 +1728,8 @@ export class PostProcessingComposer {
         uBloomStrength: { value: 0.34 },
         uAoStrength: { value: 0.84 },
         uSharpness: { value: 0.32 },
+        uNightFactor: { value: 0.0 },
+        uSkillHdrLoad: { value: 0.0 },
       },
       toneMapped: true,
       depthWrite: false,
@@ -1733,6 +1752,8 @@ export class PostProcessingComposer {
         uniform float uBloomStrength;
         uniform float uAoStrength;
         uniform float uSharpness;
+        uniform float uNightFactor;
+        uniform float uSkillHdrLoad;
         varying vec2 vUv;
 
         float linearizeDepth(float d) {
@@ -1790,10 +1811,26 @@ export class PostProcessingComposer {
             hdrCol *= aoTint;
           }
 
-          // 3. Unreal-Bloom additiv aufbessern (Feuer, Fackeln, Metin-Steine, Waffen-Glanz, Sonnenkorona)
+          // 3. Unreal-Bloom additiv aufbessern + Nächtliche HDR-Spitzenregulierung (kontrolliertes Kernleuchten, scharfe Runen!)
           if (uBloomStrength > 0.005) {
             vec3 bloom = texture2D(uBloomTex, vUv).rgb;
-            hdrCol += bloom * uBloomStrength;
+            // In finsterer Nacht wird Bloom auf bereits gleißend weißen Pixeln sanft gedämpft, damit feine Runen & Effektstrukturen scharf bleiben
+            float basePeak = max(hdrCol.r, max(hdrCol.g, hdrCol.b));
+            float runeProtect = 1.0 - smoothstep(0.95, 2.35, basePeak) * (0.34 * uNightFactor + 0.24 * uSkillHdrLoad);
+            hdrCol += bloom * (uBloomStrength * runeProtect);
+          }
+
+          // 3B. Dynamische nächtliche HDR-Shoulder-Kompression (verhindert Überblenden des Gesamtbilds durch gleißende Zauber bei Nacht)
+          if (uNightFactor > 0.04) {
+            float peakC = max(hdrCol.r, max(hdrCol.g, hdrCol.b));
+            float kneeStart = mix(1.55, 1.24, clamp(uNightFactor * 0.65 + uSkillHdrLoad * 0.55, 0.0, 1.0));
+            if (peakC > kneeStart) {
+              float over = peakC - kneeStart;
+              float rollOff = 0.22 * uNightFactor + 0.34 * uSkillHdrLoad;
+              float newPeak = kneeStart + over / (1.0 + over * rollOff);
+              // Sättigungserhaltende Skalierung (tiefes Arkan-Blau & intensives Feuer-Rot bleichen nicht zu reinem Weiß aus)
+              hdrCol *= newPeak / peakC;
+            }
           }
 
           // 4. Dezente kinoreife Rand-Vignette
@@ -1862,7 +1899,14 @@ export class PostProcessingComposer {
       this.renderer.render(this.quadScene, this.quadCamera);
     }
 
-    // 2. Unreal-Bloom Pass (Threshold Downsample -> Tent Blur)
+    const nightF = this.engine?.getSkillNightLightingFactor
+      ? this.engine.getSkillNightLightingFactor()
+      : (this.engine?.dayNightSystem?.celestial?.isNight ? 1.0 : 0.0);
+    const skillHdrLoad = Math.max(0.0, Math.min(1.0, Number(this.engine?._skillNightHdrLoad || 0.0)));
+
+    // 2. Unreal-Bloom Pass (Threshold Downsample -> Tent Blur, inkl. nächtlicher HDR-Spitzen- & Kern-Bloom-Steuerung)
+    this.bloomExtractMaterial.uniforms.uNightFactor.value = nightF;
+    this.bloomExtractMaterial.uniforms.uSkillHdrLoad.value = skillHdrLoad;
     this.quadMesh.material = this.bloomExtractMaterial;
     this.renderer.setRenderTarget(this.bloomTargetA);
     this.renderer.render(this.quadScene, this.quadCamera);
@@ -1873,11 +1917,14 @@ export class PostProcessingComposer {
 
     // 3. Finaler Composite Pass auf den Bildschirm (null)
     const bloomCfg = Number(this.engine?.env?.bloomIntensity ?? 1.2);
+    const nightBloomMult = 1.0 + nightF * 0.24 - skillHdrLoad * 0.12;
     this.compositeMaterial.uniforms.uCameraNear.value = camera.near;
     this.compositeMaterial.uniforms.uCameraFar.value = camera.far;
-    this.compositeMaterial.uniforms.uBloomStrength.value = Math.min(0.55, 0.24 * bloomCfg);
+    this.compositeMaterial.uniforms.uBloomStrength.value = Math.min(0.62, 0.24 * bloomCfg * nightBloomMult);
     this.compositeMaterial.uniforms.uAoStrength.value = ppTier >= 2 || isPc ? 0.88 : 0.70;
     this.compositeMaterial.uniforms.uSharpness.value = isPc ? 0.36 : 0.28;
+    this.compositeMaterial.uniforms.uNightFactor.value = nightF;
+    this.compositeMaterial.uniforms.uSkillHdrLoad.value = skillHdrLoad;
 
     this.quadMesh.material = this.compositeMaterial;
     this.renderer.setRenderTarget(null);

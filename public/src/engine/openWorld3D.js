@@ -11,7 +11,7 @@
 // ============================================================================
 
 import * as THREE from '../../vendor/three.module.js';
-import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261031_v625';
+import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261031_v630';
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
 import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
@@ -31,30 +31,62 @@ const GLOBAL_CONTACT_SHADOW_CACHE = {
   discGeo: null,
 };
 
+function isPcClientRuntime(engineInstance = null) {
+  if (engineInstance?._isPcProfile === true) return true;
+  if (typeof window !== 'undefined') {
+    if (window.__IS_AERYNDOR_PC_CLIENT__ === true) return true;
+    const qs = String(window.location?.search || '');
+    if (qs.includes('client=pc_client') || qs.includes('mode=pc_client')) return true;
+  }
+  if (typeof navigator !== 'undefined' && String(navigator.userAgent || '').includes('AeryndorPCClient')) {
+    return true;
+  }
+  return false;
+}
+
 const HERO_GLB_BY_CLASS = {
   warrior: {
     glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw4',
+    glbLow: '/assets/models/heroes/klingenwaechter_male_low.glb?v=20261031_kw5',
     tex: ['/assets/models/heroes/klingenwaechter_male.png?v=20261031_kw4'],
     normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw4',
     height: 1.88,
+    useMeshyHandSocket: true,
+    // Sobald klingenwaechter_female.glb vorhanden ist, hier als { glb, glbLow, tex, normalMap } eintragen:
+    female: null,
   },
   ninja: {
     glb: '/assets/models/npcs/plechi_old_warrior1.glb',
     tex: ['/assets/models/npcs/old_warrior1_tex.png'],
     height: 1.78,
+    female: null,
   },
   sura: {
     glb: '/assets/models/npcs/pewi_guan.glb',
     tex: ['/assets/models/npcs/pewi_guan.png'],
     height: 1.86,
     hasBuiltinWeapon: true,
+    female: null,
   },
   shaman: {
     glb: '/assets/models/npcs/plechi_noble_npc2.glb',
     tex: ['/assets/models/npcs/noble_npc2_tex.png'],
     height: 1.76,
+    female: null,
   },
 };
+
+function resolveHeroGlbEntry(classId = 'warrior', gender = 'male') {
+  const base = HERO_GLB_BY_CLASS[classId] || HERO_GLB_BY_CLASS.warrior;
+  const isFem = gender === 'f' || gender === 'female';
+  if (isFem && base.female && base.female.glb) {
+    return { ...base, ...base.female };
+  }
+  if (!isFem && base.male && base.male.glb) {
+    return { ...base, ...base.male };
+  }
+  return base;
+}
 
 // Wiederverwendbarer Farb-Ringpuffer für Per-Frame-Berechnungen (vermeidet GC-Spitzen durch
 // dutzende `new THREE.Color()` pro Frame). Nur für kurzlebige Zwischenwerte innerhalb eines Aufrufs!
@@ -247,10 +279,21 @@ export class OpenWorld3DEngine {
       uFireflyColInt: {
         value: Array.from({ length: 8 }, () => new THREE.Vector4(0.65, 0.95, 0.25, 0)),
       },
+      uSkillLightPosRad: {
+        value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -5000, 0, 0)),
+      },
+      uSkillLightColInt: {
+        value: Array.from({ length: 8 }, () => new THREE.Vector4(1.0, 0.5, 0.2, 0)),
+      },
+      uSkillNightFactor: { value: 0.0 },
       uGroundShadowStrength: { value: 1.35 },
       uGrassShadowStrength: { value: 1.0 },
       uGrassShadowDist: { value: 55.0 },
     };
+    this._metinVfxUniforms = {
+      uNightVfxParams: { value: new THREE.Vector4(0.0, 0.0, 0.0, 0.0) },
+    };
+    this._skillNightHdrLoad = 0.0;
     this._terrainSplatUniforms = null;
     this._puddleRippleArray = Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, -999, 0));
     this._puddleRippleIdx = 0;
@@ -675,6 +718,9 @@ export class OpenWorld3DEngine {
       uMonolithColInt: this._grassShaderUniforms.uMonolithColInt,
       uFireflyPosRad: this._grassShaderUniforms.uFireflyPosRad,
       uFireflyColInt: this._grassShaderUniforms.uFireflyColInt,
+      uSkillLightPosRad: this._grassShaderUniforms.uSkillLightPosRad,
+      uSkillLightColInt: this._grassShaderUniforms.uSkillLightColInt,
+      uSkillNightFactor: this._grassShaderUniforms.uSkillNightFactor,
       uRainRate: { value: 0.0 },
       uWindSpeed: { value: 0.35 },
       uWindDir: { value: new THREE.Vector2(0.82, 0.57) },
@@ -815,6 +861,9 @@ export class OpenWorld3DEngine {
         uniform vec4 uMonolithColInt[4];
         uniform vec4 uFireflyPosRad[8];
         uniform vec4 uFireflyColInt[8];
+        uniform vec4 uSkillLightPosRad[8];
+        uniform vec4 uSkillLightColInt[8];
+        uniform float uSkillNightFactor;
         uniform float uRainRate;
         uniform float uWindSpeed;
         uniform vec2 uWindDir;
@@ -1661,6 +1710,43 @@ export class OpenWorld3DEngine {
                   }
                 }
               }
+              // Echtzeit-Skill- & Magie-Beleuchtungspipeline (Inverse-Square Falloff, Color Bleeding, Pflaster-Mikroreflexe & Bodenkontakt-Glanzpunkte)
+              vec3 N_surfT = normalize(inverseTransformDirection(normal, viewMatrix));
+              float fresnelGroundS = pow(1.0 - clamp(dot(N_surfT, V_m), 0.0, 1.0), 3.0);
+              float nightBleedT = mix(0.46, 1.36, clamp(uSkillNightFactor, 0.0, 1.0));
+              for (int sIdx = 0; sIdx < 8; sIdx++) {
+                vec4 sPR = uSkillLightPosRad[sIdx];
+                if (sPR.w > 0.1) {
+                  vec3 toS = sPR.xyz - vTerrainWorldPos;
+                  float dS2 = dot(toS, toS);
+                  float rS2 = sPR.w * sPR.w;
+                  if (dS2 < rS2) {
+                    float dS = sqrt(dS2);
+                    vec3 L_s = toS / max(0.01, dS);
+                    // Physikalisch basiertes Inverse-Square Law mit weichem Radius-Windowing (kein unendliches Strahlen, keine harte Kante)
+                    float invSqS = 1.0 / (1.0 + 0.30 * dS + 0.22 * dS2);
+                    float ratioS2 = dS2 / max(0.0001, rS2);
+                    float winS = clamp(1.0 - ratioS2 * ratioS2, 0.0, 1.0);
+                    float attenS = invSqS * winS * winS;
+                    vec4 sCI = uSkillLightColInt[sIdx];
+                    float ndlSurf = clamp(dot(N_surfT, L_s) * 0.78 + 0.22, 0.0, 1.0);
+                    vec3 H_s = normalize(L_s + V_m);
+                    float ndhS = clamp(dot(N_surfT, H_s), 0.0, 1.0);
+                    float terrLumS = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                    // Terrain-Adaption & Oberflächen-Interaktion: Pflasterstein-Kuppen, Bodenkontakt-Hotspot & nasse/glatte Texturen
+                    float cobbleCrown = smoothstep(0.14, 0.56, terrLumS) * (0.45 + 0.55 * clamp(vSplat.x + vSplat.z * 0.6, 0.0, 1.0));
+                    float groundContact = 1.0 - smoothstep(0.12, 2.35, abs(sPR.y - vTerrainWorldPos.y));
+                    float wetSmooth = clamp(puddleMask + localWet * 0.75 + cobbleCrown * 0.28 * groundContact, 0.0, 1.0);
+                    float microSpec = pow(ndhS, mix(16.0, 44.0, cobbleCrown)) * (0.20 + 0.38 * cobbleCrown);
+                    float wetHotspot = pow(ndhS, mix(34.0, 110.0, wetSmooth)) * (0.35 + 1.05 * wetSmooth) * (0.55 + 0.65 * groundContact + 0.35 * fresnelGroundS);
+                    // Color Bleeding: satte magische Farbübertragung auf dunkles Steinpflaster, Fugen & Pfützen
+                    vec3 bleedBase = mix(diffuseColor.rgb * 1.85 + vec3(0.06), vec3(terrLumS * 1.45 + 0.10), 0.36);
+                    vec3 sDiff = bleedBase * sCI.rgb * ndlSurf;
+                    vec3 sSpec = mix(sCI.rgb, vec3(1.0), 0.22 * wetSmooth) * (microSpec + wetHotspot * wetSmooth);
+                    outgoingLight += (sDiff + sSpec) * (attenS * sCI.w * nightBleedT);
+                  }
+                }
+              }
             }
             if (uRiftFactor > 0.01) {
               float dRift = length(wp - uRiftCenterXZ);
@@ -2450,7 +2536,7 @@ export class OpenWorld3DEngine {
       }
     }
 
-    const progCacheKey = `ow_v6_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}_${mat.envMap ? 1 : 0}`;
+    const progCacheKey = `ow_v7_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}_${mat.envMap ? 1 : 0}`;
     mat.customProgramCacheKey = () => progCacheKey;
 
     mat.onBeforeCompile = (shader) => {
@@ -2464,6 +2550,9 @@ export class OpenWorld3DEngine {
         uMonolithColInt: grassUniforms.uMonolithColInt,
         uFireflyPosRad: grassUniforms.uFireflyPosRad,
         uFireflyColInt: grassUniforms.uFireflyColInt,
+        uSkillLightPosRad: grassUniforms.uSkillLightPosRad,
+        uSkillLightColInt: grassUniforms.uSkillLightColInt,
+        uSkillNightFactor: grassUniforms.uSkillNightFactor,
         uSnowStrength: { value: snowStrength },
         uWetStrength: { value: wetStrength },
       });
@@ -2578,6 +2667,9 @@ export class OpenWorld3DEngine {
         uniform vec4 uMonolithColInt[4];
         uniform vec4 uFireflyPosRad[8];
         uniform vec4 uFireflyColInt[8];
+        uniform vec4 uSkillLightPosRad[8];
+        uniform vec4 uSkillLightColInt[8];
+        uniform float uSkillNightFactor;
         uniform float uVegLeafDensity;
         uniform float uFoliageSSS;
         uniform float uTreeColorVariation;
@@ -2978,6 +3070,65 @@ export class OpenWorld3DEngine {
                     float objLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
                     vec3 fTint = (objLumF * 1.50 + 0.09) * fCI.rgb;
                     outgoingLight += fTint * (ndlF + rimF * 0.45) * (attenF * fCI.w);
+                  }
+                }
+              }
+              // Echtzeit-Skill- & Magie-Beleuchtungspipeline auf Hauswände, Holzbauten, Felsen, Vegetation & anwesende Charaktere
+              vec3 N_surfO = normalize(inverseTransformDirection(normal, viewMatrix));
+              float nightBleedO = mix(0.48, 1.38, clamp(uSkillNightFactor, 0.0, 1.0));
+              float wetSurfO = clamp(uObjWetness * uWetStrength, 0.0, 1.0);
+              for (int sIdx = 0; sIdx < 8; sIdx++) {
+                vec4 sPR = uSkillLightPosRad[sIdx];
+                if (sPR.w > 0.1) {
+                  vec3 toS = sPR.xyz - vObjWorldPos;
+                  float dS2 = dot(toS, toS);
+                  float rS2 = sPR.w * sPR.w;
+                  if (dS2 < rS2) {
+                    float dS = sqrt(dS2);
+                    vec3 L_s = toS / max(0.01, dS);
+                    // Physikalisches Inverse-Square Falloff + sanfte Reichweiten-Fensterung
+                    float invSqS = 1.0 / (1.0 + 0.30 * dS + 0.22 * dS2);
+                    float ratioS2 = dS2 / max(0.0001, rS2);
+                    float winS = clamp(1.0 - ratioS2 * ratioS2, 0.0, 1.0);
+                    float attenS = invSqS * winS * winS;
+                    vec4 sCI = uSkillLightColInt[sIdx];
+                    float rawNdlS = dot(N_surfO, L_s);
+                    vec3 H_s = normalize(L_s + V_obj);
+                    float ndhS = clamp(dot(N_surfO, H_s), 0.0, 1.0);
+                    float rimS = pow(1.0 - max(dot(N_surfO, V_obj), 0.0), 2.3) * clamp(rawNdlS + 0.40, 0.0, 1.0);
+                    float objLumS = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                    ${
+                      isCreature
+                        ? `
+                    // Anwesende Charaktere: Haut-SSS Color Bleeding, Metallrüstungs-Glanzlichter & Stoff-Rim-Sheen im Magielicht
+                    float ndlCharS = clamp(rawNdlS * 0.72 + 0.28, 0.0, 1.0);
+                    float wrapSkinS = clamp((rawNdlS + 0.48) / 1.48, 0.0, 1.0);
+                    vec3 charDiffBleed = mix(diffuseColor.rgb * 1.75 + vec3(0.08), vec3(objLumS * 1.40 + 0.10), 0.30) * sCI.rgb * ndlCharS;
+                    vec3 skinSssBleed = (diffuseColor.rgb * 1.35 + vec3(0.14, 0.05, 0.04)) * sCI.rgb * (wrapSkinS * 0.42 + pow(ndhS, 26.0) * 0.22) * charSkinMask;
+                    vec3 armorMetalSpec = mix(sCI.rgb, vec3(1.0), 0.26) * pow(ndhS, 58.0) * clamp(rawNdlS * 1.6 + 0.15, 0.0, 1.0) * (0.35 + 0.85 * charMetalMask);
+                    vec3 clothSheenS = mix(sCI.rgb, diffuseColor.rgb * sCI.rgb * 1.8, 0.35) * (rimS * 0.48) * (0.35 + 0.65 * charFabricMask);
+                    outgoingLight += (charDiffBleed + skinSssBleed + armorMetalSpec + clothSheenS) * (attenS * sCI.w * nightBleedO * clamp(cavityAO, 0.65, 1.05));
+                    `
+                        : isFoliage
+                        ? `
+                    // Blätter & Büsche: Transluzentes Durchscheinen des magischen Lichts bei Nacht
+                    float ndlFolS = clamp(rawNdlS * 0.52 + 0.48, 0.0, 1.0);
+                    float backScatterS = pow(clamp(dot(V_obj, -L_s), 0.0, 1.0), 2.0) * 0.45;
+                    vec3 folBleed = (diffuseColor.rgb * 1.65 + vec3(0.07)) * sCI.rgb * (ndlFolS + backScatterS + rimS * 0.32);
+                    outgoingLight += folBleed * (attenS * sCI.w * nightBleedO);
+                    `
+                        : `
+                    // Hauswände, Holzbauten, Steinmauern & Pflaster-Props: Color Bleeding + raue Holz-/Stein-Mikroreflexe + nasse Glanzpunkte
+                    float ndlWallS = clamp(rawNdlS * 0.76 + 0.24, 0.0, 1.0);
+                    float microGrainO = smoothstep(0.12, 0.58, objLumS);
+                    float groundHotspotO = 1.0 - smoothstep(0.15, 2.20, abs(sPR.y - vObjWorldPos.y));
+                    float effGlossO = clamp(wetSurfO * 0.80 + microGrainO * 0.25 + groundHotspotO * 0.22, 0.0, 1.0);
+                    float roughSpecO = pow(ndhS, mix(14.0, 68.0, effGlossO)) * (0.22 + 0.72 * effGlossO) * clamp(rawNdlS * 1.4 + 0.2, 0.0, 1.0);
+                    vec3 wallBleed = mix(diffuseColor.rgb * 1.80 + vec3(0.07), vec3(objLumS * 1.45 + 0.09), 0.34) * sCI.rgb * (ndlWallS + rimS * 0.26);
+                    vec3 wallSpec = mix(sCI.rgb, vec3(1.0), 0.18 * effGlossO) * roughSpecO;
+                    outgoingLight += (wallBleed + wallSpec) * (attenS * sCI.w * nightBleedO);
+                    `
+                    }
                   }
                 }
               }
@@ -4714,6 +4865,7 @@ export class OpenWorld3DEngine {
         clips,
         actions,
         materials,
+        meshes: createdMeshes,
         baseScale: baseScaleFactor,
         basePosY: baseRigPosY,
         baseRotX: baseRigRotX,
@@ -6011,6 +6163,10 @@ export class OpenWorld3DEngine {
     this.rtWarmBounceLight.position.set(60, 28, -95);
     this.rtWarmBounceLight.castShadow = false;
     this.scene.add(this.rtWarmBounceLight);
+
+    // Vorallokierter Echtzeit-Skill-Lichtpool + Nächtliches Magie-Schattenlicht + Volumetrische Nebel-Halos
+    // direkt beim Szenenstart registrieren -> 0 Shader-Recompiles beim ersten Zauber im Kampf!
+    this.ensureSkillEnvPointLightPool();
 
     // Welt-Container für Map-Geometrie
     this.mapGroup = new THREE.Group();
@@ -7983,8 +8139,13 @@ export class OpenWorld3DEngine {
         : isGoldenHour
         ? 1.04
         : (wMeta.storm ? 1.05 : 0.98);
-      const targetExp = baseExp * Number(this.env.exposureMult ?? 1.0);
-      this.renderer.toneMappingExposure += (targetExp - this.renderer.toneMappingExposure) * skyLerp;
+      // Nächtliche HDR-Spitzenregulierung: Verhindert bei gleißenden Nahbereichs-Zaubern das Überblenden dunkler Weltdetails
+      const nightSkillHdrDamp = isNightNow
+        ? 1.0 - Math.min(0.14, Math.max(0.0, Number(this._skillNightHdrLoad || 0.0)) * 0.14)
+        : 1.0;
+      const targetExp = baseExp * Number(this.env.exposureMult ?? 1.0) * nightSkillHdrDamp;
+      const expLerp = isNightNow && (this._skillNightHdrLoad || 0) > 0.05 ? Math.max(skyLerp, Math.min(0.32, dt * 7.5)) : skyLerp;
+      this.renderer.toneMappingExposure += (targetExp - this.renderer.toneMappingExposure) * expLerp;
     }
 
     const isNightNow = cel ? cel.isNight : (h < 5.8 || h > 20.2);
@@ -9463,6 +9624,17 @@ export class OpenWorld3DEngine {
           spl.intensity = 0;
           spl.position.set(0, -5000, 0);
           spl.visible = true;
+        }
+      }
+      if (this._skillNightShadowLight) {
+        this._skillNightShadowLight.intensity = 0;
+        this._skillNightShadowLight.position.set(0, -5000, 0);
+        this._skillNightShadowLight.visible = true;
+        this._skillNightShadowLight.shadow.needsUpdate = false;
+      }
+      if (this._skillVolumetricHalos) {
+        for (const vh of this._skillVolumetricHalos) {
+          vh.visible = false;
         }
       }
       return;
@@ -20772,6 +20944,9 @@ export class OpenWorld3DEngine {
         uniform vec4 uMonolithColInt[4];
         uniform vec4 uFireflyPosRad[8];
         uniform vec4 uFireflyColInt[8];
+        uniform vec4 uSkillLightPosRad[8];
+        uniform vec4 uSkillLightColInt[8];
+        uniform float uSkillNightFactor;
         uniform float uGroundShadowStrength;
         uniform float uGrassShadowStrength;
         uniform sampler2D uGrassTexAutumn;
@@ -20892,6 +21067,28 @@ export class OpenWorld3DEngine {
                   float gLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
                   vec3 gTintF = (gLumF * 1.55 + 0.10) * fCI.rgb;
                   outgoingLight += gTintF * (attenFG * fCI.w * bladeGlowF);
+                }
+              }
+            }
+            {
+              float nightBleedG = mix(0.45, 1.35, clamp(uSkillNightFactor, 0.0, 1.0));
+              float bladeGlowS = mix(0.42, 1.32, smoothstep(0.04, 0.94, vBladeProg)) * (1.0 + uGrassWetness * 0.28);
+              float gLumS = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+              for (int sIdx = 0; sIdx < 8; sIdx++) {
+                vec4 sPR = uSkillLightPosRad[sIdx];
+                if (sPR.w > 0.1) {
+                  vec3 toSG = sPR.xyz - vGrassWorldPos;
+                  float dSG2 = dot(toSG, toSG);
+                  float rSG2 = sPR.w * sPR.w;
+                  if (dSG2 < rSG2) {
+                    float dSG = sqrt(dSG2);
+                    float invSqSG = 1.0 / (1.0 + 0.30 * dSG + 0.22 * dSG2);
+                    float ratioSG2 = dSG2 / max(0.0001, rSG2);
+                    float winSG = clamp(1.0 - ratioSG2 * ratioSG2, 0.0, 1.0);
+                    vec4 sCI = uSkillLightColInt[sIdx];
+                    vec3 gTintS = mix(diffuseColor.rgb * 1.85 + vec3(0.08), vec3(gLumS * 1.55 + 0.10), 0.35) * sCI.rgb;
+                    outgoingLight += gTintS * (invSqSG * winSG * winSG * sCI.w * bladeGlowS * nightBleedG);
+                  }
                 }
               }
             }
@@ -21062,6 +21259,9 @@ export class OpenWorld3DEngine {
         uniform vec4 uMonolithColInt[4];
         uniform vec4 uFireflyPosRad[8];
         uniform vec4 uFireflyColInt[8];
+        uniform vec4 uSkillLightPosRad[8];
+        uniform vec4 uSkillLightColInt[8];
+        uniform float uSkillNightFactor;
         uniform float uGroundShadowStrength;
         uniform float uGrassShadowStrength;
         ` +
@@ -21170,6 +21370,28 @@ export class OpenWorld3DEngine {
                   float gLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
                   vec3 gTintF = (gLumF * 1.55 + 0.10) * fCI.rgb;
                   outgoingLight += gTintF * (attenFG * fCI.w * bladeGlowF);
+                }
+              }
+            }
+            {
+              float nightBleedG = mix(0.45, 1.35, clamp(uSkillNightFactor, 0.0, 1.0));
+              float bladeGlowS = mix(0.42, 1.32, smoothstep(0.04, 0.94, vBladeProg)) * (1.0 + uGrassWetness * 0.28);
+              float gLumS = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+              for (int sIdx = 0; sIdx < 8; sIdx++) {
+                vec4 sPR = uSkillLightPosRad[sIdx];
+                if (sPR.w > 0.1) {
+                  vec3 toSG = sPR.xyz - vGrassWorldPos;
+                  float dSG2 = dot(toSG, toSG);
+                  float rSG2 = sPR.w * sPR.w;
+                  if (dSG2 < rSG2) {
+                    float dSG = sqrt(dSG2);
+                    float invSqSG = 1.0 / (1.0 + 0.30 * dSG + 0.22 * dSG2);
+                    float ratioSG2 = dSG2 / max(0.0001, rSG2);
+                    float winSG = clamp(1.0 - ratioSG2 * ratioSG2, 0.0, 1.0);
+                    vec4 sCI = uSkillLightColInt[sIdx];
+                    vec3 gTintS = mix(diffuseColor.rgb * 1.85 + vec3(0.08), vec3(gLumS * 1.55 + 0.10), 0.35) * sCI.rgb;
+                    outgoingLight += gTintS * (invSqSG * winSG * winSG * sCI.w * bladeGlowS * nightBleedG);
+                  }
                 }
               }
             }
@@ -22207,17 +22429,109 @@ export class OpenWorld3DEngine {
     };
   }
 
+  getSkillNightLightingFactor() {
+    if (this.isDungeonMap && this.isDungeonMap()) return 1.0;
+    const weather = this.env?.weather || 'sunny';
+    const stormBoost = ['thunderstorm', 'severe_thunderstorm', 'heavy_rain', 'blizzard'].includes(weather)
+      ? 0.24
+      : ['rain', 'fog', 'cloudy'].includes(weather)
+      ? 0.10
+      : 0.0;
+    const cel = this.dayNightSystem?.celestial;
+    if (cel && typeof cel.sunElevation === 'number') {
+      const sunDeg = THREE.MathUtils.radToDeg(cel.sunElevation);
+      // Sanfter Übergang ab Dämmerung (+6.2° Sonnenhöhe) bis tiefe Nacht (-6.8° Sonnenhöhe)
+      const t = Math.max(0.0, Math.min(1.0, (6.2 - sunDeg) / 13.0));
+      const smoothNight = t * t * (3.0 - 2.0 * t);
+      return Math.max(stormBoost, smoothNight);
+    }
+    const h = Number(this.env?.hourOfDay ?? 14.0);
+    if (h <= 5.2 || h >= 20.8) return 1.0;
+    if (h < 7.0) return Math.max(stormBoost, (7.0 - h) / 1.8);
+    if (h > 18.8) return Math.max(stormBoost, (h - 18.8) / 2.0);
+    return stormBoost;
+  }
+
+  getVolumetricNightFogGlowTexture() {
+    if (this._volumetricNightFogGlowTex) return this._volumetricNightFogGlowTex;
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const half = size * 0.5;
+    // Physisch inspirierte Mie-Vorwärtsstreuungs-Phasenverteilung für nächtlichen Dunst & Nebel
+    const grad = ctx.createRadialGradient(half, half, 0.5, half, half, half - 1);
+    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.62)');
+    grad.addColorStop(0.16, 'rgba(255, 255, 255, 0.42)');
+    grad.addColorStop(0.38, 'rgba(255, 255, 255, 0.20)');
+    grad.addColorStop(0.64, 'rgba(255, 255, 255, 0.068)');
+    grad.addColorStop(0.86, 'rgba(255, 255, 255, 0.014)');
+    grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.userData = { isShared: true };
+    tex.needsUpdate = true;
+    this._volumetricNightFogGlowTex = tex;
+    return tex;
+  }
+
   ensureSkillEnvPointLightPool() {
     if (this._skillEnvPointLights || !this.scene) return;
     this._skillEnvPointLights = [];
     this._activeSkillEnvGlows = [];
-    for (let i = 0; i < 3; i++) {
-      const pl = new THREE.PointLight(0xffffff, 0, 12.5, 1.75);
+    this._tmpSkillFogColor = new THREE.Color();
+    this._tmpSkillLightColor = new THREE.Color();
+
+    // 1. 4x Echtzeit-3D-Punktlichtquellen mit physikalischem Inverse-Square Falloff (decay = 2.0)
+    for (let i = 0; i < 4; i++) {
+      const pl = new THREE.PointLight(0xffffff, 0, 14.5, 2.0);
       pl.castShadow = false;
       pl.visible = true; // Niemals umschalten (verhindert NUM_POINT_LIGHTS Shader-Recompile!)
       pl.position.set(0, -5000, 0);
       this.scene.add(pl);
       this._skillEnvPointLights.push(pl);
+    }
+
+    // 2. Dediziertes nächtliches Magie- & Explosions-Schattenlicht (wirft flüchtige dynamische 3D-Schatten bei Nacht!)
+    // WICHTIG: castShadow bleibt dauerhaft true (0 Shader-Recompiles!), shadow.autoUpdate = false spart 100% GPU im Leerlauf/am Tag!
+    const shadowPl = new THREE.PointLight(0xffffff, 0, 18.5, 2.0);
+    shadowPl.castShadow = true;
+    shadowPl.visible = true;
+    shadowPl.position.set(0, -5000, 0);
+    shadowPl.shadow.mapSize.width = 512;
+    shadowPl.shadow.mapSize.height = 512;
+    shadowPl.shadow.camera.near = 0.35;
+    shadowPl.shadow.camera.far = 22.0;
+    shadowPl.shadow.bias = -0.00055;
+    shadowPl.shadow.normalBias = 0.018;
+    shadowPl.shadow.radius = 2.35;
+    shadowPl.shadow.autoUpdate = false;
+    shadowPl.shadow.needsUpdate = true; // Einmalige leere Initialisierung beim Start
+    this.scene.add(shadowPl);
+    this._skillNightShadowLight = shadowPl;
+
+    // 3. 8x Volumetrische Partikel-/Nebel-Streulicht-Halos (machen die Dichte der Nachtluft & des Nebels physisch sichtbar)
+    this._skillVolumetricHalos = [];
+    const volTex = this.getVolumetricNightFogGlowTexture();
+    for (let i = 0; i < 8; i++) {
+      const vMat = new THREE.SpriteMaterial({
+        map: volTex,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        fog: false,
+      });
+      const vSprite = new THREE.Sprite(vMat);
+      vSprite.visible = false;
+      vSprite.renderOrder = 11;
+      vSprite.position.set(0, -5000, 0);
+      this.scene.add(vSprite);
+      this._skillVolumetricHalos.push(vSprite);
     }
   }
 
@@ -22252,18 +22566,21 @@ export class OpenWorld3DEngine {
     const distSq =
       Math.pow((x || 0) - (this.localPlayerPos?.x || 0), 2) +
       Math.pow((z || 0) - (this.localPlayerPos?.z || 0), 2);
-    if (distSq > 2500) return;
+    if (distSq > 3025) return;
 
     const delay = Math.max(0, Number(opts.delay || 0));
-    const duration = Math.max(0.38, Math.min(1.85, Number(opts.duration || 0.92)));
-    // Ganz leichtes, dezentes Leuchten auf die Umwelt (Bodenpflaster, Wände, Rüstung & nahe Objekte)
-    const peakIntensity = Math.max(0.55, Math.min(2.05, Number(opts.intensity || 1.32)));
-    const distance = Math.max(7.5, Math.min(16.0, Number(opts.distance || 11.5)));
-    const heightOffset = Number(opts.heightOffset ?? 1.08);
+    const duration = Math.max(0.32, Math.min(2.35, Number(opts.duration || 0.94)));
+    const peakIntensity = Math.max(0.45, Math.min(2.65, Number(opts.intensity || 1.35)));
+    const distance = Math.max(6.2, Math.min(18.5, Number(opts.distance || 11.8)));
+    const heightOffset = Number(opts.heightOffset ?? 1.12);
     const followActor = opts.followActor || null;
+    const followVfx = opts.followVfx || null;
+    const castShadow = Boolean(opts.castShadow ?? peakIntensity >= 1.34);
+    const volumetricScale = Number(opts.volumetricScale ?? 1.0);
+    const skipGroundWash = Boolean(opts.skipGroundWash || opts.isProjectile);
 
     if (!this._activeSkillEnvGlows) this._activeSkillEnvGlows = [];
-    if (this._activeSkillEnvGlows.length >= 6) {
+    if (this._activeSkillEnvGlows.length >= 12) {
       this._activeSkillEnvGlows.shift();
     }
     this._activeSkillEnvGlows.push({
@@ -22278,15 +22595,23 @@ export class OpenWorld3DEngine {
       age: 0,
       duration,
       followActor,
+      followVfx,
+      castShadow,
+      volumetricScale,
+      isProjectile: Boolean(opts.isProjectile),
     });
 
-    // Sehr dezenter, weich auslaufender Boden-Lichtschimmer (sichtbar auch bei hellem Tageslicht, niemals grell)
+    if (skipGroundWash) return;
+
+    // Weich auslaufender Boden-Lichtschimmer (nachts dezent gedämpft, da echte Shader-Color-Bleeding- & Glanz-Reflexe übernehmen!)
     if (!this._sharedUnitPlaneGeo) {
       this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
       this._sharedUnitPlaneGeo.userData = { isShared: true };
     }
-    const washAlpha = Math.max(0.07, Math.min(0.18, Number(opts.groundWashAlpha ?? 0.13)));
-    const washRadius = Math.max(4.8, Math.min(11.5, distance * 0.78));
+    const nightF = this.getSkillNightLightingFactor();
+    const rawWash = Math.max(0.05, Math.min(0.18, Number(opts.groundWashAlpha ?? 0.12)));
+    const washAlpha = rawWash * (1.0 - nightF * 0.32);
+    const washRadius = Math.max(4.6, Math.min(11.8, distance * 0.78));
     const washCol = new THREE.Color(colorHex);
     const washMat = new THREE.MeshBasicMaterial({
       map: this.getSoftSkillEnvGroundWashTexture(),
@@ -22307,6 +22632,7 @@ export class OpenWorld3DEngine {
     this.vfxList.push({
       type: 'metin_particles',
       mesh: washGroup,
+      isGroundWashOnly: true,
       groundRings: [
         {
           mesh: washMesh,
@@ -22335,67 +22661,334 @@ export class OpenWorld3DEngine {
 
   updateSkillEnvironmentLights(dt) {
     if (!this._skillEnvPointLights) return;
+    const nowSec = performance.now() * 0.001;
+    const nightF = this.getSkillNightLightingFactor();
+    const fogDens = Number(this.scene?.fog?.density || 0.0012);
+    const wetness = Number(this._envState?.wetness || 0.0);
+    const fogScatter = nightF * Math.max(0.32, Math.min(1.55, 0.44 + fogDens * 240.0 + wetness * 0.34));
+    const lpX = this.localPlayerPos?.x || 0;
+    const lpY = this.localPlayerPos?.y || 0;
+    const lpZ = this.localPlayerPos?.z || 0;
+
+    const candidates = [];
+
+    // 1. Aktive Zauber, Explosionen & fliegende magische Projektile
     const list = this._activeSkillEnvGlows || [];
-    const activeReady = [];
     for (let i = list.length - 1; i >= 0; i--) {
       const g = list[i];
       g.age += dt;
       const effAge = g.age - g.delay;
-      if (effAge >= g.duration) {
+      if (effAge >= g.duration || (g.followVfx && (g.followVfx.age >= g.followVfx.maxAge || !g.followVfx.mesh?.parent))) {
         list.splice(i, 1);
         continue;
       }
       if (effAge < 0) continue;
-      if (g.followActor?.root) {
+      if (g.followVfx?.mesh) {
+        g.x = g.followVfx.mesh.position.x;
+        g.y = g.followVfx.mesh.position.y;
+        g.z = g.followVfx.mesh.position.z;
+      } else if (g.followActor?.root) {
         g.x = g.followActor.root.position.x;
         g.y = g.followActor.root.position.y;
         g.z = g.followActor.root.position.z;
       }
       const u = Math.max(0, Math.min(1, effAge / g.duration));
-      const env = u < 0.14 ? u / 0.14 : Math.pow(Math.max(0, 1.0 - (u - 0.14) / 0.86), 1.55);
+      const env = g.isProjectile
+        ? (u < 0.08 ? u / 0.08 : u > 0.82 ? Math.max(0, (1.0 - u) / 0.18) : 1.0)
+        : (u < 0.13 ? u / 0.13 : Math.pow(Math.max(0, 1.0 - (u - 0.13) / 0.87), 1.48));
       const curInt = g.peakIntensity * env;
-      if (curInt > 0.015) {
-        const d2 =
-          Math.pow(g.x - (this.localPlayerPos?.x || 0), 2) +
-          Math.pow(g.z - (this.localPlayerPos?.z || 0), 2);
-        activeReady.push({ g, curInt, d2 });
+      if (curInt > 0.02) {
+        const d2 = (g.x - lpX) * (g.x - lpX) + (g.z - lpZ) * (g.z - lpZ);
+        if (d2 < 3200) {
+          candidates.push({
+            wx: g.x,
+            wy: g.followVfx?.mesh ? g.y + (g.isProjectile ? 0.18 : g.heightOffset * 0.45) : g.y + g.heightOffset,
+            wz: g.z,
+            colorHex: g.colorHex,
+            rawInt: curInt,
+            distance: g.distance,
+            castShadow: Boolean(g.castShadow),
+            volScale: g.volumetricScale || 1.0,
+            d2,
+            priority: (g.castShadow ? 2.5 : 1.5) + curInt,
+          });
+        }
       }
     }
-    activeReady.sort((a, b) => a.d2 - b.d2 || b.curInt - a.curInt);
-    for (let i = 0; i < this._skillEnvPointLights.length; i++) {
+
+    // 2. Aktive Boss-Eruptionen, Dunkle Wirbel & Riss-Blitze aus vfxList als dynamische Nacht-Lichtquellen
+    if (this.vfxList && this.vfxList.length > 0) {
+      for (let i = 0; i < this.vfxList.length; i++) {
+        const v = this.vfxList[i];
+        if (!v?.mesh) continue;
+        if (v.type === 'boss_skill_eruption' || v.type === 'dark_vortex' || v.type === 'rift_lightning_bolt') {
+          const ratio = Math.max(0, Math.min(1, v.age / Math.max(0.1, v.maxAge || 0.9)));
+          const fade = Math.sin(Math.min(1, ratio) * Math.PI);
+          if (fade <= 0.05) continue;
+          const vx = v.mesh.position.x;
+          const vy = v.mesh.position.y + (v.type === 'rift_lightning_bolt' ? 1.45 : 1.15);
+          const vz = v.mesh.position.z;
+          const d2 = (vx - lpX) * (vx - lpX) + (vz - lpZ) * (vz - lpZ);
+          if (d2 < 3200) {
+            const colHex = v.type === 'rift_lightning_bolt' ? 0x60a5fa : v.type === 'dark_vortex' ? 0xa855f7 : 0xf43f5e;
+            candidates.push({
+              wx: vx,
+              wy: vy,
+              wz: vz,
+              colorHex: colHex,
+              rawInt: (v.type === 'boss_skill_eruption' ? 1.85 : 1.42) * fade,
+              distance: v.type === 'boss_skill_eruption' ? 15.5 : 11.8,
+              castShadow: v.type !== 'dark_vortex',
+              volScale: 1.25,
+              d2,
+              priority: 3.2 * fade,
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Kontinuierliche Waffenauren (Aura des Schwerts, Verzauberte Klinge, L-Skill-Schwünge, +9 Klingenleuchten) & aktive Buff-Auren
+    const collectActorAuras = (actor) => {
+      if (!actor?.root || !actor.root.visible) return;
+      const rx = actor.root.position.x;
+      const ry = actor.root.position.y;
+      const rz = actor.root.position.z;
+      const d2 = (rx - lpX) * (rx - lpX) + (rz - lpZ) * (rz - lpZ);
+      if (d2 > 1156) return; // 34m Radius für kontinuierliche Waffenauren
+      const rotY = actor.root.rotation.y || 0;
+      const bladeAura = actor.weaponGroup?.userData?.bladeAuraGroup;
+      const activeLSwing = (actor._activeSkillTimer || 0) > 0 && actor._activeSkillIsLSkill;
+      const hasBladeBuff = Boolean(actor._hasMetinWeaponBladeBuff);
+      const hasHighPlusGlow = Boolean(!hasBladeBuff && bladeAura?.visible && nightF > 0.12);
+
+      if (hasBladeBuff || activeLSwing || hasHighPlusGlow) {
+        const att = this.getActorMetinAttachWorldPos(actor, 'right_hand', [0, 0, 0], rx, ry, rz, rotY);
+        const pulse = 0.90 + 0.10 * Math.sin(nowSec * 7.2 + rx * 0.7) * Math.cos(nowSec * 4.3 + rz * 0.5);
+        const auraHex = activeLSwing
+          ? 0xe879f9
+          : hasBladeBuff && actor._weaponTrailColorHex
+          ? actor._weaponTrailColorHex
+          : bladeAura?.userData?.defaultOuterHex || 0xf97316;
+        const baseBladeInt = activeLSwing ? 1.18 : hasBladeBuff ? 0.86 : 0.42;
+        candidates.push({
+          wx: att.x,
+          wy: Math.max(ry + 0.42, att.y),
+          wz: att.z,
+          colorHex: auraHex,
+          rawInt: baseBladeInt * pulse,
+          distance: activeLSwing ? 9.6 : hasBladeBuff ? 7.8 : 5.2,
+          castShadow: false,
+          volScale: hasBladeBuff || activeLSwing ? 0.74 : 0.46,
+          d2,
+          priority: hasBladeBuff || activeLSwing ? 1.15 : 0.55,
+        });
+      }
+
+      if (actor._activeMetinBuffLoops && actor._activeMetinBuffLoops.size > 0) {
+        for (const entry of actor._activeMetinBuffLoops.values()) {
+          const isHandBuff = entry.loop?.bone === 'right_hand' || entry.code === 'geomgyeong' || entry.code === 'gwigeom';
+          if (isHandBuff) continue; // Bereits präzise auf der Schwertklinge platziert
+          const pal = this.getMetinSkillPalette(entry.code, entry.tier || 1, Boolean(entry.isLSkill));
+          const bodyPulse = 0.88 + 0.12 * Math.sin(nowSec * 4.6 + d2 * 0.1 + (entry.tier || 1));
+          candidates.push({
+            wx: rx,
+            wy: ry + (actor.mountGroup?.visible ? 1.38 : 1.02),
+            wz: rz,
+            colorHex: pal.env,
+            rawInt: (entry.isLSkill ? 0.84 : 0.64) * bodyPulse,
+            distance: entry.isLSkill ? 8.4 : 6.8,
+            castShadow: false,
+            volScale: 0.72,
+            d2,
+            priority: 0.92,
+          });
+          break; // Maximal 1 Körper-Aura-Punktlicht pro Charakter bündeln
+        }
+      }
+    };
+
+    collectActorAuras(this.localPlayerActor);
+    if (this.otherPlayerMeshes && this.otherPlayerMeshes.size > 0) {
+      for (const otherAct of this.otherPlayerMeshes.values()) {
+        collectActorAuras(otherAct);
+      }
+    }
+
+    // Nach Priorität & Nähe sortieren
+    candidates.sort((a, b) => (b.priority - a.priority) * 18.0 + (a.d2 - b.d2));
+
+    // Physikalische Candela-Skalierung (decay = 2.0 Inverse-Square Law): nachts kraftvoll & plastisch, tagsüber dezent
+    const candelaNightMult = 1.05 + nightF * 3.15;
+
+    // A) Nächtlicher Schattenwurf durch mächtige Zauber & Explosionen (0ms GPU-Last wenn inaktiv!)
+    let shadowUsedIdx = -1;
+    if (this._skillNightShadowLight) {
+      const shLight = this._skillNightShadowLight;
+      shLight.visible = true;
+      if (nightF > 0.18 && this._shadowsActive !== false) {
+        for (let i = 0; i < candidates.length; i++) {
+          const c = candidates[i];
+          if (c.castShadow && c.rawInt > 0.32 && c.d2 < 900) {
+            shadowUsedIdx = i;
+            break;
+          }
+        }
+      }
+      if (shadowUsedIdx >= 0) {
+        const sc = candidates[shadowUsedIdx];
+        shLight.position.set(sc.wx, sc.wy + 0.24, sc.wz);
+        shLight.color.setHex(sc.colorHex);
+        shLight.distance = Math.min(20.0, sc.distance * 1.18);
+        shLight.intensity = sc.rawInt * candelaNightMult * (0.55 + 0.65 * nightF);
+        const stride = this._isPcProfile ? 1 : 2;
+        if ((this._frameIndex || 0) % stride === 0) {
+          shLight.shadow.needsUpdate = true;
+        }
+      } else {
+        shLight.intensity = 0;
+        shLight.position.set(0, -5000, 0);
+        shLight.shadow.needsUpdate = false;
+      }
+    }
+
+    // B) 4x Echtzeit-PointLights für direkte PBR-Glanzlichter auf nicht-geshadeten Meshes & Details
+    let poolSlot = 0;
+    for (let i = 0; i < candidates.length && poolSlot < this._skillEnvPointLights.length; i++) {
+      if (i === shadowUsedIdx) continue;
+      const c = candidates[i];
+      const pl = this._skillEnvPointLights[poolSlot++];
+      pl.visible = true;
+      pl.position.set(c.wx, c.wy, c.wz);
+      pl.color.setHex(c.colorHex);
+      pl.distance = c.distance;
+      pl.intensity = c.rawInt * candelaNightMult * 0.86;
+    }
+    for (let i = poolSlot; i < this._skillEnvPointLights.length; i++) {
       const pl = this._skillEnvPointLights[i];
       pl.visible = true;
-      if (i < activeReady.length) {
-        const { g, curInt } = activeReady[i];
-        pl.position.set(g.x, g.y + g.heightOffset, g.z);
-        pl.color.setHex(g.colorHex);
-        pl.distance = g.distance;
-        pl.intensity = curInt;
+      pl.intensity = 0;
+      pl.position.set(0, -5000, 0);
+    }
+
+    // C) 8x Per-Pixel Shader-Skill-Lights (Color Bleeding, Pflaster-/Holz-Mikroreflexe, nasse Glanzpunkte & Charakter-SSS)
+    //    + 8x Volumetrische Partikel-/Nachtnebel-Halos + Nächtliche HDR-Spitzenlast-Messung
+    const uGrass = this._grassShaderUniforms;
+    const posArr = uGrass?.uSkillLightPosRad?.value;
+    const colArr = uGrass?.uSkillLightColInt?.value;
+    if (uGrass?.uSkillNightFactor) {
+      uGrass.uSkillNightFactor.value = nightF;
+    }
+    const fogCol = this.scene?.fog?.color;
+    let peakHdrDemand = 0.0;
+
+    for (let i = 0; i < 8; i++) {
+      const halo = this._skillVolumetricHalos ? this._skillVolumetricHalos[i] : null;
+      if (i < candidates.length) {
+        const c = candidates[i];
+        this._tmpSkillLightColor.setHex(c.colorHex);
+        if (posArr && posArr[i]) {
+          posArr[i].set(c.wx, c.wy, c.wz, c.distance);
+        }
+        if (colArr && colArr[i]) {
+          // Kalibrierte physikalische Color-Bleeding-Stärke (überblendet niemals Albedo-Strukturen)
+          const shaderInt = Math.min(1.45, c.rawInt * 0.64);
+          colArr[i].set(this._tmpSkillLightColor.r, this._tmpSkillLightColor.g, this._tmpSkillLightColor.b, shaderInt);
+        }
+
+        // Volumetrische Partikelbeleuchtung im nächtlichen Nebel / Dunst
+        if (halo) {
+          const volOpacity = Math.min(0.34, fogScatter * c.rawInt * 0.135 * c.volScale);
+          if (volOpacity > 0.008) {
+            halo.visible = true;
+            halo.position.set(c.wx, c.wy + 0.12, c.wz);
+            const haloDiam = Math.max(2.6, Math.min(13.5, c.distance * (0.52 + fogScatter * 0.24) * c.volScale));
+            halo.scale.set(haloDiam, haloDiam * 0.88, 1.0);
+            if (fogCol) {
+              this._tmpSkillFogColor.copy(this._tmpSkillLightColor).lerp(fogCol, 0.18);
+              halo.material.color.copy(this._tmpSkillFogColor);
+            } else {
+              halo.material.color.copy(this._tmpSkillLightColor);
+            }
+            halo.material.opacity = volOpacity;
+          } else {
+            halo.visible = false;
+          }
+        }
+
+        // Nächtliche HDR-Spitzenlast für Nahbereichs-Zauber ermitteln
+        if (nightF > 0.1) {
+          const camRefPos = this.camera?.position;
+          const distCamSq = camRefPos
+            ? (c.wx - camRefPos.x) * (c.wx - camRefPos.x) + (c.wy - camRefPos.y) * (c.wy - camRefPos.y) + (c.wz - camRefPos.z) * (c.wz - camRefPos.z)
+            : c.d2 + 36.0;
+          const prox = 1.0 / (1.0 + distCamSq * 0.012);
+          peakHdrDemand = Math.max(peakHdrDemand, Math.min(1.0, c.rawInt * prox * nightF * 1.15));
+        }
       } else {
-        pl.intensity = 0;
-        pl.position.set(0, -5000, 0);
+        if (posArr && posArr[i]) posArr[i].set(0, -5000, 0, 0);
+        if (colArr && colArr[i]) colArr[i].set(0, 0, 0, 0);
+        if (halo) halo.visible = false;
       }
+    }
+
+    // Sanfte Augen-Adaption (schneller Attack bei gleißendem Blitz, weicher Release beim Abklingen)
+    const curLoad = Number(this._skillNightHdrLoad || 0.0);
+    const adaptRate = peakHdrDemand > curLoad ? Math.min(1.0, dt * 9.2) : Math.min(1.0, dt * 2.4);
+    this._skillNightHdrLoad = curLoad + (peakHdrDemand - curLoad) * adaptRate;
+
+    if (this._metinVfxUniforms?.uNightVfxParams?.value) {
+      this._metinVfxUniforms.uNightVfxParams.value.set(nightF, this._skillNightHdrLoad, fogScatter, nowSec);
     }
   }
 
   applyMetinLuminanceTintShader(mat) {
     if (!mat) return mat;
-    mat.customProgramCacheKey = () => 'metin_lum_tint_v1';
+    if (!this._metinVfxUniforms) {
+      this._metinVfxUniforms = {
+        uNightVfxParams: { value: new THREE.Vector4(0.0, 0.0, 0.0, 0.0) },
+      };
+    }
+    const nightParamsUniform = this._metinVfxUniforms.uNightVfxParams;
+    mat.customProgramCacheKey = () => 'metin_lum_tint_v2';
     mat.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `#ifdef USE_MAP
-          vec4 sampledDiffuseColor = texture2D( map, vMapUv );
-          float maxCh = max( sampledDiffuseColor.r, max( sampledDiffuseColor.g, sampledDiffuseColor.b ) );
-          float texWarmth = clamp( sampledDiffuseColor.r - sampledDiffuseColor.b, 0.0, 1.0 );
-          float tintCool = clamp( max( diffuse.b, diffuse.g ) - diffuse.r * 0.58, 0.0, 1.0 );
-          float lumMix = clamp( texWarmth * tintCool * 1.75, 0.0, 0.94 );
-          vec3 baseTexRgb = mix( sampledDiffuseColor.rgb, vec3( maxCh ), lumMix );
-          float hotCore = pow( maxCh, 2.15 ) * 0.32;
-          sampledDiffuseColor.rgb = baseTexRgb + vec3( hotCore );
-          diffuseColor *= sampledDiffuseColor;
-        #endif`
-      );
+      shader.uniforms.uNightVfxParams = nightParamsUniform;
+      shader.fragmentShader =
+        `uniform vec4 uNightVfxParams;\n` +
+        shader.fragmentShader.replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+            vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+            float maxCh = max( sampledDiffuseColor.r, max( sampledDiffuseColor.g, sampledDiffuseColor.b ) );
+            float minCh = min( sampledDiffuseColor.r, min( sampledDiffuseColor.g, sampledDiffuseColor.b ) );
+            float texWarmth = clamp( sampledDiffuseColor.r - sampledDiffuseColor.b, 0.0, 1.0 );
+            float tintCool = clamp( max( diffuse.b, diffuse.g ) - diffuse.r * 0.58, 0.0, 1.0 );
+            float lumMix = clamp( texWarmth * tintCool * 1.75, 0.0, 0.94 );
+            vec3 baseTexRgb = mix( sampledDiffuseColor.rgb, vec3( maxCh ), lumMix );
+
+            // Gezieltes nächtliches Bloom-Mapping & Runen-Schärfung (uNightVfxParams.x = nightFactor, .y = hdrLoad, .z = fogScatter):
+            // 1) Mittelton-Shoulder-Kompression verhindert, dass überlappende Additive-Layer nachts zu einem weißen Fleck ausbrennen.
+            // 2) Feine Runen, Risse & Klingenstrukturen (0.22..0.82) erhalten erhöhten Mikrokontrast und bleiben gestochen scharf lesbar!
+            // 3) Nur der engste Magiekern (maxCh > 0.72) erhält gezielten HDR-Emissionsschub für intensives, kontrolliertes Nacht-Bloom!
+            float nightF_vfx = clamp( uNightVfxParams.x, 0.0, 1.0 );
+            float hdrLoad_vfx = clamp( uNightVfxParams.y, 0.0, 1.0 );
+            float fogScat_vfx = clamp( uNightVfxParams.z, 0.0, 1.6 );
+
+            float runeBand = smoothstep( 0.16, 0.46, maxCh ) * ( 1.0 - smoothstep( 0.74, 0.96, maxCh ) );
+            float localStruct = clamp( ( maxCh - minCh ) * 0.65 + runeBand * 0.85, 0.0, 1.0 );
+            vec3 compressedMid = baseTexRgb / ( vec3( 1.0 ) + baseTexRgb * ( 0.38 * nightF_vfx + 0.30 * hdrLoad_vfx ) );
+            vec3 crispRunes = mix( baseTexRgb, compressedMid * ( 1.0 + localStruct * 0.34 * nightF_vfx ), nightF_vfx * 0.88 );
+
+            float narrowCore = pow( smoothstep( 0.58, 0.99, maxCh ), mix( 2.05, 2.85, nightF_vfx ) );
+            float coreBloomDrive = mix( 0.30, 0.66 - 0.16 * hdrLoad_vfx, nightF_vfx );
+            vec3 coreTint = mix( vec3( 1.0 ), max( diffuse, vec3( 0.25 ) ), 0.32 * nightF_vfx );
+
+            // Volumetrischer Nachtluft-Saum an weichen Partikelrändern
+            float softMistHalo = smoothstep( 0.04, 0.32, maxCh ) * ( 1.0 - smoothstep( 0.32, 0.72, maxCh ) ) * fogScat_vfx * 0.12;
+            sampledDiffuseColor.rgb = crispRunes + coreTint * ( narrowCore * coreBloomDrive ) + baseTexRgb * softMistHalo;
+            diffuseColor *= sampledDiffuseColor;
+          #endif`
+        );
     };
     return mat;
   }
@@ -22688,18 +23281,75 @@ export class OpenWorld3DEngine {
   }
 
   getMetinSkillPalette(code, tier = 1, isLSkill = false) {
-    // Authentische Metin2 Stufen-Farbpaletten (Normal -> Meister -> Großmeister -> Perfekt P -> Legendär L1)
+    // Authentische Elementar- & Metin2-Stufen-Farbpaletten für ALLE 4 Klassen & 8 Lehren (inkl. realistischem Color Bleeding bei Nacht!)
+    const arcaneBlueCodes = new Set([
+      'noegeom', 'geompung', 'noejeon', 'byeorak', 'pokroe', 'yongpa', 'chunwoon', 'kwaesok', 'pungraepo', 'seomjeon', 'gyeonggong', 'gungsin',
+    ]);
+    const fireRedOrangeCodes = new Set([
+      'hwayeom', 'hwajo', 'paeryong', 'meteo', 'jeongwi', 'finish', 'gyeoksan', 'samyeon', 'tanhwan', 'seomgwang',
+    ]);
+    const emeraldPoisonCodes = new Set([
+      'dokgigung', 'sangong', 'amseup', 'eunhyeong', 'yeonsa', 'gwangyeok',
+    ]);
+    const darkAbyssVioletCodes = new Set([
+      'mahwan', 'maryeong', 'heuksin', 'tusok', 'gongpo', 'akgi', 'akgi_dark', 'gwigeom', 'jumagap', 'swaeryeong', 'yonggwon', 'muyeong', 'gihyeol',
+    ]);
+    const celestialGoldCodes = new Set([
+      'hosin', 'gicheon', 'jeongeop', 'bipabu', 'cheongeun', 'daejin', 'gigongcham',
+    ]);
+
     if (isLSkill || tier >= 5) {
-      if (code === 'jeongwi') return { core: 0xffd1f7, main: 0xf43f5e, accent: 0xc026d3, env: 0xe11d48 };
-      if (code === 'geomgyeong') return { core: 0xfff7ed, main: 0xe879f9, accent: 0x38bdf8, env: 0xd946ef };
-      if (code === 'noegeom' || code === 'daejin') return { core: 0xe0f2fe, main: 0x38bdf8, accent: 0xd946ef, env: 0x60a5fa };
-      if (code === 'finish' || code === 'gyeoksan') return { core: 0xfef3c7, main: 0xf59e0b, accent: 0xe879f9, env: 0xf97316 };
-      return { core: 0xfef9ff, main: 0xd946ef, accent: 0x38bdf8, env: 0xc084fc };
+      if (code === 'jeongwi' || fireRedOrangeCodes.has(code)) {
+        return { core: 0xffe4e6, main: 0xf43f5e, accent: 0xf97316, env: 0xef4444 };
+      }
+      if (arcaneBlueCodes.has(code)) {
+        return { core: 0xe0f2fe, main: 0x38bdf8, accent: 0x818cf8, env: 0x2563eb };
+      }
+      if (emeraldPoisonCodes.has(code)) {
+        return { core: 0xd1fae5, main: 0x10b981, accent: 0x38bdf8, env: 0x10b981 };
+      }
+      if (celestialGoldCodes.has(code)) {
+        return { core: 0xfef3c7, main: 0xf59e0b, accent: 0xe879f9, env: 0xf59e0b };
+      }
+      if (code === 'geomgyeong') {
+        return { core: 0xfff7ed, main: 0xe879f9, accent: 0x38bdf8, env: 0xd946ef };
+      }
+      return { core: 0xfef9ff, main: 0xd946ef, accent: 0x38bdf8, env: 0xa855f7 };
     }
+
+    // Element-spezifische Farbtreue für realistisches Color Bleeding (Tiefes Arkan-Blau, Feuer-Rot/Orange, Smaragd-Gift, Dunkle Magie, Drachengold)
+    if (arcaneBlueCodes.has(code)) {
+      return tier >= 4
+        ? { core: 0xe0f2fe, main: 0x3b82f6, accent: 0x38bdf8, env: 0x2563eb }
+        : tier >= 3
+        ? { core: 0xe0f2fe, main: 0x38bdf8, accent: 0x6366f1, env: 0x0284c7 }
+        : { core: 0xf0f9ff, main: 0x60a5fa, accent: 0x38bdf8, env: 0x2563eb };
+    }
+    if (emeraldPoisonCodes.has(code)) {
+      return tier >= 4
+        ? { core: 0xd1fae5, main: 0x10b981, accent: 0x059669, env: 0x10b981 }
+        : { core: 0xecfdf5, main: 0x22c55e, accent: 0x14b8a6, env: 0x16a34a };
+    }
+    if (darkAbyssVioletCodes.has(code)) {
+      return tier >= 4
+        ? { core: 0xfae8ff, main: 0x9333ea, accent: 0xe11d48, env: 0x9333ea }
+        : { core: 0xf5f3ff, main: 0xa855f7, accent: 0xec4899, env: 0x7e22ce };
+    }
+    if (celestialGoldCodes.has(code)) {
+      return tier >= 4
+        ? { core: 0xfef3c7, main: 0xf59e0b, accent: 0xfbbf24, env: 0xf59e0b }
+        : { core: 0xfffbeb, main: 0xfbbf24, accent: 0xf59e0b, env: 0xd97706 };
+    }
+    if (fireRedOrangeCodes.has(code)) {
+      return tier >= 4
+        ? { core: 0xfef2f2, main: 0xef4444, accent: 0xf97316, env: 0xef4444 }
+        : tier >= 3
+        ? { core: 0xfff7ed, main: 0xf97316, accent: 0xe11d48, env: 0xea580c }
+        : { core: 0xfff7ed, main: 0xf97316, accent: 0xfbbf24, env: 0xf97316 };
+    }
+
     if (tier >= 4) {
-      if (code === 'jeongwi') return { core: 0xfef2f2, main: 0xef4444, accent: 0xf97316, env: 0xef4444 };
       if (code === 'geomgyeong') return { core: 0xfffbeb, main: 0xef4444, accent: 0xfbbf24, env: 0xf97316 };
-      if (code === 'noegeom') return { core: 0xe0f2fe, main: 0x60a5fa, accent: 0xa855f7, env: 0x38bdf8 };
       return { core: 0xfff7ed, main: 0xf97316, accent: 0xef4444, env: 0xf97316 };
     }
     if (tier >= 3) {
@@ -22708,7 +23358,7 @@ export class OpenWorld3DEngine {
     if (tier >= 2) {
       return { core: 0xfffbeb, main: 0xf59e0b, accent: 0xef4444, env: 0xf59e0b };
     }
-    return { core: 0xf0f9ff, main: 0xfb923c, accent: 0x38bdf8, env: 0xfb923c };
+    return { core: 0xf0f9ff, main: 0xfb923c, accent: 0x38bdf8, env: 0xf97316 };
   }
 
   spawnMetinSignatureSkillPolish(actor, x, y, z, rotY, resolved, opts = {}) {
@@ -22747,6 +23397,7 @@ export class OpenWorld3DEngine {
         depthWrite: false,
         side: THREE.DoubleSide,
       });
+      this.applyMetinLuminanceTintShader(mat);
       const mesh = new THREE.Mesh(this._sharedUnitPlaneGeo, mat);
       mesh.rotation.order = 'YXZ';
       mesh.rotation.x = -Math.PI / 2 + tiltX;
@@ -22782,6 +23433,7 @@ export class OpenWorld3DEngine {
         depthWrite: false,
         side: THREE.DoubleSide,
       });
+      this.applyMetinLuminanceTintShader(mat);
       const mesh = new THREE.Mesh(this._sharedTornadoFunnelGeo, mat);
       mesh.position.set(0, ly, 0);
       mesh.scale.set(s0, s0 * heightAspect, s0);
@@ -23068,14 +23720,20 @@ export class OpenWorld3DEngine {
         }, Math.round(slamDelay * 1000));
       }
     } else {
-      // Universelle breite Metin2-Schockwelle + dezentes Umgebungsleuchten für alle weiteren Klassen-Skills!
+      // Universelle breite Metin2-Schockwelle + dynamisches Echtzeit-Magielicht (inkl. Schattenwurf bei mächtigen Magie-Explosionen)
+      const majorShadowCasterCodes = new Set([
+        'hwayeom', 'mahwan', 'akgi', 'akgi_dark', 'paeryong', 'byeorak', 'meteo', 'chunwoon', 'hwajo', 'pungraepo', 'gihyeol', 'swaeryeong',
+      ]);
+      const isMajorMagic = isLSkill || majorShadowCasterCodes.has(code);
       addHorizLayer(ringTex, 1.5 * tierScale, 5.8 * tierScale, pal.core, pal.main, 0.78, 0.08, 0.74, 3.0, 0, 0.05, 0);
       this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
         delay: 0.06,
-        duration: 0.86,
-        intensity: isLSkill ? 1.38 : 1.16,
-        distance: 11.2,
+        duration: isMajorMagic ? 1.04 : 0.88,
+        intensity: isMajorMagic ? (isLSkill ? 1.72 : 1.48) : (isLSkill ? 1.38 : 1.18),
+        distance: isMajorMagic ? 13.8 : 11.4,
         groundWashAlpha: 0.12,
+        castShadow: isMajorMagic,
+        volumetricScale: isMajorMagic ? 1.22 : 1.0,
       });
     }
 
@@ -23524,22 +24182,63 @@ export class OpenWorld3DEngine {
       }
 
       if (groundRings.length > 0 || verticalPlanes.length > 0 || sprites.length > 0) {
-        this.scene.add(pGroup);
-        this.vfxList.push({
+        const isFlyProjectile = Number(opts.evType) === 6 && !fileLower.includes('blow') && !fileLower.includes('hit');
+        const isImpactExplosion =
+          !attachedToLimb &&
+          !fileLower.includes('_loop') &&
+          (fileLower.includes('blow') ||
+            fileLower.includes('boom') ||
+            fileLower.includes('meteo') ||
+            fileLower.includes('byeorak') ||
+            fileLower.includes('paeryong') ||
+            fileLower.includes('hwayeom') ||
+            fileLower.includes('mahwan') ||
+            fileLower.includes('akgi') ||
+            Number(opts.evType) === 6);
+        const flySpeed = isFlyProjectile ? 14.5 : 0.0;
+        const projVx = flySpeed > 0 ? Math.sin(rotY || 0) * flySpeed : 0;
+        const projVz = flySpeed > 0 ? Math.cos(rotY || 0) * flySpeed : 0;
+        const vfxEntry = {
           type: 'metin_particles',
           mesh: pGroup,
           groundRings,
           verticalPlanes,
           sprites,
           age: 0,
-          maxAge: Math.max(0.65, Math.min(2.65, maxLayerEnd)),
-          followActor: opts.follow ? actor : null,
+          maxAge: isFlyProjectile ? Math.min(1.15, Math.max(0.55, maxLayerEnd)) : Math.max(0.65, Math.min(2.65, maxLayerEnd)),
+          followActor: opts.follow && !isFlyProjectile ? actor : null,
           followBone,
           evPos,
           offsetX: opts.offsetX || 0,
           offsetY: (opts.offsetY || 0) + groupLift,
           offsetZ: opts.offsetZ || 0,
-        });
+          projVx,
+          projVy: 0,
+          projVz,
+        };
+        this.scene.add(pGroup);
+        this.vfxList.push(vfxEntry);
+
+        // Magische Projektile & verzögerte Einschlag-Explosionen mit eigener 3D-Echtzeit-Punktlichtquelle + Volumetrischem Nachtnebel-Schein ausstatten!
+        if (isFlyProjectile || isImpactExplosion) {
+          const pal = opts.skillCode ? this.getMetinSkillPalette(opts.skillCode, tier, isLSkill) : null;
+          let emitHex = pal ? pal.env : 0x38bdf8;
+          if (!pal && effectDef.particles[0]?.color) {
+            emitHex = this.boostMetinVfxColor(effectDef.particles[0].color, isLSkill, 0.36).getHex();
+          }
+          this.triggerSkillEnvironmentGlow(pGroup.position.x, pGroup.position.y, pGroup.position.z, emitHex, {
+            delay: 0,
+            duration: vfxEntry.maxAge,
+            intensity: isFlyProjectile ? (isLSkill ? 1.32 : 1.08) : (isLSkill ? 1.68 : 1.42),
+            distance: isFlyProjectile ? 9.4 : 13.2,
+            heightOffset: isFlyProjectile ? 0.15 : 0.92,
+            followVfx: vfxEntry,
+            isProjectile: isFlyProjectile,
+            skipGroundWash: isFlyProjectile,
+            castShadow: !isFlyProjectile && (isLSkill || fileLower.includes('meteo') || fileLower.includes('byeorak') || fileLower.includes('paeryong') || fileLower.includes('hwayeom') || fileLower.includes('blow')),
+            volumetricScale: isFlyProjectile ? 0.88 : 1.18,
+          });
+        }
       }
     }
   }
@@ -23628,6 +24327,8 @@ export class OpenWorld3DEngine {
             follow: ev.follow,
             followBone: ev.follow ? (ev.bone || '') : '',
             evPos,
+            evType: ev.type,
+            skillCode: code,
             eventIndex: curEvIdx,
             attachedToLimb: att.attachedToLimb,
             offsetX: att.offsetX,
@@ -23642,6 +24343,8 @@ export class OpenWorld3DEngine {
             effect: ev.effect,
             bone: ev.bone || '',
             pos: evPos,
+            evType: ev.type,
+            skillCode: code,
             eventIndex: curEvIdx,
             x,
             y,
@@ -23691,6 +24394,8 @@ export class OpenWorld3DEngine {
           follow: item.follow,
           followBone: item.follow ? (item.bone || '') : '',
           evPos,
+          evType: item.evType,
+          skillCode: item.skillCode,
           eventIndex: item.eventIndex || 0,
           attachedToLimb: att.attachedToLimb,
           offsetX: att.offsetX,
@@ -26904,10 +27609,21 @@ export class OpenWorld3DEngine {
     const weaponShining = buildShiningEmitter(plus, 0.042, 1.02, 0.76, true);
     if (weaponShining) weaponGroup.add(weaponShining);
 
-    // --- 2. ECHTES 3D-GLB-HELDENMODELL PRO KLASSE (Krieger, Ninja, Sura, Schamane) ---
+    // --- 2. ECHTES 3D-GLB-HELDENMODELL PRO KLASSE & GESCHLECHT (High-Poly im PC-Client, Low-Poly im Browser & Fern-LOD) ---
     const classKey = cfg.classId || 'warrior';
-    const heroGlbCfg = HERO_GLB_BY_CLASS[classKey] || HERO_GLB_BY_CLASS.warrior;
+    const heroGlbCfg = resolveHeroGlbEntry(classKey, cfg.gender);
+    const isPcRuntime = isPcClientRuntime(this);
+    const useInitialHighPoly = isPcRuntime && Boolean(cfg.isLocal || cfg.isShowcase);
+    const activeHeroGlbUrl = useInitialHighPoly
+      ? heroGlbCfg.glb
+      : (heroGlbCfg.glbLow || heroGlbCfg.glb);
     const heroGlbHolder = new THREE.Group();
+    heroGlbHolder.userData._heroLodInfo = {
+      highUrl: heroGlbCfg.glb,
+      lowUrl: heroGlbCfg.glbLow || null,
+      activeTier: activeHeroGlbUrl === heroGlbCfg.glb ? 'high' : 'low',
+      lockedHigh: Boolean(cfg.isLocal || cfg.isShowcase),
+    };
     root.add(heroGlbHolder);
 
     if (this.attachGLBModelToGroup && !cfg.disableGlbHero) {
@@ -26927,7 +27643,7 @@ export class OpenWorld3DEngine {
       }
       this.attachGLBModelToGroup(
         heroGlbHolder,
-        heroGlbCfg.glb,
+        activeHeroGlbUrl,
         heroGlbCfg.tex,
         heroGlbCfg.height,
         bodyGroup,
@@ -26985,7 +27701,7 @@ export class OpenWorld3DEngine {
           if (handBone && weaponGroup) {
             const weaponSocket = new THREE.Group();
             weaponSocket.name = 'weaponSocket';
-            if (heroGlbCfg.glb.includes('klingenwaechter_male')) {
+            if (heroGlbCfg.useMeshyHandSocket || activeHeroGlbUrl.includes('klingenwaechter_male')) {
               // Exakt anatomisch aus R_Hand-Bindpose (Knöchel-Achse +X, Handflächen-Normale +Y, Daumen/Klinge +Z)
               // berechneter lokaler Faust-Socket – 100 % unabhängig von der aktuellen Mixer-Animationsphase!
               weaponSocket.position.set(-0.0177, -0.0118, 0.0389);
@@ -27056,11 +27772,11 @@ export class OpenWorld3DEngine {
         };
       };
 
-      const cachedHeroTpl = (this._glbResolvedTemplates || GLOBAL_GLB_RESOLVED_CACHE).get(heroGlbCfg.glb);
+      const cachedHeroTpl = (this._glbResolvedTemplates || GLOBAL_GLB_RESOLVED_CACHE).get(activeHeroGlbUrl);
       if (cachedHeroTpl) {
         bindHeroWeaponAndIk(cachedHeroTpl);
       } else if (this.loadGLBTemplate) {
-        this.loadGLBTemplate(heroGlbCfg.glb)
+        this.loadGLBTemplate(activeHeroGlbUrl)
           .then(bindHeroWeaponAndIk)
           .catch(() => {});
       }
@@ -33271,11 +33987,13 @@ export class OpenWorld3DEngine {
         (mesh.root.position.z - lpZ) * (mesh.root.position.z - lpZ);
       if (distSqToLocal > 185 * 185) {
         mesh._isDistanceCulled = true;
+        mesh._distSqToLocal = Infinity;
         mesh.root.visible = false;
         if (mesh.petGroup) mesh.petGroup.visible = false;
         continue;
       }
       mesh._isDistanceCulled = false;
+      mesh._distSqToLocal = distSqToLocal;
       mesh.root.visible = true;
       if (mesh.petGroup) mesh.petGroup.visible = Boolean(mesh.playerData?.activePet);
 
@@ -33456,6 +34174,73 @@ export class OpenWorld3DEngine {
       // Begleiter-Haustier des anderen Spielers flüssig mitbewegen
       if (mesh.petGroup) {
         this.updatePetCompanion(mesh.petGroup, mesh.root, isMoving, dt, elapsed);
+      }
+    }
+
+    this._updateOtherPlayersHeroLods(nowPerf);
+  }
+
+  _updateOtherPlayersHeroLods(nowPerf) {
+    if (!this.otherPlayerMeshes || this.otherPlayerMeshes.size === 0) return;
+    if (this._lastHeroLodEvalMs && nowPerf - this._lastHeroLodEvalMs < 250) return;
+    this._lastHeroLodEvalMs = nowPerf;
+
+    const isPc = isPcClientRuntime(this);
+    const resolvedMap = this._glbResolvedTemplates || GLOBAL_GLB_RESOLVED_CACHE;
+    const candidates = [];
+
+    for (const mesh of this.otherPlayerMeshes.values()) {
+      if (!mesh?.root || mesh._isDistanceCulled) continue;
+      const distSq = mesh._distSqToLocal ?? Infinity;
+      const glbAct = mesh.heroGlbHolder?.userData?.glbActor;
+      if (!glbAct?.meshes || glbAct.meshes.length === 0) continue;
+
+      // Ab > 34m Schattenwurf entfernter Bots/Spieler einsparen (Nahbereich <= 31m behält volle Echtzeit-Schatten)
+      const prevShadow = mesh._heroCastShadow !== false;
+      const wantShadow = prevShadow ? distSq <= 34 * 34 : distSq <= 31 * 31;
+      if (wantShadow !== prevShadow) {
+        mesh._heroCastShadow = wantShadow;
+        for (let i = 0; i < glbAct.meshes.length; i++) {
+          if (glbAct.meshes[i]) glbAct.meshes[i].castShadow = wantShadow;
+        }
+      }
+
+      if (!isPc) continue;
+      const lodInfo = mesh.heroGlbHolder?.userData?._heroLodInfo;
+      if (!lodInfo || !lodInfo.lowUrl || !lodInfo.highUrl || lodInfo.lowUrl === lodInfo.highUrl || lodInfo.lockedHigh) {
+        continue;
+      }
+      candidates.push({ mesh, glbAct, lodInfo, distSq });
+    }
+
+    if (!isPc || candidates.length === 0) return;
+    candidates.sort((a, b) => a.distSq - b.distSq);
+
+    const MAX_NEARBY_HIGH_POLY_PLAYERS = 4;
+    let highCount = 0;
+    for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+      const { glbAct, lodInfo, distSq } = candidates[cIdx];
+      const maxDist = lodInfo.activeTier === 'high' ? 21.0 : 18.0;
+      let desiredTier = 'low';
+      if (highCount < MAX_NEARBY_HIGH_POLY_PLAYERS && distSq <= maxDist * maxDist) {
+        desiredTier = 'high';
+        highCount++;
+      }
+      if (desiredTier === lodInfo.activeTier) continue;
+
+      const targetUrl = desiredTier === 'high' ? lodInfo.highUrl : lodInfo.lowUrl;
+      const targetTpl = resolvedMap.get(targetUrl);
+      if (!targetTpl) {
+        this.loadGLBTemplate?.(targetUrl)?.catch(() => {});
+        continue;
+      }
+      if (Array.isArray(targetTpl.geometries) && targetTpl.geometries.length === glbAct.meshes.length) {
+        for (let i = 0; i < glbAct.meshes.length; i++) {
+          if (glbAct.meshes[i] && targetTpl.geometries[i]) {
+            glbAct.meshes[i].geometry = targetTpl.geometries[i];
+          }
+        }
+        lodInfo.activeTier = desiredTier;
       }
     }
   }
@@ -36311,6 +37096,10 @@ export class OpenWorld3DEngine {
             v.mesh.position.y = v.followActor.root.position.y + (v.offsetY || 0.03);
             v.mesh.position.z = v.followActor.root.position.z + (v.offsetZ || 0);
           }
+        } else if (v.mesh && (v.projVx || v.projVz || v.projVy)) {
+          v.mesh.position.x += (v.projVx || 0) * dt;
+          v.mesh.position.y += (v.projVy || 0) * dt;
+          v.mesh.position.z += (v.projVz || 0) * dt;
         }
         if (v.groundRings) {
           for (const gr of v.groundRings) {
@@ -36868,18 +37657,36 @@ export class CharacterShowcase3D {
       CharacterShowcase3D._preloadHelper = h;
     }
     const helper = CharacterShowcase3D._preloadHelper;
-    const warmClass = (clsKey) => {
-      const entry = HERO_GLB_BY_CLASS[clsKey];
-      if (!entry) return Promise.resolve();
-      if (Array.isArray(entry.tex)) {
-        for (const tUrl of entry.tex) {
+    const isPc = isPcClientRuntime();
+    const warmVariant = (v) => {
+      if (!v || !v.glb) return Promise.resolve();
+      if (Array.isArray(v.tex)) {
+        for (const tUrl of v.tex) {
           if (tUrl) helper.loadModelTexture(tUrl, false);
         }
       }
-      if (entry.normalMap) {
-        helper.loadModelTexture(entry.normalMap, true);
+      if (v.normalMap) {
+        helper.loadModelTexture(v.normalMap, true);
       }
-      return helper.loadGLBTemplate(entry.glb).catch(() => null);
+      // Browser lädt ausschließlich Low-Poly (schneller Download & wenig VRAM);
+      // PC-Client lädt High-Poly fürs Podest/eigenen Helden und wärmt Low-Poly im Hintergrund für Fern-LOD nach.
+      const primaryUrl = isPc ? v.glb : (v.glbLow || v.glb);
+      const p = helper.loadGLBTemplate(primaryUrl).catch(() => null);
+      if (isPc && v.glbLow && v.glbLow !== v.glb) {
+        p.finally(() => {
+          helper.loadGLBTemplate(v.glbLow).catch(() => null);
+        });
+      }
+      return p;
+    };
+    const warmClass = (clsKey) => {
+      const entry = HERO_GLB_BY_CLASS[clsKey];
+      if (!entry) return Promise.resolve();
+      const pMain = warmVariant(entry);
+      if (entry.female && entry.female.glb) {
+        pMain.finally(() => warmVariant({ ...entry, ...entry.female }));
+      }
+      return pMain;
     };
 
     const firstKey = HERO_GLB_BY_CLASS[priorityClassId] ? priorityClassId : 'warrior';
@@ -37007,6 +37814,9 @@ export class CharacterShowcase3D {
       uMonolithColInt: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0.66, 0.33, 0.97, 0)) },
       uFireflyPosRad: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -5000, 0, 0)) },
       uFireflyColInt: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0.65, 0.95, 0.25, 0)) },
+      uSkillLightPosRad: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -5000, 0, 0)) },
+      uSkillLightColInt: { value: Array.from({ length: 8 }, () => new THREE.Vector4(1.0, 0.5, 0.2, 0)) },
+      uSkillNightFactor: { value: 0.0 },
     };
     this.helperEngine._objectWeatherUniforms = {
       uObjSnow: { value: 0.0 },
@@ -37086,6 +37896,7 @@ export class CharacterShowcase3D {
       showPet: false,
       skipPet: true,
       lazyMount: !this.isMountedPreview,
+      isShowcase: true,
     });
     if (this.actor.bodyGroup) {
       this.actor.bodyGroup.visible = false;
