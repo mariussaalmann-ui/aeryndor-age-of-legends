@@ -388,74 +388,50 @@ class GameDatabase:
                 except Exception:
                     pass
 
-    def _ensure_sa_blackzimple_account_conn(self, conn: sqlite3.Connection):
-        """Sichert die SA/GM-Rechte f?r den Account 'blackzimple' und Charakter '[SA]Nemesis'."""
+    def _provision_sa_max_warrior_conn(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        account_key: str,
+        account_username: str,
+        account_password: str,
+        account_email: str,
+        delete_code: str,
+        default_pid: str,
+        char_name: str,
+    ):
+        """Richtet einen voll ausgestatteten SA-Admin-Account samt Klingenwächter-Charakter
+        (Lv. 99 Max-Level, Gilde 'Serverleitung', alle Körper-Skills L1 Legendär, alle Passiva 20/20,
+        Maximal-EQ +9, Militärgaul Lv. 50 Max-Level inkl. Pferde-Skills sowie Begleiter Lv. 120 Max-Level
+        inkl. 120er Pet-Attributen und allen passiven & aktiven Pet-Skills auf Maximalstufe) ein."""
         now = time.time()
-        row = conn.execute("SELECT * FROM accounts WHERE username_key = 'blackzimple'").fetchone()
-        if not row:
-            return
-        try:
-            chars = json.loads(row["characters_json"] or "[null,null,null,null]")
-            if not isinstance(chars, list):
-                chars = [None, None, None, None]
-        except Exception:
-            chars = [None, None, None, None]
-        chars = (chars + [None, None, None, None])[:4]
-        for idx, ch in enumerate(chars):
-            if not isinstance(ch, dict):
-                continue
-            cpid = str(ch.get("playerId") or "").strip()
-            cname = str(ch.get("name") or "").strip()
-            if cname.upper().startswith("[SA]"):
-                ch["isSA"] = True
-                ch["isGM"] = True
-                ch["role"] = "SA"
-                ch["guild"] = "Serverleitung"
-                if cpid:
-                    prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
-                    if prow:
-                        try:
-                            q = json.loads(prow["quests_json"] or "{}")
-                            if not isinstance(q, dict):
-                                q = {}
-                        except Exception:
-                            q = {}
-                        q["__is_sa__"] = True
-                        q["__guild_name__"] = "Serverleitung"
-                        conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
-            else:
-                # Normaler Charakter auf Admin-Account: Definitiv KEINE SA/GM-Rechte!
-                ch["isSA"] = False
-                ch["isGM"] = False
-                if ch.get("role") in ("SA", "sa"):
-                    ch["role"] = "player"
-                if ch.get("guild") == "Serverleitung":
-                    ch["guild"] = ""
-                if cpid:
-                    prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
-                    if prow:
-                        try:
-                            q = json.loads(prow["quests_json"] or "{}")
-                            if isinstance(q, dict) and "__is_sa__" in q:
-                                q.pop("__is_sa__", None)
-                                conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
-                        except Exception:
-                            pass
-        conn.execute(
-            """
-            UPDATE accounts
-            SET coins = MAX(coins, 999999), characters_json = ?, updated_at = ?
-            WHERE username_key = 'blackzimple'
-            """,
-            (json.dumps(chars, ensure_ascii=False), now),
-        )
+        char_name_lower = char_name.lower()
 
-    def _ensure_sa_cryptel_account_conn(self, conn: sqlite3.Connection):
-        """Richtet den SA-Admin-Account 'cryptel' (Passwort '1234') samt Charakter '[SA]Cryptel'
-        (Klingenwächter Körper, Lv. 99 Max-Level, alle Körper-Skills L1 Legendär, Maximal-EQ +9) ein."""
-        now = time.time()
-        pid = "hero_warrior_cryptel"
-        char_name = "[SA]Cryptel"
+        arow = conn.execute("SELECT * FROM accounts WHERE username_key = ?", (account_key,)).fetchone()
+        existing_chars = [None, None, None, None]
+        if arow is not None:
+            try:
+                parsed_chars = json.loads(arow["characters_json"] or "[null,null,null,null]")
+                if isinstance(parsed_chars, list):
+                    existing_chars = (parsed_chars + [None, None, None, None])[:4]
+            except Exception:
+                existing_chars = [None, None, None, None]
+
+        pid = default_pid
+        for ch in existing_chars:
+            if isinstance(ch, dict):
+                cpid = str(ch.get("playerId") or "").strip()
+                cname = str(ch.get("name") or "").strip().lower()
+                if cpid and (cpid == default_pid or cname == char_name_lower):
+                    pid = cpid
+                    break
+        else:
+            byname = conn.execute(
+                "SELECT player_id FROM players WHERE LOWER(TRIM(name)) = ?",
+                (char_name_lower,),
+            ).fetchone()
+            if byname and byname["player_id"]:
+                pid = str(byname["player_id"])
 
         def mk_bonus(bid: str, val: int, max_val: Optional[int] = None) -> dict:
             meta = RUNE_BONUS_BY_ID.get(bid, {"id": bid, "name": bid, "unit": "%"})
@@ -504,11 +480,11 @@ class GameDatabase:
             except Exception:
                 existing_q = {}
 
-        if not prow or not existing_q.get("__cryptel_max_provisioned_v2__"):
-            # Falls ein anderer Datensatz '[SA]Cryptel' belegt, vorab bereinigen
+        if not prow or not existing_q.get("__sa_max_provisioned_v3__"):
+            # Falls ein anderer Datensatz denselben SA-Namen belegt, vorab bereinigen
             clash = conn.execute(
-                "SELECT player_id FROM players WHERE LOWER(TRIM(name)) = '[sa]cryptel' AND player_id != ?",
-                (pid,),
+                "SELECT player_id FROM players WHERE LOWER(TRIM(name)) = ? AND player_id != ?",
+                (char_name_lower, pid),
             ).fetchall()
             for cr in clash:
                 self._delete_player_cascade_conn(conn, cr["player_id"])
@@ -518,6 +494,9 @@ class GameDatabase:
             max_passives = {ps_id: int(ps_def.get("maxLevel", 20)) for ps_id, ps_def in PASSIVE_SKILL_DEFS.items()}
 
             quests_data = dict(existing_q)
+            existing_mount = quests_data.get("__mount_profile__") if isinstance(quests_data.get("__mount_profile__"), dict) else {}
+            existing_pet = quests_data.get("__pet_profile__") if isinstance(quests_data.get("__pet_profile__"), dict) else {}
+
             bio_bonuses = {}
             for qtpl in QUEST_TEMPLATES:
                 qid = qtpl["id"]
@@ -539,7 +518,7 @@ class GameDatabase:
             quests_data["__starter_eq_plus0_v1__"] = True
             quests_data["__starter_shoes_v1__"] = True
             quests_data["__passives_reset_fb_only_v2__"] = True
-            quests_data["__empire__"] = "kaeryu"
+            quests_data["__empire__"] = str(quests_data.get("__empire__") or "kaeryu")
             quests_data["__new_spawn_wall_v1__"] = True
             quests_data["__is_sa__"] = True
             quests_data["__guild_name__"] = "Serverleitung"
@@ -550,12 +529,12 @@ class GameDatabase:
                 "dungeon_aether_citadel",
             ]
             quests_data["__mount_profile__"] = {
-                "level": 50,
-                "maxLevel": 50,
+                "level": MAX_HORSE_LEVEL,
+                "maxLevel": MAX_HORSE_LEVEL,
                 "tier": 3,
-                "tierName": "Militärgaul (Stufe 50)",
+                "tierName": f"Militärgaul (Stufe {MAX_HORSE_LEVEL})",
                 "tierShort": "Militärgaul",
-                "customName": "Kaiserliches Schlachtross",
+                "customName": str(existing_mount.get("customName") or "Kaiserliches Schlachtross"),
                 "statPoints": 0,
                 "dmgPoints": 60,
                 "hpPoints": 40,
@@ -565,7 +544,8 @@ class GameDatabase:
             }
             quests_data["__pet_profile__"] = {
                 "petId": "pet_fire_phoenix",
-                "customName": "Astralphönix",
+                "skinKey": str(existing_pet.get("skinKey") or "ridack_dragonpet"),
+                "customName": str(existing_pet.get("customName") or "Astralphönix"),
                 "level": MAX_PET_LEVEL,
                 "exp": 0,
                 "maxExp": get_required_pet_exp(MAX_PET_LEVEL),
@@ -579,6 +559,7 @@ class GameDatabase:
                 "cooldowns": {},
             }
             quests_data["__cryptel_max_provisioned_v2__"] = True
+            quests_data["__sa_max_provisioned_v3__"] = True
 
             autofarm_data = {
                 "enabled": False,
@@ -603,10 +584,11 @@ class GameDatabase:
                     """
                     UPDATE players
                     SET name = ?, class_id = 'warrior', gender = 'male', level = ?, exp = 0,
-                        hp = 52000, max_hp = 52000, mp = 9500, max_mp = 9500,
+                        hp = 61738, max_hp = 61738, mp = 5864, max_mp = 5864,
                         vit = 120, int_stat = 120, str = 120, dex = 120,
                         stat_points = 0, skill_points = 0,
                         yang = 999999999, shards = 99999, reputation = 200000,
+                        active_mount = COALESCE(active_mount, 'mount_war_boar'),
                         active_pet = 'pet_fire_phoenix',
                         skills_json = ?, passives_json = ?, quests_json = ?, autofarm_json = ?, updated_at = ?
                     WHERE player_id = ?
@@ -630,9 +612,9 @@ class GameDatabase:
                         vit, int_stat, str, dex, stat_points, skill_points, yang, shards, reputation,
                         map_id, pos_x, pos_z, rot_y, active_mount, active_pet,
                         skills_json, passives_json, quests_json, autofarm_json, updated_at
-                    ) VALUES (?, ?, 'warrior', 'male', ?, 0, 52000, 52000, 9500, 9500,
+                    ) VALUES (?, ?, 'warrior', 'male', ?, 0, 61738, 61738, 5864, 5864,
                               120, 120, 120, 120, 0, 0, 999999999, 99999, 200000,
-                              'morgenwacht', -708.0, -772.0, 1.35, NULL, 'pet_fire_phoenix',
+                              'morgenwacht', -708.0, -772.0, 1.35, 'mount_war_boar', 'pet_fire_phoenix',
                               ?, ?, ?, ?, ?)
                     """,
                     (
@@ -839,13 +821,19 @@ class GameDatabase:
                     ),
                 )
 
-            # Zusätzlich im Inventar: Ätherium-Zweihänder +9 (Max-Roll) + Tränke
+            # Zusätzlich im Inventar: Ätherium-Zweihänder +9 (Slot 0 belegt 0, 8, 16 im 8x15 Raster), Tränke, Reit-/Pet-Siegel & Riss-Materialien
             bag_items = [
                 ("wpn_aetherium_greatsword", 0, 9, 1, "mythic", wpn_bonuses),
-                ("potion_hp_large", 1, 0, 200, "common", []),
-                ("potion_mp_medium", 2, 0, 200, "common", []),
+                ("potion_hp_large", 1, 0, 200, "rare", []),
+                ("potion_mp_medium", 2, 0, 200, "rare", []),
                 ("potion_speed", 3, 0, 200, "rare", []),
                 ("potion_atk_speed", 4, 0, 200, "rare", []),
+                ("seal_mount_boar", 5, 0, 1, "epic", []),
+                ("seal_mount_wolf", 6, 0, 1, "legendary", []),
+                ("seal_pet_phoenix", 7, 0, 1, "epic", []),
+                ("seal_pet_azrael", 9, 0, 1, "legendary", []),
+                ("mat_monolith_shard", 0, 0, 50, "epic", []),
+                ("mat_awakened_rift_core", 1, 0, 50, "mythic", []),
             ]
             for tpl_id, s_idx, plus_lv, qty, rar, b_list in bag_items:
                 if tpl_id not in ITEM_TEMPLATES:
@@ -872,7 +860,7 @@ class GameDatabase:
                     ),
                 )
 
-        cryptel_slot = {
+        sa_slot = {
             "playerId": pid,
             "name": char_name,
             "classId": "warrior",
@@ -890,44 +878,113 @@ class GameDatabase:
             "isNewCharSpawn": False,
         }
 
-        arow = conn.execute("SELECT * FROM accounts WHERE username_key = 'cryptel'").fetchone()
         if arow is None:
-            chars = [cryptel_slot, None, None, None]
+            chars = [sa_slot, None, None, None]
             conn.execute(
                 """
                 INSERT INTO accounts (username_key, username, password, email, delete_code, coins, characters_json, updated_at)
-                VALUES ('cryptel', 'cryptel', '1234', 'cryptel@aeryndor.de', '1234', 999999, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 999999, ?, ?)
                 """,
-                (json.dumps(chars, ensure_ascii=False), now),
+                (
+                    account_key,
+                    account_username,
+                    account_password,
+                    account_email,
+                    delete_code,
+                    json.dumps(chars, ensure_ascii=False),
+                    now,
+                ),
             )
         else:
-            try:
-                chars = json.loads(arow["characters_json"] or "[null,null,null,null]")
-                if not isinstance(chars, list):
-                    chars = [None, None, None, None]
-            except Exception:
-                chars = [None, None, None, None]
-            chars = (chars + [None, None, None, None])[:4]
+            chars = list(existing_chars)
             found_idx = next(
-                (i for i, c in enumerate(chars) if isinstance(c, dict) and (c.get("playerId") == pid or str(c.get("name") or "").lower() == "[sa]cryptel")),
+                (
+                    i
+                    for i, c in enumerate(chars)
+                    if isinstance(c, dict)
+                    and (c.get("playerId") == pid or str(c.get("name") or "").strip().lower() == char_name_lower)
+                ),
                 -1,
             )
             if found_idx >= 0:
                 p_cur = conn.execute("SELECT level FROM players WHERE player_id = ?", (pid,)).fetchone()
-                cryptel_slot["level"] = int(p_cur["level"]) if p_cur else MAX_PLAYER_LEVEL
-                chars[found_idx] = {**chars[found_idx], **cryptel_slot}
+                sa_slot["level"] = int(p_cur["level"]) if p_cur else MAX_PLAYER_LEVEL
+                chars[found_idx] = {**chars[found_idx], **sa_slot}
             else:
                 free_idx = next((i for i, c in enumerate(chars) if not isinstance(c, dict)), 0)
-                chars[free_idx] = cryptel_slot
+                chars[free_idx] = sa_slot
+
+            # Normale Zweitcharaktere ohne [SA]-Präfix behalten keine SA/GM-Rechte
+            for idx, ch in enumerate(chars):
+                if not isinstance(ch, dict) or idx == found_idx or ch.get("playerId") == pid:
+                    continue
+                cname_other = str(ch.get("name") or "").strip()
+                cpid_other = str(ch.get("playerId") or "").strip()
+                if not cname_other.upper().startswith("[SA]"):
+                    ch["isSA"] = False
+                    ch["isGM"] = False
+                    if ch.get("role") in ("SA", "sa"):
+                        ch["role"] = "player"
+                    if ch.get("guild") == "Serverleitung":
+                        ch["guild"] = ""
+                    if cpid_other:
+                        prow_other = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid_other,)).fetchone()
+                        if prow_other:
+                            try:
+                                q_other = json.loads(prow_other["quests_json"] or "{}")
+                                if isinstance(q_other, dict) and "__is_sa__" in q_other:
+                                    q_other.pop("__is_sa__", None)
+                                    conn.execute(
+                                        "UPDATE players SET quests_json = ? WHERE player_id = ?",
+                                        (json.dumps(q_other, ensure_ascii=False), cpid_other),
+                                    )
+                            except Exception:
+                                pass
+
             conn.execute(
                 """
                 UPDATE accounts
-                SET username = 'cryptel', password = '1234', delete_code = '1234', coins = MAX(coins, 999999),
+                SET username = ?, password = ?, delete_code = ?, coins = MAX(coins, 999999),
                     characters_json = ?, updated_at = ?
-                WHERE username_key = 'cryptel'
+                WHERE username_key = ?
                 """,
-                (json.dumps(chars, ensure_ascii=False), now),
+                (
+                    account_username,
+                    account_password,
+                    delete_code,
+                    json.dumps(chars, ensure_ascii=False),
+                    now,
+                    account_key,
+                ),
             )
+
+    def _ensure_sa_blackzimple_account_conn(self, conn: sqlite3.Connection):
+        """Richtet den SA-Admin-Account 'blackzimple' (Passwort 'L37qMAQqJv-99') samt Charakter '[SA]Nemesis'
+        identisch zu '[SA]Cryptel' inkl. Max-EQ, Rechten, Level 99, Gilde 'Serverleitung', Max-Mount & Max-Pet ein."""
+        self._provision_sa_max_warrior_conn(
+            conn,
+            account_key="blackzimple",
+            account_username="blackzimple",
+            account_password="L37qMAQqJv-99",
+            account_email="blackzimple@aeryndor.de",
+            delete_code="123",
+            default_pid="hero_warrior_mq6dr",
+            char_name="[SA]Nemesis",
+        )
+
+    def _ensure_sa_cryptel_account_conn(self, conn: sqlite3.Connection):
+        """Richtet den SA-Admin-Account 'cryptel' (Passwort '1234') samt Charakter '[SA]Cryptel'
+        (Klingenwächter Körper, Lv. 99 Max-Level, alle Körper-Skills L1 Legendär, Maximal-EQ +9, Max-Mount & Max-Pet) ein."""
+        self._provision_sa_max_warrior_conn(
+            conn,
+            account_key="cryptel",
+            account_username="cryptel",
+            account_password="1234",
+            account_email="cryptel@aeryndor.de",
+            delete_code="1234",
+            default_pid="hero_warrior_cryptel",
+            char_name="[SA]Cryptel",
+        )
 
     def _ensure_sa_admin_account_conn(self, conn: sqlite3.Connection):
         """Richtet den offiziellen SA-Account ('admin' / Passwort '123') ein und versieht alle seine Charaktere automatisch mit [SA]."""
@@ -1878,6 +1935,7 @@ class GameDatabase:
             norm_pet_skills[sk_id] = max(0, min(int(sk_def["maxLevel"]), int(raw_pet_skills.get(sk_id, default_sk_lvl) or 0)))
         p["petData"] = {
             "petId": "pet_fire_phoenix",
+            "skinKey": str(raw_pet.get("skinKey") or "ridack_dragonpet"),
             "customName": str(raw_pet.get("customName") or "Grüner Smaragddrache"),
             "level": pet_lvl,
             "exp": max(0, int(raw_pet.get("exp", 0) or 0)),
@@ -3109,6 +3167,9 @@ class GameDatabase:
                 if ukey == "admin":
                     if pw not in ("123", "9274"):
                         return False, "⚠️ Falsches Passwort für SA-Account (admin / 123)!", None
+                elif ukey == "blackzimple":
+                    if pw not in (stored_pw, "L37qMAQqJv-99", "L37qM_AQqJv-99_"):
+                        return False, "⚠️ Falsches Passwort für diesen Account!", None
                 elif stored_pw and pw != stored_pw:
                     return False, "⚠️ Falsches Passwort für diesen Account!", None
 
