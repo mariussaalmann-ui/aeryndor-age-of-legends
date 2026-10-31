@@ -746,7 +746,7 @@ export function initChatIdleFade(app) {
       if (last.id !== app._chatIdleLastId) {
         app._chatIdleLastId = last.id;
         const ch = last.channel || 'normal';
-        if (ch !== 'drops' && box.classList.contains('chat-idle')) {
+        if (ch !== 'drops' && (!app.doesChatMessageMatchFilter || app.doesChatMessageMatchFilter(last, app.chatFilter)) && box.classList.contains('chat-idle')) {
           box.classList.add('chat-peek');
           wake(5200);
           setTimeout(() => box.classList.remove('chat-peek'), 700);

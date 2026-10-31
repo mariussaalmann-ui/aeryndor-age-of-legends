@@ -352,7 +352,7 @@ def generate_ai_chronicle_embed(question: str, user_name: str = "Abenteurer") ->
                     "name": "🏰 Map-2-Dungeonboss: Schwarzwind-Kriegsherr Malakor (Lv. 35)",
                     "value": (
                         "• In den **Äther-Katakomben** herrscht jetzt der massiv verstärkte **Schwarzwind-Kriegsherr Malakor [Map-2-Dungeonboss] (Lv. 35)**.\n"
-                        "• Er wird von **2 Map-2-Elite-Leibwächtern** (*Schwarzwind-Gu-Ryung & Wilder General*) beschützt und lässt **Sternenreißer (Lv. 30)**, **Drachenschuppenpanzer (Lv. 30)**, **Erwachte Risskerne** und **Seelensteine** fallen!"
+                        "• Er wird von **2 Map-2-Elite-Leibwächtern** (*Schwarzwind-Gu-Ryung & Wilder General*) beschützt und lässt **Ebenholz-Ausrüstung (Lv. 30)** (*Ebenholz-Schwert, Ebenholz-Rüstung*), **Erwachte Risskerne** und **Seelensteine** fallen!"
                     ),
                     "inline": False,
                 },

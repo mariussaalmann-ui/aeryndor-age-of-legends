@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v609';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v611';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -16,7 +16,7 @@ import {
   fadeOutIslandContent,
   popIsland,
   shakeElement,
-} from './iosUi.js?v=20261031_v607';
+} from './iosUi.js?v=20261031_v611';
 
 const CLASS_PORTRAITS = {
   warrior: './assets/client_ui/charackter/klingenwaechter_m.png',

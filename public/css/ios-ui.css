@@ -4074,17 +4074,33 @@ body.ui-theme-dark #hud-quest-tracker.hidden,
 /* ============================================================================
    13. DYNAMIC ISLAND: KOMPASS-PILLEN, ZIELPUNKT, INFO-MELDUNGEN & QUEST-DIALOG GLAS
    ============================================================================ */
-/* Linke Pille (Blickrichtung) -> öffnet Weltkarte; zeigt Meter zum eigenen Zielpunkt blau */
+/* Linke Pille: Questziel (Bild 2: ◆ ... m) bzw. eigener Zielpunkt (📍 ... m); Blickrichtung entfernt */
 #hud-compass #hud-compass-heading {
   pointer-events: auto !important;
   cursor: pointer !important;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms var(--ios-out);
+  flex: 0 0 auto !important;
+  min-width: 74px !important;
+  width: auto !important;
+  padding: 0 8px !important;
+  color: #facc15 !important;
+  background: rgba(10, 8, 6, 0.82) !important;
+  border: 1px solid rgba(217, 119, 6, 0.65) !important;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms var(--ios-out), box-shadow 160ms ease;
 }
 #hud-compass #hud-compass-heading:hover {
-  background: rgba(250, 204, 21, 0.14) !important;
-  border-color: rgba(250, 204, 21, 0.4) !important;
+  background: rgba(250, 204, 21, 0.18) !important;
+  border-color: rgba(250, 204, 21, 0.85) !important;
+  color: #fef08a !important;
 }
-#hud-compass #hud-compass-heading:active { transform: scale(0.94); }
+#hud-compass #hud-compass-heading:active {
+  transform: scale(0.94) !important;
+}
+#hud-compass #hud-compass-heading.is-quest-wp {
+  color: #facc15 !important;
+  background: rgba(10, 8, 6, 0.85) !important;
+  border: 1px solid rgba(217, 119, 6, 0.75) !important;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.22) !important;
+}
 #hud-compass #hud-compass-heading.is-user-wp {
   color: #e0f2fe !important;
   background: rgba(56, 189, 248, 0.24) !important;

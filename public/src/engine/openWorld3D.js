@@ -15,6 +15,7 @@ import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261026_v52
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
 import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
+import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v611';
 
 // Wiederverwendbarer Farb-Ringpuffer für Per-Frame-Berechnungen (vermeidet GC-Spitzen durch
 // dutzende `new THREE.Color()` pro Frame). Nur für kurzlebige Zwischenwerte innerhalb eines Aufrufs!
@@ -200,6 +201,12 @@ export class OpenWorld3DEngine {
       },
       uMonolithColInt: {
         value: Array.from({ length: 4 }, () => new THREE.Vector4(0.66, 0.33, 0.97, 0)),
+      },
+      uFireflyPosRad: {
+        value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -5000, 0, 0)),
+      },
+      uFireflyColInt: {
+        value: Array.from({ length: 8 }, () => new THREE.Vector4(0.65, 0.95, 0.25, 0)),
       },
       uGroundShadowStrength: { value: 1.35 },
       uGrassShadowStrength: { value: 1.0 },
@@ -624,6 +631,8 @@ export class OpenWorld3DEngine {
       uRiftCenterXZ: { value: new THREE.Vector2(0, 0) },
       uMonolithPosRad: this._grassShaderUniforms.uMonolithPosRad,
       uMonolithColInt: this._grassShaderUniforms.uMonolithColInt,
+      uFireflyPosRad: this._grassShaderUniforms.uFireflyPosRad,
+      uFireflyColInt: this._grassShaderUniforms.uFireflyColInt,
       uRainRate: { value: 0.0 },
       uWindSpeed: { value: 0.35 },
       uWindDir: { value: new THREE.Vector2(0.82, 0.57) },
@@ -762,6 +771,8 @@ export class OpenWorld3DEngine {
         uniform vec2 uRiftCenterXZ;
         uniform vec4 uMonolithPosRad[4];
         uniform vec4 uMonolithColInt[4];
+        uniform vec4 uFireflyPosRad[8];
+        uniform vec4 uFireflyColInt[8];
         uniform float uRainRate;
         uniform float uWindSpeed;
         uniform vec2 uWindDir;
@@ -1584,6 +1595,30 @@ export class OpenWorld3DEngine {
                   }
                 }
               }
+              // Echtzeit-Biolumineszenz der Glühwürmchen bei Nacht auf Boden, Grasuntergrund & nasse Pfützen
+              for (int fIdx = 0; fIdx < 8; fIdx++) {
+                vec4 fPR = uFireflyPosRad[fIdx];
+                if (fPR.w > 0.05) {
+                  vec3 toF = fPR.xyz - vTerrainWorldPos;
+                  float dF2 = dot(toF, toF);
+                  float rF2 = fPR.w * fPR.w;
+                  if (dF2 < rF2) {
+                    float dF = sqrt(dF2);
+                    vec3 L_f = toF / max(0.01, dF);
+                    float ndlF = clamp(dot(N_m, L_f) * 0.78 + 0.22, 0.0, 1.0);
+                    float nDistF = dF / fPR.w;
+                    float attenF = (1.0 - nDistF) * (1.0 - nDistF) * smoothstep(1.0, 0.12, nDistF);
+                    vec4 fCI = uFireflyColInt[fIdx];
+                    vec3 H_f = normalize(L_f + V_m);
+                    float wetF = clamp(puddleMask + localWet * 0.55, 0.0, 1.0);
+                    float specF = pow(clamp(dot(N_m, H_f), 0.0, 1.0), mix(12.0, 38.0, wetF));
+                    float terrLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                    vec3 fDiff = (terrLumF * 1.45 + 0.08) * fCI.rgb * ndlF;
+                    vec3 fSpec = fCI.rgb * specF * (0.20 + 0.60 * wetF);
+                    outgoingLight += (fDiff + fSpec) * (attenF * fCI.w);
+                  }
+                }
+              }
             }
             if (uRiftFactor > 0.01) {
               float dRift = length(wp - uRiftCenterXZ);
@@ -2130,7 +2165,7 @@ export class OpenWorld3DEngine {
     const objUniforms = this._objectWeatherUniforms;
     const grassUniforms = this._grassShaderUniforms;
 
-    const progCacheKey = `ow_v3_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}`;
+    const progCacheKey = `ow_v4_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}`;
     mat.customProgramCacheKey = () => progCacheKey;
 
     mat.onBeforeCompile = (shader) => {
@@ -2142,6 +2177,8 @@ export class OpenWorld3DEngine {
         uRiftAwakened: grassUniforms.uRiftAwakened,
         uMonolithPosRad: grassUniforms.uMonolithPosRad,
         uMonolithColInt: grassUniforms.uMonolithColInt,
+        uFireflyPosRad: grassUniforms.uFireflyPosRad,
+        uFireflyColInt: grassUniforms.uFireflyColInt,
         uSnowStrength: { value: snowStrength },
         uWetStrength: { value: wetStrength },
       });
@@ -2254,6 +2291,8 @@ export class OpenWorld3DEngine {
         uniform float uRiftAwakened;
         uniform vec4 uMonolithPosRad[4];
         uniform vec4 uMonolithColInt[4];
+        uniform vec4 uFireflyPosRad[8];
+        uniform vec4 uFireflyColInt[8];
         uniform float uVegLeafDensity;
         uniform float uFoliageSSS;
         uniform float uTreeColorVariation;
@@ -2539,6 +2578,28 @@ export class OpenWorld3DEngine {
                     vec3 baseTint = (objLum * 1.65 + 0.09) * mCI.rgb;
                     vec3 monoLitObj = outgoingLight * mix(vec3(1.0), mCI.rgb * 1.35, clamp(mWeightObj * (ndlObj + rimObj * 0.5) * 1.30, 0.0, 0.80)) + (baseTint * (ndlObj + rimObj * 0.55) + mCI.rgb * specObj * 0.28) * (mWeightObj * 1.15);
                     outgoingLight = max(outgoingLight * 0.92, monoLitObj);
+                  }
+                }
+              }
+              // Echtzeit-Biolumineszenz naher Glühwürmchen auf Felsen, Baumrinde, Büsche, Zäune & Hauswände bei Nacht
+              for (int fIdx = 0; fIdx < 8; fIdx++) {
+                vec4 fPR = uFireflyPosRad[fIdx];
+                if (fPR.w > 0.05) {
+                  vec3 toF = fPR.xyz - vObjWorldPos;
+                  float dF2 = dot(toF, toF);
+                  float rF2 = fPR.w * fPR.w;
+                  if (dF2 < rF2) {
+                    float dF = sqrt(dF2);
+                    vec3 L_f = toF / max(0.01, dF);
+                    float rawNdlF = dot(N_obj, L_f);
+                    float ndlF = ${isFoliage ? 'clamp(rawNdlF * 0.50 + 0.50, 0.0, 1.0)' : 'clamp(rawNdlF * 0.74 + 0.20, 0.0, 1.0)'};
+                    float nDistF = dF / fPR.w;
+                    float attenF = (1.0 - nDistF) * (1.0 - nDistF) * smoothstep(1.0, 0.12, nDistF);
+                    vec4 fCI = uFireflyColInt[fIdx];
+                    float rimF = pow(1.0 - max(dot(N_obj, V_obj), 0.0), 2.0) * clamp(rawNdlF + 0.35, 0.0, 1.0);
+                    float objLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                    vec3 fTint = (objLumF * 1.50 + 0.09) * fCI.rgb;
+                    outgoingLight += fTint * (ndlF + rimF * 0.45) * (attenF * fCI.w);
                   }
                 }
               }
@@ -3105,8 +3166,21 @@ export class OpenWorld3DEngine {
             geometries.push(mergedGeo);
           }
         }
-        const heightCm = Math.max(40, (maxZ - minZ) || 160);
-        if (!Number.isFinite(minZ)) minZ = 0;
+        const isYUp =
+          Number.isFinite(minY) &&
+          Number.isFinite(maxY) &&
+          (maxY - minY) > Math.max(0.1, maxZ - minZ) * 1.8 &&
+          maxY < 20.0;
+        const heightCm = isYUp
+          ? Math.max(0.4, (maxY - minY) || 1.7)
+          : Math.max(40, (maxZ - minZ) || 160);
+        if (isYUp) {
+          minZ = Number.isFinite(minY) ? minY : 0;
+          maxZ = Number.isFinite(maxY) ? maxY : 1.7;
+          baseZ = minZ;
+        } else if (!Number.isFinite(minZ)) {
+          minZ = 0;
+        }
 
         // Referenz-Root-Positionen aus 'wait' (oder 1. Clip) ermitteln, damit beim Wechsel zwischen
         // wait <-> walk <-> run <-> attack keinerlei horizontaler/vertikaler 15–30cm Versatz entsteht!
@@ -3183,6 +3257,15 @@ export class OpenWorld3DEngine {
                     }
                     vals[k + 2] = rz;
                   }
+                } else if (isYUp) {
+                  // Y-Up SmartRig / Meter-Hierarchie: Y ist vertikal (Meter), X/Z horizontal
+                  for (let k = 0; k < vals.length; k += 3) {
+                    if (!isDeathClip) {
+                      vals[k] = rx + Math.max(-0.35, Math.min(0.35, vals[k] - x0));
+                      vals[k + 1] = ry + Math.max(-0.55, Math.min(0.85, vals[k + 1] - y0));
+                      vals[k + 2] = rz + Math.max(-0.45, Math.min(0.45, vals[k + 2] - z0));
+                    }
+                  }
                 } else {
                   // Standard Z-Up Biped: Z ist vertikal, X/Y horizontal
                   for (let k = 0; k < vals.length; k += 3) {
@@ -3235,11 +3318,143 @@ export class OpenWorld3DEngine {
         // erzeugen wir aus der echten Wait-Kampfhaltung + Welt-X-Pitch-Achse einen vollwertigen,
         // flüssigen Skelett-Laufzyklus (Oberschenkel, Knie, Füße, Beinschürzen, Oberkörper & Arme)!
         const nodesList = gltf.nodes || [];
-        if (clips.wait && (!clips.walk || clips.walk.tracks.length < 15)) {
-          const hasThighs = nodesList.some((n) => {
-            const nm = (n.name || '').toLowerCase();
-            return nm.includes('l_thigh') || nm.includes('l thigh');
+        const hasThighs = nodesList.some((n) => {
+          const nm = (n.name || '').toLowerCase();
+          return nm.includes('l_thigh') || nm.includes('l thigh');
+        });
+
+        // Falls ein SmartRig / Y-Up Heldenmodell (z.B. klingenwaechter_male.glb) in A-Pose ohne eingebetteten
+        // 'wait'-Clip vorliegt, erzeugen wir zuerst eine natürliche, heroische Kampf-Bereitschaftshaltung ('wait')
+        // inkl. entspannter Schulter-Adduktion, angewinkelter Unterarme, geschlossener Schwertfaust & Atem-Zyklus!
+        if (!clips.wait && hasThighs) {
+          const parentOfWait = new Int32Array(nodesList.length).fill(-1);
+          nodesList.forEach((n, pIdx) => {
+            for (const cIdx of n.children || []) parentOfWait[cIdx] = pIdx;
           });
+          const bindQuats = nodesList.map((n) => {
+            const q = new THREE.Quaternion();
+            if (n.rotation) q.fromArray(n.rotation).normalize();
+            return q;
+          });
+          const bindWorldQuats = new Array(nodesList.length);
+          const getBindWorldQuat = (idx) => {
+            if (bindWorldQuats[idx]) return bindWorldQuats[idx];
+            const pIdx = parentOfWait[idx];
+            bindWorldQuats[idx] =
+              pIdx >= 0 ? getBindWorldQuat(pIdx).clone().multiply(bindQuats[idx]) : bindQuats[idx].clone();
+            return bindWorldQuats[idx];
+          };
+          for (let i = 0; i < nodesList.length; i++) getBindWorldQuat(i);
+
+          const wX = new THREE.Vector3(1, 0, 0);
+          const wY = isYUp ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
+          const wZ = isYUp ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+          const waitDur = 2.4;
+          const waitFrames = 25;
+          const waitTracks = [];
+          const buildWaitQuatTrack = (nodeIdx, fnXYZ, localZAxisAngle = 0) => {
+            const invW = bindWorldQuats[nodeIdx].clone().invert();
+            const lX = wX.clone().applyQuaternion(invW).normalize();
+            const lY = wY.clone().applyQuaternion(invW).normalize();
+            const lZ = wZ.clone().applyQuaternion(invW).normalize();
+            const times = new Float32Array(waitFrames);
+            const vals = new Float32Array(waitFrames * 4);
+            const qF = new THREE.Quaternion();
+            const qD = new THREE.Quaternion();
+            for (let f = 0; f < waitFrames; f++) {
+              const u = f / (waitFrames - 1);
+              times[f] = u * waitDur;
+              const ph = u * Math.PI * 2.0;
+              const [ax, ay, az] = fnXYZ ? fnXYZ(ph, u) : [0, 0, 0];
+              qF.copy(bindQuats[nodeIdx]);
+              if (ax) {
+                qD.setFromAxisAngle(lX, ax);
+                qF.multiply(qD);
+              }
+              if (ay) {
+                qD.setFromAxisAngle(lY, ay);
+                qF.multiply(qD);
+              }
+              if (az) {
+                qD.setFromAxisAngle(lZ, az);
+                qF.multiply(qD);
+              }
+              if (localZAxisAngle) {
+                qD.setFromAxisAngle(new THREE.Vector3(0, 0, 1), localZAxisAngle);
+                qF.multiply(qD);
+              }
+              qF.normalize();
+              vals[f * 4] = qF.x;
+              vals[f * 4 + 1] = qF.y;
+              vals[f * 4 + 2] = qF.z;
+              vals[f * 4 + 3] = qF.w;
+            }
+            return new THREE.QuaternionKeyframeTrack(`bone_${nodeIdx}.quaternion`, times, vals);
+          };
+
+          nodesList.forEach((n, idx) => {
+            if (n.mesh !== undefined) return;
+            const nm = (n.name || '').toLowerCase();
+            if (nm === 'pelvis' && n.translation) {
+              const times = new Float32Array(waitFrames);
+              const vals = new Float32Array(waitFrames * 3);
+              const [bx, by, bz] = n.translation;
+              for (let f = 0; f < waitFrames; f++) {
+                const u = f / (waitFrames - 1);
+                const ph = u * Math.PI * 2.0;
+                times[f] = u * waitDur;
+                vals[f * 3] = bx;
+                vals[f * 3 + 1] = by - 0.012 + Math.sin(ph) * 0.007;
+                vals[f * 3 + 2] = bz;
+              }
+              waitTracks.push(new THREE.VectorKeyframeTrack(`bone_${idx}.position`, times, vals));
+              waitTracks.push(buildWaitQuatTrack(idx, () => [0, 0, 0]));
+            } else if (nm === 'spine' || nm === 'spine1' || nm === 'spine2' || nm === 'spine3') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0.018 + Math.sin(ph) * 0.012, 0, -0.025 + Math.cos(ph) * 0.008]));
+            } else if (nm === 'neck' || nm === 'head') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.022 - Math.sin(ph) * 0.010, 0, 0.035 + Math.sin(ph) * 0.014]));
+            } else if (nm === 'r_clavicle') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0, -0.06 + Math.sin(ph) * 0.016, 0]));
+            } else if (nm === 'l_clavicle') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0, 0.06 - Math.sin(ph) * 0.016, 0]));
+            } else if (nm === 'r_upperarm') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0.06 + Math.sin(ph) * 0.022, -0.22, -0.08]));
+            } else if (nm === 'l_upperarm') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.06 - Math.sin(ph) * 0.022, 0.22, 0.08]));
+            } else if (nm === 'r_forearm') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.46 + Math.sin(ph) * 0.028, -0.06, 0.18]));
+            } else if (nm === 'l_forearm') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.34 - Math.sin(ph) * 0.024, 0.06, -0.16]));
+            } else if (nm === 'r_hand') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0.08 + Math.sin(ph) * 0.015, 0, 0]));
+            } else if (nm === 'l_hand') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0.05 - Math.sin(ph) * 0.015, 0, 0]));
+            } else if (/^r_(index|middle|ring|pinky)[123]$/.test(nm)) {
+              waitTracks.push(buildWaitQuatTrack(idx, null, -0.82));
+            } else if (/^r_thumb[123]$/.test(nm)) {
+              waitTracks.push(buildWaitQuatTrack(idx, null, -0.42));
+            } else if (/^l_(index|middle|ring|pinky)[123]$/.test(nm)) {
+              waitTracks.push(buildWaitQuatTrack(idx, null, 0.56));
+            } else if (/^l_thumb[123]$/.test(nm)) {
+              waitTracks.push(buildWaitQuatTrack(idx, null, 0.32));
+            } else if (nm === 'r_thigh') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.05 - Math.sin(ph) * 0.012, 0.04, 0]));
+            } else if (nm === 'l_thigh') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.05 - Math.sin(ph) * 0.012, -0.04, 0]));
+            } else if (nm === 'r_calf' || nm === 'l_calf') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [0.09 + Math.sin(ph) * 0.020, 0, 0]));
+            } else if (nm === 'r_foot' || nm === 'l_foot') {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.04 - Math.sin(ph) * 0.008, 0, 0]));
+            } else if (nm.includes('frontlegskirt')) {
+              waitTracks.push(buildWaitQuatTrack(idx, (ph) => [-0.04 + Math.sin(ph) * 0.038, 0, Math.cos(ph) * 0.024]));
+            } else {
+              waitTracks.push(buildWaitQuatTrack(idx, null, 0));
+            }
+          });
+          clips.wait = new THREE.AnimationClip('wait', waitDur, waitTracks);
+        }
+
+        if (clips.wait && (!clips.walk || clips.walk.tracks.length < 15)) {
           if (hasThighs) {
             const parentOf = new Int32Array(nodesList.length).fill(-1);
             nodesList.forEach((n, pIdx) => {
@@ -3285,8 +3500,8 @@ export class OpenWorld3DEngine {
             const numFrames = 25;
             const walkDur = 0.92;
             const worldX = new THREE.Vector3(1, 0, 0);
-            const worldY = new THREE.Vector3(0, 1, 0);
-            const worldZ = new THREE.Vector3(0, 0, 1);
+            const worldY = isYUp ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
+            const worldZ = isYUp ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
 
             const buildWorldMultiAxisQuatTrack = (nodeIdx, dur, fnXYZ) => {
               const invWorld = worldQuats[nodeIdx].clone().invert();
@@ -3455,9 +3670,37 @@ export class OpenWorld3DEngine {
               } else if (nm.includes('backlegskirt')) {
                 customWalkTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, walkDur, (ph) => [Math.abs(Math.sin(ph)) * 0.26 + 0.06, 0, 0]));
                 customRunTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, runDur, (ph) => [Math.abs(Math.sin(ph)) * 0.38 + 0.10, 0, 0]));
-              } else if (nm === 'spine' || nm === 'bip01 spine' || nm === 'bip001 spine' || nm === 'spine1' || nm === 'bip01 spine1') {
-                const isSpine1 = nm.includes('1');
-                const wMult = isSpine1 ? 0.65 : 1.0;
+              } else if (nm === 'pelvis' && isYUp && n.translation) {
+                const [bx, by, bz] = n.translation;
+                const buildPelvisPosTrack = (dur, fnY) => {
+                  const times = new Float32Array(numFrames);
+                  const vals = new Float32Array(numFrames * 3);
+                  for (let f = 0; f < numFrames; f++) {
+                    const u = f / (numFrames - 1);
+                    times[f] = u * dur;
+                    vals[f * 3] = bx;
+                    vals[f * 3 + 1] = by + fnY(u * Math.PI * 2.0, u);
+                    vals[f * 3 + 2] = bz;
+                  }
+                  return new THREE.VectorKeyframeTrack(`bone_${idx}.position`, times, vals);
+                };
+                const posKey = `bone_${idx}.position`;
+                customWalkTracks.set(posKey, buildPelvisPosTrack(walkDur, (ph) => -0.018 + Math.abs(Math.sin(ph)) * 0.032));
+                customRunTracks.set(posKey, buildPelvisPosTrack(runDur, (ph) => -0.032 + Math.abs(Math.sin(ph)) * 0.054));
+                customJumpTracks.set(posKey, buildPelvisPosTrack(jumpDur, (ph, u) => Math.sin(u * Math.PI) * 0.08));
+                customAttack5Tracks.set(posKey, buildPelvisPosTrack(atk5Dur, (ph, u) => (u < 0.32 ? 0.03 : -0.04 * Math.sin(((u - 0.32) / 0.68) * Math.PI))));
+                customAttack6Tracks.set(posKey, buildPelvisPosTrack(atk6Dur, (ph, u) => (u < 0.26 ? 0.04 : -0.05 * Math.sin(((u - 0.26) / 0.74) * Math.PI))));
+              } else if (
+                nm === 'spine' ||
+                nm === 'bip01 spine' ||
+                nm === 'bip001 spine' ||
+                nm === 'spine1' ||
+                nm === 'bip01 spine1' ||
+                nm === 'spine2' ||
+                nm === 'spine3'
+              ) {
+                const isUpper = nm.includes('1') || nm.includes('2') || nm.includes('3');
+                const wMult = nm.includes('3') ? 0.42 : nm.includes('2') ? 0.52 : isUpper ? 0.65 : 1.0;
                 customWalkTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, walkDur, (ph) => [0.03 * wMult, 0, Math.sin(ph) * 0.075 * wMult]));
                 customRunTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, runDur, (ph) => [0.11 * wMult + Math.abs(Math.cos(ph)) * 0.03, 0, Math.sin(ph) * 0.11 * wMult]));
                 customMountIdleTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, mountIdleDur, (ph) => [Math.sin(ph) * 0.025 * wMult, 0, 0]));
@@ -3604,11 +3847,35 @@ export class OpenWorld3DEngine {
                   const strike = u >= 0.26 ? Math.sin(((u - 0.26) / 0.74) * Math.PI) : 0;
                   return [-0.38 * windup + 0.44 * strike, 0, -0.24 * windup + 0.48 * strike];
                 }));
+                customWalkTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, walkDur, (ph) => [-Math.sin(ph) * 0.16 - 0.08, 0, 0]));
+                customRunTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, runDur, (ph) => [-Math.sin(ph) * 0.28 - 0.18, 0, 0]));
+                customJumpTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, jumpDur, (ph) => [-0.24 - Math.sin(ph * 0.5) * 0.14, 0, 0]));
                 customMountAttackTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, mountAtkDur, (ph, u) => {
                   const sw = Math.sin(u * Math.PI);
                   const sweep = 1.0 - Math.pow(1.0 - u, 2.2);
                   return [(-0.20 + sweep * 0.44) * sw, 0, (-0.16 + sweep * 0.38) * sw];
                 }));
+              } else if (nm.includes('l_forearm') || nm.includes('l forearm')) {
+                customWalkTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, walkDur, (ph) => [Math.sin(ph) * 0.18 - 0.10, 0, 0]));
+                customRunTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, runDur, (ph) => [Math.sin(ph) * 0.32 - 0.22, 0, 0]));
+                customJumpTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, jumpDur, (ph) => [-0.28 - Math.sin(ph * 0.5) * 0.16, 0, 0]));
+                customAttack1Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk1Dur, (ph, u) => [-0.18 * Math.sin(u * Math.PI), 0, 0]));
+                customAttack2Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk2Dur, (ph, u) => [-0.22 * Math.sin(u * Math.PI), 0, 0]));
+                customAttack5Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk5Dur, (ph, u) => [-0.26 * Math.sin(u * Math.PI), 0, 0]));
+                customAttack6Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk6Dur, (ph, u) => [-0.30 * Math.sin(u * Math.PI), 0, 0]));
+              } else if (nm === 'r_hand' || nm === 'bip01 r hand') {
+                customAttack1Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk1Dur, (ph, u) => [(-0.18 + 0.42 * u) * Math.sin(u * Math.PI), 0, 0]));
+                customAttack2Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk2Dur, (ph, u) => [(-0.16 + 0.38 * u) * Math.sin(u * Math.PI), 0, 0]));
+                customAttack3Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk3Dur, (ph, u) => [(0.18 - 0.40 * u) * Math.sin(u * Math.PI), 0, 0]));
+                customAttack4Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk4Dur, (ph, u) => [(-0.20 + 0.44 * u) * Math.sin(u * Math.PI), 0, 0]));
+                customAttack5Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk5Dur, (ph, u) => [(u < 0.32 ? -0.25 : 0.38) * Math.sin(u * Math.PI), 0, 0]));
+                customAttack6Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk6Dur, (ph, u) => [(u < 0.26 ? -0.28 : 0.42) * Math.sin(u * Math.PI), 0, 0]));
+              } else if (nm === 'neck' || nm === 'head' || nm === 'bip01 neck' || nm === 'bip01 head') {
+                const hMult = nm.includes('head') ? 0.55 : 0.45;
+                customWalkTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, walkDur, (ph) => [-0.02, 0, -Math.sin(ph) * 0.08 * hMult]));
+                customRunTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, runDur, (ph) => [-0.12, 0, -Math.sin(ph) * 0.12 * hMult]));
+                customAttack1Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk1Dur, (ph, u) => [0, 0, (0.28 - 0.56 * u) * Math.sin(u * Math.PI) * hMult]));
+                customAttack2Tracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, atk2Dur, (ph, u) => [0, 0, (-0.28 + 0.56 * u) * Math.sin(u * Math.PI) * hMult]));
               }
             });
 
@@ -3625,6 +3892,161 @@ export class OpenWorld3DEngine {
             if (!clips.attack5) clips.attack5 = finalizeClipFromCustomTracks('attack5', atk5Dur, customAttack5Tracks);
             if (!clips.attack6) clips.attack6 = finalizeClipFromCustomTracks('attack6', atk6Dur, customAttack6Tracks);
             if (!clips.attack) clips.attack = clips.attack1;
+
+            if (!clips.dead) {
+              const deadDur = 0.85;
+              const customDeadTracks = new Map();
+              nodesList.forEach((n, idx) => {
+                const nm = (n.name || '').toLowerCase();
+                const trKey = `bone_${idx}.quaternion`;
+                if (nm === 'pelvis' && isYUp && n.translation) {
+                  const [bx, by, bz] = n.translation;
+                  const times = new Float32Array(numFrames);
+                  const vals = new Float32Array(numFrames * 3);
+                  for (let f = 0; f < numFrames; f++) {
+                    const u = f / (numFrames - 1);
+                    const ease = Math.min(1.0, Math.pow(u, 1.4));
+                    times[f] = u * deadDur;
+                    vals[f * 3] = bx;
+                    vals[f * 3 + 1] = by * (1.0 - ease * 0.78);
+                    vals[f * 3 + 2] = bz - ease * 0.35;
+                  }
+                  customDeadTracks.set(`bone_${idx}.position`, new THREE.VectorKeyframeTrack(`bone_${idx}.position`, times, vals));
+                  customDeadTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, deadDur, (ph, u) => [-Math.min(1.0, u * 1.25) * 1.38, 0, 0]));
+                } else if (nm.includes('thigh')) {
+                  customDeadTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, deadDur, (ph, u) => [-Math.sin(u * Math.PI) * 0.45, 0, 0]));
+                } else if (nm.includes('calf')) {
+                  customDeadTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, deadDur, (ph, u) => [Math.sin(u * Math.PI) * 0.65, 0, 0]));
+                } else if (nm.includes('upperarm')) {
+                  const sign = nm.startsWith('r_') ? 1 : -1;
+                  customDeadTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, deadDur, (ph, u) => [-0.35 * u, sign * 0.45 * u, 0]));
+                }
+              });
+              clips.dead = finalizeClipFromCustomTracks('dead', deadDur, customDeadTracks);
+            }
+
+            // 5. Echte Metin2-Fertigkeits-Skelettanimationen (Buff, Wirbel, Dreiwege-Combo, Durchschlag/Stampfer, Magie-Wurf)
+            if (!clips.skill_buff) {
+              const buffDur = 1.25;
+              const spinDur = 1.15;
+              const comboDur = 1.18;
+              const slamDur = 1.22;
+              const castDur = 1.10;
+              const buffTracks = new Map();
+              const spinTracks = new Map();
+              const comboTracks = new Map();
+              const slamTracks = new Map();
+              const castTracks = new Map();
+              nodesList.forEach((n, idx) => {
+                const nm = (n.name || '').toLowerCase();
+                const trKey = `bone_${idx}.quaternion`;
+                if (nm === 'pelvis' && isYUp && n.translation) {
+                  const [bx, by, bz] = n.translation;
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => {
+                    const arch = Math.sin(u * Math.PI);
+                    return [-0.12 * arch, 0, Math.sin(u * Math.PI * 2.0) * 0.14];
+                  }));
+                  spinTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, spinDur, (ph, u) => {
+                    const easeU = u * u * (3.0 - 2.0 * u);
+                    return [0.16 * Math.sin(u * Math.PI), 0, easeU * Math.PI * 2.0];
+                  }));
+                  comboTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, comboDur, (ph, u) => {
+                    return [0.18 * Math.sin(u * Math.PI), 0, Math.sin(u * Math.PI * 3.0) * 0.52];
+                  }));
+                  const slamTimes = new Float32Array(numFrames);
+                  const slamVals = new Float32Array(numFrames * 3);
+                  for (let f = 0; f < numFrames; f++) {
+                    const u = f / (numFrames - 1);
+                    slamTimes[f] = u * slamDur;
+                    const leap = u < 0.62 ? Math.sin((u / 0.62) * Math.PI) * 0.28 : -Math.sin(((u - 0.62) / 0.38) * Math.PI) * 0.08;
+                    slamVals[f * 3] = bx;
+                    slamVals[f * 3 + 1] = by + leap;
+                    slamVals[f * 3 + 2] = bz + Math.sin(u * Math.PI) * 0.18;
+                  }
+                  slamTracks.set(`bone_${idx}.position`, new THREE.VectorKeyframeTrack(`bone_${idx}.position`, slamTimes, slamVals));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => {
+                    const wind = u < 0.42 ? -Math.sin((u / 0.42) * (Math.PI * 0.5)) * 0.28 : Math.sin(((u - 0.42) / 0.58) * Math.PI) * 0.38;
+                    return [wind, 0, (u < 0.42 ? 0.35 : -0.45) * Math.sin(u * Math.PI)];
+                  }));
+                  castTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, castDur, (ph, u) => {
+                    return [(u < 0.35 ? -0.18 : 0.24) * Math.sin(u * Math.PI), 0, (u < 0.35 ? 0.32 : -0.38) * Math.sin(u * Math.PI)];
+                  }));
+                } else if (nm === 'spine01' || nm === 'spine02' || nm === 'spine03') {
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => [-0.14 * Math.sin(u * Math.PI), 0, 0]));
+                  spinTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, spinDur, (ph, u) => [0.12 * Math.sin(u * Math.PI), 0, Math.sin(u * Math.PI * 2.0) * 0.18]));
+                  comboTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, comboDur, (ph, u) => [0.10 * Math.sin(u * Math.PI), 0, Math.sin(u * Math.PI * 3.0) * 0.26]));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => [(u < 0.42 ? -0.18 : 0.28) * Math.sin(u * Math.PI), 0, 0]));
+                  castTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, castDur, (ph, u) => [(u < 0.35 ? -0.12 : 0.18) * Math.sin(u * Math.PI), 0, 0]));
+                } else if (nm === 'r_upperarm') {
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => {
+                    const raise = Math.sin(Math.pow(u, 0.75) * Math.PI);
+                    return [-2.35 * raise, -0.25 * raise, -0.18 * raise];
+                  }));
+                  spinTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, spinDur, (ph, u) => {
+                    const s = Math.sin(u * Math.PI);
+                    return [-1.35 * s, -0.78 * s, (0.65 - 1.35 * u) * s];
+                  }));
+                  comboTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, comboDur, (ph, u) => {
+                    const s = Math.sin(u * Math.PI);
+                    const w = Math.sin(u * Math.PI * 3.0);
+                    return [-1.28 * s + 0.38 * w, -0.45 * s, 0.85 * w];
+                  }));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => {
+                    const up = u < 0.45 ? Math.sin((u / 0.45) * (Math.PI * 0.5)) : 1.0 - ((u - 0.45) / 0.55);
+                    const down = u >= 0.45 ? Math.sin(((u - 0.45) / 0.55) * Math.PI) : 0.0;
+                    return [-2.45 * up - 0.45 * down, -0.32 * (up + down), 0.55 * down];
+                  }));
+                  castTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, castDur, (ph, u) => {
+                    const push = Math.sin(Math.pow(u, 0.7) * Math.PI);
+                    return [-1.55 * push, -0.22 * push, (u < 0.35 ? -0.45 : 0.52) * push];
+                  }));
+                } else if (nm === 'l_upperarm') {
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => {
+                    const raise = Math.sin(u * Math.PI);
+                    return [-1.25 * raise, 0.42 * raise, 0.28 * raise];
+                  }));
+                  spinTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, spinDur, (ph, u) => {
+                    const s = Math.sin(u * Math.PI);
+                    return [-1.15 * s, 0.68 * s, 0.35 * s];
+                  }));
+                  comboTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, comboDur, (ph, u) => {
+                    const s = Math.sin(u * Math.PI);
+                    const w = -Math.sin(u * Math.PI * 3.0);
+                    return [-1.05 * s + 0.32 * w, 0.42 * s, 0.65 * w];
+                  }));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => {
+                    const s = Math.sin(u * Math.PI);
+                    return [-1.35 * s, 0.45 * s, 0.25 * s];
+                  }));
+                  castTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, castDur, (ph, u) => {
+                    const push = Math.sin(u * Math.PI);
+                    return [-1.45 * push, 0.32 * push, -0.35 * push];
+                  }));
+                } else if (nm === 'r_forearm') {
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => [-0.28 * Math.sin(u * Math.PI), 0, 0]));
+                  spinTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, spinDur, (ph, u) => [0.22 * Math.sin(u * Math.PI), 0, 0]));
+                  comboTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, comboDur, (ph, u) => [0.28 * Math.sin(u * Math.PI * 3.0), 0, 0]));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => [(u < 0.45 ? -0.45 : 0.38) * Math.sin(u * Math.PI), 0, 0]));
+                  castTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, castDur, (ph, u) => [0.25 * Math.sin(u * Math.PI), 0, 0]));
+                } else if (nm.includes('thigh')) {
+                  const isR = nm.startsWith('r_');
+                  const sgn = isR ? 1 : -1;
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => [-0.24 * Math.sin(u * Math.PI), sgn * 0.14 * Math.sin(u * Math.PI), 0]));
+                  spinTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, spinDur, (ph, u) => [sgn * 0.28 * Math.sin(u * Math.PI * 2.0), sgn * 0.12, 0]));
+                  comboTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, comboDur, (ph, u) => [sgn * 0.32 * Math.sin(u * Math.PI * 3.0), 0, 0]));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => [-0.42 * Math.sin(u * Math.PI), sgn * 0.12, 0]));
+                  castTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, castDur, (ph, u) => [sgn * -0.26 * Math.sin(u * Math.PI), 0, 0]));
+                } else if (nm.includes('calf')) {
+                  buffTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, buffDur, (ph, u) => [0.32 * Math.sin(u * Math.PI), 0, 0]));
+                  slamTracks.set(trKey, buildWorldMultiAxisQuatTrack(idx, slamDur, (ph, u) => [0.55 * Math.sin(u * Math.PI), 0, 0]));
+                }
+              });
+              clips.skill_buff = finalizeClipFromCustomTracks('skill_buff', buffDur, buffTracks);
+              clips.skill_spin = finalizeClipFromCustomTracks('skill_spin', spinDur, spinTracks);
+              clips.skill_combo = finalizeClipFromCustomTracks('skill_combo', comboDur, comboTracks);
+              clips.skill_slam = finalizeClipFromCustomTracks('skill_slam', slamDur, slamTracks);
+              clips.skill_cast = finalizeClipFromCustomTracks('skill_cast', castDur, castTracks);
+            }
           }
         }
 
@@ -3641,6 +4063,7 @@ export class OpenWorld3DEngine {
           centerX,
           centerY,
           isMultiShardMonolith,
+          isYUp,
         };
         if (!this._glbResolvedTemplates) this._glbResolvedTemplates = new Map();
         this._glbResolvedTemplates.set(url, resolvedTpl);
@@ -3698,7 +4121,7 @@ export class OpenWorld3DEngine {
     };
     if (!this._sharedGlbMaterialCache) this._sharedGlbMaterialCache = new Map();
     const getOrCreateSharedMat = (tUrl) => {
-      const mKey = `${tUrl || 'notex'}|${opts.color || 0xffffff}|${opts.roughness ?? 0.72}|${opts.metalness ?? 0.08}|${opts.alphaTest || 0}|${opts.emissive || 0}|${opts.emissiveIntensity ?? 0}|${weatherOpts.snowStrength}|${weatherOpts.wetStrength}`;
+      const mKey = `${tUrl || 'notex'}|${opts.normalMap || ''}|${opts.color || 0xffffff}|${opts.roughness ?? 0.72}|${opts.metalness ?? 0.08}|${opts.alphaTest || 0}|${opts.emissive || 0}|${opts.emissiveIntensity ?? 0}|${weatherOpts.snowStrength}|${weatherOpts.wetStrength}`;
       let cachedMat = this._sharedGlbMaterialCache.get(mKey);
       if (cachedMat) return cachedMat;
       const tex = tUrl ? this.loadModelTexture(tUrl) : null;
@@ -3708,6 +4131,14 @@ export class OpenWorld3DEngine {
         metalness: opts.metalness ?? 0.08,
         side: THREE.DoubleSide,
       };
+      if (opts.normalMap) {
+        const nTex = this.loadModelTexture(opts.normalMap);
+        if (nTex) {
+          nTex.colorSpace = THREE.NoColorSpace;
+          matCfg.normalMap = nTex;
+          matCfg.normalScale = new THREE.Vector2(0.85, 0.85);
+        }
+      }
       if (tex) {
         matCfg.map = tex;
         // Pre-bind emissiveMap at creation time (with 0 intensity) so hit-flinch & rift-corruption never trigger a mid-walk WebGL shader recompile!
@@ -3812,7 +4243,7 @@ export class OpenWorld3DEngine {
         );
       } else {
         const scaleFactor = (targetHeight || 1.8) / tpl.heightCm;
-        rigGroup.rotation.x = -Math.PI / 2;
+        rigGroup.rotation.x = tpl.isYUp ? 0 : -Math.PI / 2;
         rigGroup.scale.setScalar(scaleFactor);
         rigGroup.position.y = -tpl.minZ * scaleFactor;
       }
@@ -3829,7 +4260,7 @@ export class OpenWorld3DEngine {
 
       const baseScaleFactor = rigGroup.scale.x || 1.0;
       const baseRigPosY = rigGroup.position.y || 0.0;
-      const baseRigRotX = rigGroup.rotation.x || -Math.PI / 2;
+      const baseRigRotX = tpl.isYUp ? 0 : (rigGroup.rotation.x || -Math.PI / 2);
 
       const actorCtrl = {
         container: parentGroup,
@@ -3857,12 +4288,16 @@ export class OpenWorld3DEngine {
           if (!this.clips[targetKey]) {
             if (targetKey === 'dead' && this.clips.die) targetKey = 'die';
             else if (targetKey === 'dead' && this.clips.dead1) targetKey = 'dead1';
+            else if (targetKey.startsWith('skill_') && this.clips.skill) targetKey = 'skill';
+            else if (targetKey.startsWith('skill_') && this.clips.attack6) targetKey = 'attack6';
+            else if (targetKey.startsWith('skill_') && this.clips.attack1) targetKey = 'attack1';
+            else if (targetKey.startsWith('skill_') && this.clips.attack) targetKey = 'attack';
             else if (targetKey === 'skill' && this.clips.attack6) targetKey = 'attack6';
             else if (targetKey === 'skill' && this.clips.attack1) targetKey = 'attack1';
             else if (targetKey === 'skill' && this.clips.attack) targetKey = 'attack';
-            else if (targetKey === 'attack6' && this.clips.skill) targetKey = 'skill';
+            else if ((targetKey === 'attack6' || targetKey === 'attack7') && this.clips.skill) targetKey = 'skill';
             else if (
-              (targetKey === 'attack2' || targetKey === 'attack4' || targetKey === 'attack6') &&
+              (targetKey === 'attack2' || targetKey === 'attack4' || targetKey === 'attack6' || targetKey === 'attack7') &&
               (this.clips.attack1 || this.clips.attack)
             ) {
               targetKey = this.clips.attack1 ? 'attack1' : 'attack';
@@ -3888,12 +4323,16 @@ export class OpenWorld3DEngine {
             targetKey === 'attack4' ||
             targetKey === 'attack5' ||
             targetKey === 'attack6' ||
+            targetKey === 'attack7' ||
             targetKey === 'mount_attack' ||
+            targetKey === 'mount_attack2' ||
             targetKey === 'skill' ||
+            targetKey.startsWith('skill_') ||
             targetKey === 'knockdown' ||
             targetKey === 'standup';
           const isOneShot =
             loopOnce ||
+            targetKey.startsWith('skill_') ||
             targetKey === 'dead' ||
             targetKey === 'die' ||
             targetKey === 'dead1' ||
@@ -10353,9 +10792,13 @@ export class OpenWorld3DEngine {
 
         const tierDensity = this._fxTier === 1 ? 0.65 : 1.0;
         const riftBoost = riftF > 0.05 ? 1.0 + riftF * 0.45 : 1.0;
+        // Nachts: Tag-Pollen/Staub komplett ausblenden, damit keine riesigen kamera-gekoppelten gelben Punkte entstehen (Fokus allein auf echte Welt-Glühwürmchen!)
+        const nightParticleMult = isNightGlow
+          ? (riftF > 0.08 || weather === 'fog' || isSnowWeather(weather) ? 0.16 : 0.0)
+          : (isTwilight ? 0.32 : 1.0);
         const totalFrac = Math.max(
           0.0,
-          Math.min(1.0, seasonDensity * weatherDensity * windDensityFactor * tierDensity * riftBoost)
+          Math.min(1.0, seasonDensity * weatherDensity * windDensityFactor * tierDensity * riftBoost * nightParticleMult)
         );
         const totalParticles = this._worldParticleData.length;
         const activeCount = Math.floor(totalParticles * totalFrac);
@@ -10462,9 +10905,10 @@ export class OpenWorld3DEngine {
             const lightningBoost = (this._lightningFlashTimer || 0) > 0 ? 0.25 : 0.0;
 
             this.worldParticles.material.size = baseTierSize * seasonSizeMult * weatherSizeMult;
+            const nightOpMult = isNightGlow ? 0.25 : 1.0;
             this.worldParticles.material.opacity = Math.min(
               0.96,
-              (baseTierOp * weatherOpacityMult + Math.sin(elapsed * pulseFreq) * pulseAmp) + lightningBoost
+              ((baseTierOp * weatherOpacityMult * nightOpMult) + Math.sin(elapsed * pulseFreq) * (pulseAmp * nightOpMult)) + lightningBoost
             );
           }
         }
@@ -10891,6 +11335,14 @@ export class OpenWorld3DEngine {
     this._navSyncState = null;
     this._cachedTownsHouseMapId = null;
     this._cachedTownsHouseMap = null;
+    this._nearbyFireflyCircles = null;
+    this._nearbyFireflyBoxes = null;
+    this._nearbyFireflySegs = null;
+    this._fireflyLightSlots = null;
+    this._fireflyObsRefreshPos = null;
+    if (typeof this._clearFireflyShaderLights === 'function') {
+      this._clearFireflyShaderLights();
+    }
 
     const theme = this.getBiomeTheme(this.currentMapId);
     const isMorgenwacht = this.currentMapId === 'morgenwacht';
@@ -11252,6 +11704,8 @@ export class OpenWorld3DEngine {
 
     // 6. Schwebende Äther-Partikel in der Welt
     this.buildWorldAtmosphereParticles(theme);
+    // 6B. Ambiente Tierwelt: Glühwürmchen bei Nacht & Singvögel bei Tag
+    this.buildAmbientWildlife();
 
     // 7. Jahreszeiten-, Wetter- & Lichteffekte auf die geladene Region anwenden
     this.applySnowRegionForMap(this.currentMapId);
@@ -19753,6 +20207,8 @@ export class OpenWorld3DEngine {
         uniform float uRiftAwakened;
         uniform vec4 uMonolithPosRad[4];
         uniform vec4 uMonolithColInt[4];
+        uniform vec4 uFireflyPosRad[8];
+        uniform vec4 uFireflyColInt[8];
         uniform float uGroundShadowStrength;
         uniform float uGrassShadowStrength;
         uniform sampler2D uGrassTexAutumn;
@@ -19856,6 +20312,23 @@ export class OpenWorld3DEngine {
                   vec3 gTint = (gLum * 1.55 + 0.08) * mCI.rgb;
                   vec3 monoLitG = outgoingLight * mix(vec3(1.0), mCI.rgb * 1.35, clamp(mWeightG * bladeGlow * 1.45, 0.0, 0.85)) + gTint * (mWeightG * bladeGlow * 1.08);
                   outgoingLight = max(outgoingLight * 0.90, monoLitG);
+                }
+              }
+            }
+            for (int fIdx = 0; fIdx < 8; fIdx++) {
+              vec4 fPR = uFireflyPosRad[fIdx];
+              if (fPR.w > 0.05) {
+                vec3 toFG = fPR.xyz - vGrassWorldPos;
+                float dFG2 = dot(toFG, toFG);
+                float rFG2 = fPR.w * fPR.w;
+                if (dFG2 < rFG2) {
+                  float nDistFG = sqrt(dFG2) / fPR.w;
+                  float attenFG = (1.0 - nDistFG) * (1.0 - nDistFG) * smoothstep(1.0, 0.12, nDistFG);
+                  vec4 fCI = uFireflyColInt[fIdx];
+                  float bladeGlowF = mix(0.45, 1.28, smoothstep(0.05, 0.92, vBladeProg));
+                  float gLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                  vec3 gTintF = (gLumF * 1.55 + 0.10) * fCI.rgb;
+                  outgoingLight += gTintF * (attenFG * fCI.w * bladeGlowF);
                 }
               }
             }
@@ -20024,6 +20497,8 @@ export class OpenWorld3DEngine {
         uniform float uRiftAwakened;
         uniform vec4 uMonolithPosRad[4];
         uniform vec4 uMonolithColInt[4];
+        uniform vec4 uFireflyPosRad[8];
+        uniform vec4 uFireflyColInt[8];
         uniform float uGroundShadowStrength;
         uniform float uGrassShadowStrength;
         ` +
@@ -20115,6 +20590,23 @@ export class OpenWorld3DEngine {
                   vec3 gTint = (gLum * 1.55 + 0.08) * mCI.rgb;
                   vec3 monoLitG = outgoingLight * mix(vec3(1.0), mCI.rgb * 1.35, clamp(mWeightG * bladeGlow * 1.45, 0.0, 0.85)) + gTint * (mWeightG * bladeGlow * 1.08);
                   outgoingLight = max(outgoingLight * 0.90, monoLitG);
+                }
+              }
+            }
+            for (int fIdx = 0; fIdx < 8; fIdx++) {
+              vec4 fPR = uFireflyPosRad[fIdx];
+              if (fPR.w > 0.05) {
+                vec3 toFG = fPR.xyz - vGrassWorldPos;
+                float dFG2 = dot(toFG, toFG);
+                float rFG2 = fPR.w * fPR.w;
+                if (dFG2 < rFG2) {
+                  float nDistFG = sqrt(dFG2) / fPR.w;
+                  float attenFG = (1.0 - nDistFG) * (1.0 - nDistFG) * smoothstep(1.0, 0.12, nDistFG);
+                  vec4 fCI = uFireflyColInt[fIdx];
+                  float bladeGlowF = mix(0.45, 1.28, smoothstep(0.05, 0.92, vBladeProg));
+                  float gLumF = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+                  vec3 gTintF = (gLumF * 1.55 + 0.10) * fCI.rgb;
+                  outgoingLight += gTintF * (attenFG * fCI.w * bladeGlowF);
                 }
               }
             }
@@ -20975,6 +21467,718 @@ export class OpenWorld3DEngine {
     return promise;
   }
 
+  // ==========================================================================
+  // ORIGINALE METIN2 & L-SKILL (pc / pc2, Tiers 1..5) 3D-EFFEKTE & SOUNDS
+  // ==========================================================================
+  loadSkillTexture(fileName) {
+    if (!fileName) return null;
+    if (!this._skillTexCache) this._skillTexCache = new Map();
+    if (this._skillTexCache.has(fileName)) {
+      return this._skillTexCache.get(fileName);
+    }
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load(`./assets/effects/skills/tex/${fileName}`);
+    tex.flipY = false;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.userData = { isShared: true };
+    this._skillTexCache.set(fileName, tex);
+    return tex;
+  }
+
+  loadSkillMde(fileName) {
+    if (!fileName) return Promise.reject(new Error('No MDE fileName'));
+    if (!this._skillMdeCache) this._skillMdeCache = new Map();
+    if (this._skillMdeCache.has(fileName)) {
+      return this._skillMdeCache.get(fileName);
+    }
+    const scale = 0.0115;
+    const promise = fetch(`./assets/effects/skills/mde/${fileName}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${fileName}`);
+        return res.arrayBuffer();
+      })
+      .then((buffer) => {
+        const dv = new DataView(buffer);
+        const submeshCount = dv.getUint32(11, true);
+        const frameCount = dv.getUint32(15, true);
+        let pos = 19;
+        const submeshes = [];
+        for (let s = 0; s < submeshCount; s++) {
+          pos += 160; // 32B meshName + 128B texPath
+          const vCnt = dv.getUint32(pos, true);
+          const iCnt = dv.getUint32(pos + 4, true);
+          const tvCnt = dv.getUint32(pos + 8, true);
+          pos += 12;
+          const frames = [];
+          for (let f = 0; f < frameCount; f++) {
+            const vis = dv.getFloat32(pos, true);
+            pos += 4;
+            const vBase = pos;
+            pos += vCnt * 12;
+            const iBase = pos;
+            pos += iCnt * 4;
+            const tvBase = pos;
+            pos += tvCnt * 8;
+            const tiBase = pos;
+            pos += iCnt * 4;
+            const posArr = new Float32Array(iCnt * 3);
+            const uvArr = new Float32Array(iCnt * 2);
+            for (let k = 0; k < iCnt; k++) {
+              const vi = dv.getUint32(iBase + k * 4, true);
+              const ti = dv.getUint32(tiBase + k * 4, true);
+              const vx = dv.getFloat32(vBase + vi * 12, true);
+              const vy = dv.getFloat32(vBase + vi * 12 + 4, true);
+              const vz = dv.getFloat32(vBase + vi * 12 + 8, true);
+              posArr[k * 3] = vx * scale;
+              posArr[k * 3 + 1] = vz * scale;
+              posArr[k * 3 + 2] = -vy * scale;
+              uvArr[k * 2] = dv.getFloat32(tvBase + ti * 8, true);
+              uvArr[k * 2 + 1] = dv.getFloat32(tvBase + ti * 8 + 4, true);
+            }
+            frames.push({ vis, posArr, uvArr });
+          }
+          submeshes.push({ iCnt, frames });
+        }
+        return { submeshCount, frameCount, submeshes };
+      });
+    this._skillMdeCache.set(fileName, promise);
+    return promise;
+  }
+
+  playMetinSkillSound(soundUrl, worldX, worldZ) {
+    if (!soundUrl) return;
+    if (window.aeryndorAudio?.muted) return;
+    const dist = Math.hypot((worldX || 0) - (this.localPlayerPos?.x || 0), (worldZ || 0) - (this.localPlayerPos?.z || 0));
+    if (dist > 38.0) return;
+    const vol = Math.max(0.08, Math.min(0.68, (1.0 - dist / 38.0) * 0.58));
+    try {
+      const audio = new Audio(`./${soundUrl}`);
+      audio.volume = vol;
+      audio.play().catch(() => {});
+    } catch (_) {}
+  }
+
+  getActorMetinAttachWorldPos(actor, boneName, evPos, baseX, baseY, baseZ, rotY) {
+    let bx = baseX;
+    let by = baseY;
+    let bz = baseZ;
+    let attachedToLimb = false;
+    const bLower = String(boneName || '').toLowerCase();
+    if (actor?.root && bLower) {
+      if (!this._tmpMetinBoneVec) this._tmpMetinBoneVec = new THREE.Vector3();
+      if (!this._tmpMetinBoneQuat) this._tmpMetinBoneQuat = new THREE.Quaternion();
+      const glbAct = actor.heroGlbHolder?.userData?.glbActor;
+      if (bLower.includes('right') || bLower.includes('r hand') || bLower.includes('r_hand')) {
+        if (actor.weaponGroup) {
+          actor.root.updateMatrixWorld(true);
+          actor.weaponGroup.getWorldPosition(this._tmpMetinBoneVec);
+          actor.weaponGroup.getWorldQuaternion(this._tmpMetinBoneQuat);
+          // Entlang der Schwertklinge (+Z) auf Klingenmitte verschieben (geom.mse / geom_sword_making / palbang_sword)
+          const bladeMid = new THREE.Vector3(0, 0, 0.44).applyQuaternion(this._tmpMetinBoneQuat);
+          bx = this._tmpMetinBoneVec.x + bladeMid.x;
+          by = this._tmpMetinBoneVec.y + bladeMid.y;
+          bz = this._tmpMetinBoneVec.z + bladeMid.z;
+          attachedToLimb = true;
+        } else if (glbAct?.rightHandBone) {
+          actor.root.updateMatrixWorld(true);
+          glbAct.rightHandBone.getWorldPosition(this._tmpMetinBoneVec);
+          bx = this._tmpMetinBoneVec.x;
+          by = this._tmpMetinBoneVec.y;
+          bz = this._tmpMetinBoneVec.z;
+          attachedToLimb = true;
+        }
+      } else if (bLower.includes('left') || bLower.includes('l hand') || bLower.includes('l_hand')) {
+        if (glbAct?.leftHandBone) {
+          actor.root.updateMatrixWorld(true);
+          glbAct.leftHandBone.getWorldPosition(this._tmpMetinBoneVec);
+          bx = this._tmpMetinBoneVec.x;
+          by = this._tmpMetinBoneVec.y;
+          bz = this._tmpMetinBoneVec.z;
+          attachedToLimb = true;
+        }
+      } else if (bLower.includes('head')) {
+        if (glbAct?.headBone) {
+          actor.root.updateMatrixWorld(true);
+          glbAct.headBone.getWorldPosition(this._tmpMetinBoneVec);
+          bx = this._tmpMetinBoneVec.x;
+          by = this._tmpMetinBoneVec.y + 0.22;
+          bz = this._tmpMetinBoneVec.z;
+          attachedToLimb = true;
+        } else {
+          by = baseY + 1.75;
+          attachedToLimb = true;
+        }
+      }
+    }
+    const lx = ((evPos && evPos[0]) || 0) * 0.01;
+    const ly = ((evPos && evPos[2]) || 0) * 0.01;
+    const lz = -((evPos && evPos[1]) || 0) * 0.01;
+    const cosR = Math.cos(rotY || 0);
+    const sinR = Math.sin(rotY || 0);
+    const wx = lx * cosR + lz * sinR;
+    const wz = -lx * sinR + lz * cosR;
+    return {
+      x: bx + wx,
+      y: by + ly,
+      z: bz + wz,
+      offsetX: wx,
+      offsetY: ly,
+      offsetZ: wz,
+      attachedToLimb,
+    };
+  }
+
+  spawnMetinMseEffect(effectDef, originX, originY, originZ, rotY = 0, actor = null, opts = {}) {
+    if (!effectDef || !this.scene) return;
+    const distSq =
+      Math.pow((originX || 0) - (this.localPlayerPos?.x || 0), 2) +
+      Math.pow((originZ || 0) - (this.localPlayerPos?.z || 0), 2);
+    if (distSq > 3600) return;
+    const isLSkill = Boolean(opts.isLSkill);
+    const tier = Number(opts.tier || 1);
+    const scaleMult = opts.scaleMult || (isLSkill ? 1.24 : tier >= 4 ? 1.12 : tier >= 3 ? 1.05 : 1.0);
+    const followBone = opts.followBone || '';
+    const attachedToLimb = Boolean(opts.attachedToLimb);
+    const cosR = Math.cos(rotY || 0);
+    const sinR = Math.sin(rotY || 0);
+
+    // 1. 3D-.mde-Effektmeshes spawnen (exakt in Blickrichtung rotiert!)
+    if (Array.isArray(effectDef.meshes)) {
+      for (const mCfg of effectDef.meshes) {
+        if (!mCfg.mde) continue;
+        this.loadSkillMde(mCfg.mde)
+          .then((mdeData) => {
+            if (this.disposed || !mdeData || !mdeData.submeshes?.length) return;
+            const mdeGroup = new THREE.Group();
+            const ox = (mCfg.pos?.[0] || 0) * 0.01 * scaleMult;
+            const oy = (mCfg.pos?.[2] || 0) * 0.01 * scaleMult;
+            const oz = -(mCfg.pos?.[1] || 0) * 0.01 * scaleMult;
+            const wx = ox * cosR + oz * sinR;
+            const wz = -ox * sinR + oz * cosR;
+            const baseLift = attachedToLimb ? 0.0 : 0.06;
+            mdeGroup.position.set(originX + wx, originY + baseLift + oy, originZ + wz);
+            mdeGroup.rotation.y = rotY;
+            mdeGroup.scale.setScalar(scaleMult);
+            const submeshNodes = [];
+            const [cr, cg, cb] = mCfg.color || [1, 1, 1];
+            const mColor = new THREE.Color(
+              isLSkill ? Math.min(1, cr * 1.12 + 0.14) : cr,
+              isLSkill ? Math.min(1, cg * 0.96 + 0.06) : cg,
+              isLSkill ? Math.min(1, cb * 1.20 + 0.20) : cb
+            );
+            mdeData.submeshes.forEach((sub, sIdx) => {
+              if (!sub.frames?.length || !sub.iCnt) return;
+              const f0 = sub.frames[0];
+              const geo = new THREE.BufferGeometry();
+              geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(f0.posArr), 3));
+              geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(f0.uvArr), 2));
+              const texName = mCfg.submeshes?.[sIdx]?.tex || null;
+              const tex = texName ? this.loadSkillTexture(texName) : this.getSoftShockwaveRingTexture();
+              const mat = new THREE.MeshBasicMaterial({
+                map: tex,
+                color: mColor,
+                transparent: true,
+                opacity: Math.max(0.18, Math.min(0.96, f0.vis || 0.92)),
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+              });
+              const mesh = new THREE.Mesh(geo, mat);
+              mesh.frustumCulled = false;
+              mdeGroup.add(mesh);
+              submeshNodes.push({ mesh, geo, mat, sub });
+            });
+            this.scene.add(mdeGroup);
+            const fDelay = mCfg.frameDelay || 0.025;
+            const totalDur = Math.max(0.45, Math.min(2.5, mdeData.frameCount * fDelay * (mCfg.loops || 1)));
+            this.vfxList.push({
+              type: 'metin_mde',
+              mesh: mdeGroup,
+              submeshNodes,
+              frameCount: mdeData.frameCount,
+              frameDelay: fDelay,
+              age: 0,
+              maxAge: totalDur,
+              followActor: opts.follow ? actor : null,
+              followBone,
+              offsetX: (opts.offsetX || 0) + wx,
+              offsetY: (opts.offsetY || 0) + baseLift + oy,
+              offsetZ: (opts.offsetZ || 0) + wz,
+            });
+          })
+          .catch(() => {});
+      }
+    }
+
+    // 2. Originalgetreue Metin2 EffectLib .mse-Partikelschichten (BILLBOARD_TYPE_LIE=3, Y=2, NONE=0, ALL=1)
+    if (Array.isArray(effectDef.particles) && effectDef.particles.length > 0) {
+      const pGroup = new THREE.Group();
+      const groupLift = attachedToLimb ? 0.0 : 0.03;
+      pGroup.position.set(originX, originY + groupLift, originZ);
+      pGroup.rotation.y = rotY;
+      const groundRings = [];
+      const verticalPlanes = [];
+      const sprites = [];
+      const fileLower = (effectDef.file || '').toLowerCase();
+      let maxLayerEnd = isLSkill ? 1.15 : 0.95;
+
+      if (!this._sharedUnitPlaneGeo) {
+        this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
+        this._sharedUnitPlaneGeo.userData = { isShared: true };
+      }
+
+      for (const pCfg of effectDef.particles) {
+        if (!pCfg.tex) continue;
+        const tex = this.loadSkillTexture(pCfg.tex);
+        if (!tex) continue;
+        const [r0, g0, b0] = pCfg.color || [1, 1, 1];
+        const [r1, g1, b1] = pCfg.c1 || pCfg.color || [r0, g0, b0];
+        const cStart = new THREE.Color(r0, g0, b0);
+        const cEnd = new THREE.Color(r1, g1, b1);
+        const peakAlpha = Math.max(0.22, Math.min(1.0, pCfg.a ?? 0.92));
+        const layerDelay = Math.max(0, Math.min(0.85, (pCfg.t || 0) * 0.85));
+        const layerLife = Math.max(0.32, Math.min(1.85, pCfg.life || 0.72));
+        maxLayerEnd = Math.max(maxLayerEnd, layerDelay + layerLife);
+
+        const ox = (pCfg.pos?.[0] || 0) * 0.01;
+        const oy = (pCfg.pos?.[2] || 0) * 0.01;
+        const oz = -(pCfg.pos?.[1] || 0) * 0.01;
+
+        const texLower = pCfg.tex.toLowerCase();
+        const bill = pCfg.billboard ?? 1;
+        const isHorizLieDisc =
+          bill === 3 ||
+          fileLower.includes('badak') ||
+          texLower.includes('badak') ||
+          texLower.includes('circle');
+
+        if (isHorizLieDisc) {
+          // BILLBOARD_TYPE_LIE (3): Horizontale Scheibe auf exakter .mse-Höhe oy (z.B. 0.04m Runensiegel oder 0.95m palbang_spin Schwertwirbel!)
+          const rawS0 = (pCfg.s0 || pCfg.size || 96) * 0.0115 * scaleMult;
+          const rawS1 = (pCfg.s1 || pCfg.size || 160) * 0.0115 * scaleMult;
+          const startDiam = Math.max(0.55, Math.min(5.8, Math.abs(rawS1 - rawS0) < 0.08 ? rawS0 * 0.72 : rawS0));
+          const endDiam = Math.max(0.75, Math.min(6.4, Math.abs(rawS1 - rawS0) < 0.08 ? rawS1 * 1.18 : rawS1));
+          const rMat = new THREE.MeshBasicMaterial({
+            map: tex,
+            color: cStart.clone(),
+            transparent: true,
+            opacity: layerDelay > 0.02 ? 0.0 : peakAlpha,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          });
+          const rMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, rMat);
+          rMesh.rotation.x = -Math.PI / 2;
+          rMesh.rotation.z = Math.random() * Math.PI * 2;
+          const discY = attachedToLimb ? oy : Math.max(0.02 + groundRings.length * 0.008, oy + groundRings.length * 0.006);
+          rMesh.position.set(ox, discY, oz);
+          rMesh.scale.setScalar(startDiam);
+          pGroup.add(rMesh);
+
+          let spinRad = 0;
+          if (Math.abs(pCfg.rs || 0) > 1.0) {
+            spinRad = (pCfg.rs * Math.PI) / 180.0;
+          } else if (fileLower.includes('spin') || fileLower.includes('palbang') || fileLower.includes('charyun') || fileLower.includes('yonggwon')) {
+            spinRad = (groundRings.length % 2 === 0 ? -1 : 1) * 8.2;
+          } else {
+            spinRad = (groundRings.length % 2 === 0 ? 1 : -1) * 0.85;
+          }
+          groundRings.push({
+            mesh: rMesh,
+            mat: rMat,
+            s0: startDiam,
+            s1: endDiam,
+            c0: cStart,
+            c1: cEnd,
+            peakAlpha,
+            delay: layerDelay,
+            life: layerLife,
+            spinSpeed: spinRad,
+          });
+        } else if (bill === 2 || bill === 0) {
+          // BILLBOARD_TYPE_Y (2) = vertikale Energiesäule / Blitzstrahl; BILLBOARD_TYPE_NONE (0) = gerichtete 3D-Schwertwelle
+          const startSz = Math.max(0.55, Math.min(4.8, (pCfg.s0 || pCfg.size || 80) * 0.012 * scaleMult));
+          const endSz = Math.max(0.70, Math.min(5.4, (pCfg.s1 || pCfg.size || 120) * 0.012 * scaleMult));
+          const planeCnt = bill === 2 ? 2 : 1;
+          for (let pk = 0; pk < planeCnt; pk++) {
+            const pMat = new THREE.MeshBasicMaterial({
+              map: tex,
+              color: cStart.clone(),
+              transparent: true,
+              opacity: layerDelay > 0.02 ? 0.0 : peakAlpha,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            });
+            const pMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, pMat);
+            const py = attachedToLimb ? oy : Math.max(startSz * 0.42, oy);
+            pMesh.position.set(ox, py, oz);
+            if (bill === 2) {
+              pMesh.rotation.y = pk * (Math.PI * 0.5);
+            } else {
+              pMesh.rotation.set(-0.28, 0, (Math.random() - 0.5) * 0.45);
+            }
+            pMesh.scale.set(startSz, startSz * (bill === 2 ? 1.25 : 1.0), 1);
+            pGroup.add(pMesh);
+            verticalPlanes.push({
+              mesh: pMesh,
+              mat: pMat,
+              s0: startSz,
+              s1: endSz,
+              aspectY: bill === 2 ? 1.25 : 1.0,
+              c0: cStart,
+              c1: cEnd,
+              peakAlpha,
+              delay: layerDelay,
+              life: layerLife,
+              rotZ: ((pCfg.rs || 0) * Math.PI) / 180.0 * 0.35,
+            });
+          }
+        } else {
+          // BILLBOARD_TYPE_ALL (1): Echte kamerazugewandte Energie-/Funken-/Flammen-Sprites an exakter .mse-Position
+          const rawCnt = pCfg.count || 6;
+          const emitCount = attachedToLimb
+            ? Math.min(7, Math.max(2, Math.round(rawCnt * 0.35)))
+            : Math.min(12, Math.max(2, Math.round(rawCnt * 0.45)));
+          const s0Base = Math.max(0.28, Math.min(3.4, (pCfg.s0 || pCfg.size || 36) * 0.0115)) * scaleMult;
+          const s1Base = Math.max(0.28, Math.min(3.8, (pCfg.s1 || pCfg.size || 42) * 0.0115)) * scaleMult;
+          const emitRad = Math.min(1.65, Math.max(attachedToLimb ? 0.06 : 0.14, (pCfg.rad || 0) * 0.01)) * scaleMult;
+          const velM = Math.min(3.2, Math.max(0.12, Math.abs(pCfg.vel || 24) * 0.01)) * scaleMult;
+
+          for (let k = 0; k < emitCount; k++) {
+            const sMat = new THREE.SpriteMaterial({
+              map: tex,
+              color: cStart.clone(),
+              transparent: true,
+              opacity: layerDelay > 0.02 ? 0.0 : peakAlpha,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              rotation: Math.random() * Math.PI * 2,
+            });
+            const sp = new THREE.Sprite(sMat);
+            const ang = (k / emitCount) * Math.PI * 2 + Math.random() * 0.55;
+            const rDist = emitRad * (0.25 + Math.random() * 0.75);
+            const localY = attachedToLimb
+              ? oy + (Math.random() - 0.35) * 0.28
+              : (oy > 0.08 ? oy + (Math.random() - 0.5) * 0.28 : 0.28 + Math.random() * 0.85);
+            sp.position.set(
+              ox + Math.cos(ang) * rDist,
+              localY,
+              oz + Math.sin(ang) * rDist
+            );
+            const jitter = 0.82 + Math.random() * 0.36;
+            const sNow = s0Base * jitter;
+            sp.scale.set(sNow, sNow, 1);
+            sp.userData = {
+              vx: Math.cos(ang) * velM * (0.45 + Math.random() * 0.65),
+              vy: attachedToLimb ? (0.25 + Math.random() * 0.55) : (0.35 + velM * 0.45 + Math.random() * 0.85),
+              vz: Math.sin(ang) * velM * (0.45 + Math.random() * 0.65),
+              swirl: (k % 2 === 0 ? 1 : -1) * (attachedToLimb ? 1.1 : 1.8),
+              rotSpd: Math.abs(pCfg.rs || 0) > 1 ? ((pCfg.rs * Math.PI) / 180.0) * 0.5 : (k % 2 === 0 ? 1.4 : -1.4),
+              s0: s0Base * jitter,
+              s1: s1Base * jitter,
+              c0: cStart,
+              c1: cEnd,
+              peakAlpha,
+              delay: layerDelay + (k / emitCount) * Math.min(0.16, layerLife * 0.22),
+              life: layerLife,
+            };
+            pGroup.add(sp);
+            sprites.push(sp);
+          }
+        }
+      }
+
+      if (isLSkill && !attachedToLimb && groundRings.length === 0 && !fileLower.includes('_loop')) {
+        const lTex = this.loadSkillTexture('warrior_ls1_1.png') || this.getSoftShockwaveRingTexture();
+        const lStart = new THREE.Color(0xe879f9);
+        const lEnd = new THREE.Color(0xfbbf24);
+        const lMat = new THREE.MeshBasicMaterial({
+          map: lTex,
+          color: lStart.clone(),
+          transparent: true,
+          opacity: 0.88,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const lMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, lMat);
+        lMesh.rotation.x = -Math.PI / 2;
+        lMesh.position.y = 0.04;
+        lMesh.scale.setScalar(1.35);
+        pGroup.add(lMesh);
+        groundRings.push({
+          mesh: lMesh,
+          mat: lMat,
+          s0: 1.35,
+          s1: 3.85,
+          c0: lStart,
+          c1: lEnd,
+          peakAlpha: 0.88,
+          delay: 0,
+          life: 0.95,
+          spinSpeed: 3.4,
+        });
+      }
+
+      if (groundRings.length > 0 || verticalPlanes.length > 0 || sprites.length > 0) {
+        this.scene.add(pGroup);
+        this.vfxList.push({
+          type: 'metin_particles',
+          mesh: pGroup,
+          groundRings,
+          verticalPlanes,
+          sprites,
+          age: 0,
+          maxAge: Math.max(0.55, Math.min(2.2, maxLayerEnd)),
+          followActor: opts.follow ? actor : null,
+          followBone,
+          offsetX: opts.offsetX || 0,
+          offsetY: (opts.offsetY || 0) + groupLift,
+          offsetZ: opts.offsetZ || 0,
+        });
+      }
+    }
+  }
+
+  triggerMetinSkillExecution(actor, x, y, z, skillId, opts = {}) {
+    const classId = opts.classId || actor?.classId || this.localPlayerClassId || 'warrior';
+    const doctrine = opts.doctrine || actor?.userData?.doctrine || this.localPlayerDoctrine || '';
+    const skillLevel = Number(opts.skillLevel || (this.localPlayerSkills && this.localPlayerSkills[skillId]) || 1);
+    const gender = opts.gender || actor?.userData?.gender || this.localPlayerGender || 'm';
+    const resolved = resolveMetinSkill(classId, skillId, doctrine, skillLevel, gender);
+    if (!resolved) return null;
+
+    const code = resolved.code;
+    const isLSkill = resolved.isLSkill;
+    const tier = resolved.tier;
+    const rotY = actor?.root ? actor.root.rotation.y : (this.localPlayerRotY || 0);
+
+    const heroClips = actor?.heroGlbHolder?.userData?.glbActor?.clips;
+    const exactClip = `skill_${code}`;
+    let clipName = exactClip;
+    if (!heroClips || !heroClips[exactClip]) {
+      const spinCodes = new Set(['palbang', 'charyun', 'yonggwon', 'noegeom']);
+      const comboCodes = new Set(['samyeon', 'amseup', 'gungsin', 'seomgwang', 'seomjeon', 'yeonsa']);
+      const slamCodes = new Set(['gigongcham', 'gyeoksan', 'daejin', 'tanhwan', 'finish', 'gihyeol', 'swaeryeong', 'akgi']);
+      const buffCodes = new Set([
+        'geomgyeong', 'jeongwi', 'cheongeun', 'gyeonggong', 'eunhyeong',
+        'gwigeom', 'jumagap', 'gongpo', 'heuksin', 'muyeong',
+        'hosin', 'gicheon', 'jeongeop', 'kwaesok',
+      ]);
+      if (buffCodes.has(code) || opts.eventType === 'skill_buff' || opts.eventType === 'heal') {
+        clipName = 'skill_buff';
+      } else if (spinCodes.has(code)) {
+        clipName = 'skill_spin';
+      } else if (comboCodes.has(code)) {
+        clipName = 'skill_combo';
+      } else if (slamCodes.has(code)) {
+        clipName = 'skill_slam';
+      } else {
+        clipName = 'skill_cast';
+      }
+    }
+
+    // Exakte 1:1 Synchronisation zwischen originaler .gr2-Skillanimation und .msa-StartingTime-Events!
+    const rawMsaDur = Math.max(0.75, Math.min(2.7, resolved.msa?.duration || 1.4));
+    const playSpeed = rawMsaDur >= 2.2 ? 1.32 : 1.18;
+    const animDur = rawMsaDur / playSpeed;
+    if (actor) {
+      actor._activeSkillClip = clipName;
+      actor._activeSkillTimer = animDur;
+      actor._activeSkillSpeed = playSpeed;
+      actor._activeSkillForceRestart = true;
+    }
+
+    if (resolved.soundUrl) {
+      this.playMetinSkillSound(resolved.soundUrl, x, z);
+    }
+
+    if (!this._scheduledMetinEvents) this._scheduledMetinEvents = [];
+    const events = resolved.msa?.events || [];
+    if (events.length > 0) {
+      for (const ev of events) {
+        const delay = Math.max(0, Math.min(2.1, Number(ev.t || 0) / playSpeed));
+        if (delay <= 0.02) {
+          const att = this.getActorMetinAttachWorldPos(actor, ev.bone, ev.pos, x, y, z, rotY);
+          this.spawnMetinMseEffect(ev.effect, att.x, att.y, att.z, rotY, actor, {
+            follow: ev.follow,
+            followBone: ev.follow ? (ev.bone || '') : '',
+            attachedToLimb: att.attachedToLimb,
+            offsetX: att.offsetX,
+            offsetY: att.offsetY,
+            offsetZ: att.offsetZ,
+            tier,
+            isLSkill,
+          });
+        } else {
+          this._scheduledMetinEvents.push({
+            remaining: delay,
+            effect: ev.effect,
+            bone: ev.bone || '',
+            pos: ev.pos || [0, 0, 0],
+            x,
+            y,
+            z,
+            rotY,
+            actor,
+            follow: ev.follow,
+            tier,
+            isLSkill,
+          });
+        }
+      }
+    }
+
+    if (actor && resolved.loop) {
+      if (!actor._activeMetinBuffLoops) actor._activeMetinBuffLoops = new Map();
+      actor._activeMetinBuffLoops.set(skillId, {
+        skillId,
+        code,
+        tier,
+        isLSkill,
+        loop: resolved.loop,
+        expiresAt: performance.now() + 60000,
+      });
+      actor._metinLoopTimer = 0.35;
+      this.applyActorWeaponAuraTintFromMetinLoop(actor);
+    }
+
+    return resolved;
+  }
+
+  updateMetinScheduledEvents(dt) {
+    if (!this._scheduledMetinEvents || this._scheduledMetinEvents.length === 0) return;
+    for (let i = this._scheduledMetinEvents.length - 1; i >= 0; i--) {
+      const item = this._scheduledMetinEvents[i];
+      item.remaining -= dt;
+      if (item.remaining <= 0) {
+        const useLiveActor = Boolean(item.actor?.root);
+        const bx = useLiveActor ? item.actor.root.position.x : item.x;
+        const by = useLiveActor ? item.actor.root.position.y : item.y;
+        const bz = useLiveActor ? item.actor.root.position.z : item.z;
+        const aRot = useLiveActor ? item.actor.root.rotation.y : item.rotY;
+        const att = this.getActorMetinAttachWorldPos(item.actor, item.bone, item.pos, bx, by, bz, aRot);
+        this.spawnMetinMseEffect(item.effect, att.x, att.y, att.z, aRot, item.actor, {
+          follow: item.follow,
+          followBone: item.follow ? (item.bone || '') : '',
+          attachedToLimb: att.attachedToLimb,
+          offsetX: att.offsetX,
+          offsetY: att.offsetY,
+          offsetZ: att.offsetZ,
+          tier: item.tier,
+          isLSkill: item.isLSkill,
+        });
+        this._scheduledMetinEvents.splice(i, 1);
+      }
+    }
+  }
+
+  syncActorMetinBuffState(actor, activeBuffs, classId, doctrine = '', gender = 'm') {
+    if (!actor) return;
+    if (!actor._activeMetinBuffLoops) actor._activeMetinBuffLoops = new Map();
+    const activeIds = new Set();
+    if (Array.isArray(activeBuffs)) {
+      for (const b of activeBuffs) {
+        if (!b || !b.id) continue;
+        activeIds.add(b.id);
+        const skLv = Number(b.skillLevel || (this.localPlayerSkills && this.localPlayerSkills[b.id]) || 1);
+        const existing = actor._activeMetinBuffLoops.get(b.id);
+        const newTier = getMetinSkillTier(skLv);
+        if (!existing || existing.tier !== newTier) {
+          const res = resolveMetinSkill(classId, b.id, doctrine, skLv, gender);
+          if (res && res.loop) {
+            actor._activeMetinBuffLoops.set(b.id, {
+              skillId: b.id,
+              code: res.code,
+              tier: res.tier,
+              isLSkill: res.isLSkill,
+              loop: res.loop,
+              expiresAt: performance.now() + (Number(b.remaining || 15) * 1000),
+            });
+          }
+        } else {
+          existing.expiresAt = performance.now() + (Number(b.remaining || 15) * 1000);
+        }
+      }
+    }
+    for (const [k, v] of actor._activeMetinBuffLoops.entries()) {
+      if (!activeIds.has(k) && performance.now() > (v.expiresAt || 0)) {
+        actor._activeMetinBuffLoops.delete(k);
+      }
+    }
+    this.applyActorWeaponAuraTintFromMetinLoop(actor);
+  }
+
+  applyActorWeaponAuraTintFromMetinLoop(actor) {
+    const bladeAura = actor?.weaponGroup?.userData?.bladeAuraGroup;
+    if (!bladeAura || !actor?._activeMetinBuffLoops) return;
+    let chosen = null;
+    for (const entry of actor._activeMetinBuffLoops.values()) {
+      if (entry.loop?.bone === 'right_hand' || entry.code === 'geomgyeong' || entry.code === 'gwigeom') {
+        chosen = entry;
+        break;
+      }
+      if (!chosen) chosen = entry;
+    }
+    if (!chosen || !chosen.loop?.effect?.particles?.length) return;
+    const p0 = chosen.loop.effect.particles[0];
+    const [r, g, b] = p0.color || [0.2, 0.9, 0.8];
+    const loopColor = new THREE.Color(
+      chosen.isLSkill ? Math.min(1, r * 1.15 + 0.22) : r,
+      chosen.isLSkill ? Math.min(1, g * 0.92 + 0.10) : g,
+      chosen.isLSkill ? Math.min(1, b * 1.25 + 0.28) : b
+    );
+    if (bladeAura.userData.innerAuraMat) {
+      bladeAura.userData.innerAuraMat.color.copy(loopColor);
+    }
+    if (bladeAura.userData.outerAuraMat) {
+      bladeAura.userData.outerAuraMat.color.copy(loopColor);
+    }
+    if (bladeAura.userData.auraSparks && p0.tex) {
+      const sparkTex = this.loadSkillTexture(p0.tex);
+      for (const sp of bladeAura.userData.auraSparks) {
+        if (sp.material) {
+          if (sparkTex) sp.material.map = sparkTex;
+          sp.material.color.copy(loopColor);
+          sp.material.needsUpdate = true;
+        }
+      }
+    }
+  }
+
+  updateActorMetinBuffLoop(actor, dt, elapsed) {
+    if (!actor || !actor._activeMetinBuffLoops || actor._activeMetinBuffLoops.size === 0) return;
+    actor._metinLoopTimer = (actor._metinLoopTimer || 0) - dt;
+    if (actor._metinLoopTimer > 0) return;
+    actor._metinLoopTimer = 1.05;
+    if (!actor.root || !actor.root.visible) return;
+    const rx = actor.root.position.x;
+    const ry = actor.root.position.y;
+    const rz = actor.root.position.z;
+    const rotY = actor.root.rotation.y;
+    for (const entry of actor._activeMetinBuffLoops.values()) {
+      if (entry.loop?.effect) {
+        const bone = entry.loop.bone || '';
+        const isHand = bone.includes('hand');
+        const att = this.getActorMetinAttachWorldPos(actor, bone, [0, 0, 0], rx, ry, rz, rotY);
+        this.spawnMetinMseEffect(entry.loop.effect, att.x, att.y, att.z, rotY, actor, {
+          follow: true,
+          followBone: bone,
+          attachedToLimb: att.attachedToLimb,
+          offsetX: att.offsetX,
+          offsetY: att.offsetY,
+          offsetZ: att.offsetZ,
+          tier: entry.tier,
+          isLSkill: entry.isLSkill,
+          scaleMult: isHand ? (entry.isLSkill ? 0.74 : 0.62) : (entry.isLSkill ? 0.88 : 0.76),
+        });
+      }
+    }
+  }
+
   getBaltazarPortalTheme(targetMapId, isReturn = false) {
     // Exakte ColorFactor-Profile aus D:\Infinity War\...\effect\baltazar\decorations\teleport_effect\tp_*.mse
     if (isReturn) {
@@ -21618,6 +22822,1026 @@ export class OpenWorld3DEngine {
       this._airParticlesEnabled === false;
     this.worldParticles.visible = !isPerfOff;
     this.mapGroup.add(this.worldParticles);
+  }
+
+  // ==========================================================================
+  // 3E. AMBIENTE TIERWELT & NATUR:
+  // - Glühwürmchen bei Nacht (biolumineszierend, sanft pulsierend & bodennah schwebend)
+  // - Singvögel / Schwalben bei Tag (realistische Skalierung, Flügelschlag & Kurven-Banking)
+  // ==========================================================================
+  getFireflyTexture() {
+    if (this._fireflyTexture) return this._fireflyTexture;
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    // Weiß-gelber heißer Kern
+    grad.addColorStop(0.0, 'rgba(255, 255, 240, 1.0)');
+    grad.addColorStop(0.18, 'rgba(240, 253, 130, 0.95)');
+    // Biolumineszenter Hof: weiches Limetten-Gold
+    grad.addColorStop(0.42, 'rgba(190, 242, 100, 0.65)');
+    grad.addColorStop(0.72, 'rgba(163, 230, 53, 0.22)');
+    grad.addColorStop(1.0, 'rgba(132, 204, 22, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(32, 32, 32, 0, Math.PI * 2);
+    ctx.fill();
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.generateMipmaps = true;
+    this._fireflyTexture = tex;
+    return tex;
+  }
+
+  createAmbientBirdModel() {
+    const bird = new THREE.Group();
+    bird.name = 'AmbientSongbird';
+
+    // Hochwertige PBR-Materialien mit dezenter Specular-Reflexion
+    const backMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b, // Tiefes Schiefer-Blau / Obsidian-Gefieder
+      roughness: 0.42,
+      metalness: 0.12,
+    });
+    const bellyMat = new THREE.MeshStandardMaterial({
+      color: 0xfef3c7, // Cremig-weißes / warmes Brustgefieder
+      roughness: 0.65,
+    });
+    const beakMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706, // Goldener Bernstein-Schnabel
+      roughness: 0.35,
+    });
+    const wingMat = new THREE.MeshStandardMaterial({
+      color: 0x1e3a5f, // Schwingen-Federn mit dunkler Kontur
+      roughness: 0.40,
+      side: THREE.DoubleSide,
+    });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+
+    // 1. Aerodynamischer Rumpf (Länge ~0.42m)
+    const bodyGeo = new THREE.ConeGeometry(0.082, 0.38, 8);
+    bodyGeo.rotateX(-Math.PI / 2);
+    const bodyMesh = new THREE.Mesh(bodyGeo, backMat);
+    bodyMesh.scale.set(0.9, 0.75, 1.0);
+    bird.add(bodyMesh);
+
+    // Helle Unterbrust
+    const breastGeo = new THREE.SphereGeometry(0.076, 8, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+    breastGeo.scale(0.85, 0.65, 1.15);
+    breastGeo.rotateX(-Math.PI / 2);
+    const breastMesh = new THREE.Mesh(breastGeo, bellyMat);
+    breastMesh.position.set(0, -0.015, 0.05);
+    bird.add(breastMesh);
+
+    // 2. Kopf mit Bernstein-Schnabel & Augen
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.038, 0.17);
+
+    const headGeo = new THREE.SphereGeometry(0.054, 8, 8);
+    headGeo.scale(0.92, 0.95, 1.15);
+    const headMesh = new THREE.Mesh(headGeo, backMat);
+    headGroup.add(headMesh);
+
+    const beakGeo = new THREE.ConeGeometry(0.022, 0.075, 6);
+    beakGeo.rotateX(Math.PI / 2);
+    const beakMesh = new THREE.Mesh(beakGeo, beakMat);
+    beakMesh.position.set(0, -0.008, 0.08);
+    headGroup.add(beakMesh);
+
+    const eyeGeo = new THREE.SphereGeometry(0.011, 6, 6);
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+    leftEye.position.set(-0.045, 0.015, 0.03);
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+    rightEye.position.set(0.045, 0.015, 0.03);
+    headGroup.add(leftEye);
+    headGroup.add(rightEye);
+    bird.add(headGroup);
+
+    // 3. Gabelschwanz (Schwalben-Gefieder)
+    const tailShape = new THREE.Shape();
+    tailShape.moveTo(0, 0);
+    tailShape.lineTo(-0.085, -0.21);
+    tailShape.lineTo(-0.035, -0.14);
+    tailShape.lineTo(0, -0.09);
+    tailShape.lineTo(0.035, -0.14);
+    tailShape.lineTo(0.085, -0.21);
+    tailShape.closePath();
+    const tailGeo = new THREE.ShapeGeometry(tailShape);
+    tailGeo.rotateX(Math.PI / 2);
+    const tailMesh = new THREE.Mesh(tailGeo, backMat);
+    tailMesh.position.set(0, 0.012, -0.17);
+    bird.add(tailMesh);
+
+    // 4. Artikulierter linker Flügel mit Schultergelenk (Spannweite ~0.90m)
+    const leftWingPivot = new THREE.Group();
+    leftWingPivot.position.set(-0.07, 0.028, 0.04);
+    const leftWingShape = new THREE.Shape();
+    leftWingShape.moveTo(0, 0);
+    leftWingShape.lineTo(-0.21, 0.045);
+    leftWingShape.lineTo(-0.45, -0.06);
+    leftWingShape.lineTo(-0.24, -0.09);
+    leftWingShape.lineTo(-0.06, -0.085);
+    leftWingShape.closePath();
+    const leftWingGeo = new THREE.ShapeGeometry(leftWingShape);
+    leftWingGeo.rotateX(Math.PI / 2);
+    const leftWingMesh = new THREE.Mesh(leftWingGeo, wingMat);
+    leftWingPivot.add(leftWingMesh);
+    bird.add(leftWingPivot);
+
+    // 5. Artikulierter rechter Flügel mit Schultergelenk
+    const rightWingPivot = new THREE.Group();
+    rightWingPivot.position.set(0.07, 0.028, 0.04);
+    const rightWingShape = new THREE.Shape();
+    rightWingShape.moveTo(0, 0);
+    rightWingShape.lineTo(0.21, 0.045);
+    rightWingShape.lineTo(0.45, -0.06);
+    rightWingShape.lineTo(0.24, -0.09);
+    rightWingShape.lineTo(0.06, -0.085);
+    rightWingShape.closePath();
+    const rightWingGeo = new THREE.ShapeGeometry(rightWingShape);
+    rightWingGeo.rotateX(Math.PI / 2);
+    const rightWingMesh = new THREE.Mesh(rightWingGeo, wingMat);
+    rightWingPivot.add(rightWingMesh);
+    bird.add(rightWingPivot);
+
+    return {
+      root: bird,
+      leftWing: leftWingPivot,
+      rightWing: rightWingPivot,
+    };
+  }
+
+  _clearFireflyShaderLights() {
+    if (this._fireflyShaderLightsCleared) return;
+    const u = this._grassShaderUniforms;
+    if (u && u.uFireflyPosRad && u.uFireflyColInt) {
+      const posArr = u.uFireflyPosRad.value;
+      const colArr = u.uFireflyColInt.value;
+      for (let s = 0; s < 8; s++) {
+        if (posArr[s]) posArr[s].set(0, -5000, 0, 0);
+        if (colArr[s]) colArr[s].set(0, 0, 0, 0);
+      }
+    }
+    if (this._fireflyLightSlots) {
+      this._fireflyLightSlots.fill(-1);
+    }
+    this._fireflyShaderLightsCleared = true;
+  }
+
+  _refreshNearbyFireflyObstacles(px, pz, nowElapsed) {
+    if (
+      this._nearbyFireflyCircles &&
+      this._fireflyObsRefreshPos &&
+      nowElapsed - (this._fireflyObsRefreshTime || 0) < 0.30 &&
+      Math.hypot(px - this._fireflyObsRefreshPos.x, pz - this._fireflyObsRefreshPos.z) < 5.0
+    ) {
+      return;
+    }
+    this._fireflyObsRefreshTime = nowElapsed;
+    if (!this._fireflyObsRefreshPos) {
+      this._fireflyObsRefreshPos = { x: px, z: pz };
+    } else {
+      this._fireflyObsRefreshPos.x = px;
+      this._fireflyObsRefreshPos.z = pz;
+    }
+
+    const maxR = 62.0;
+    const circles = [];
+    if (this._worldObstacleCircles && this._worldObstacleCircles.length > 0) {
+      for (let i = 0; i < this._worldObstacleCircles.length; i++) {
+        const c = this._worldObstacleCircles[i];
+        const ox = c[0];
+        const oz = c[1];
+        const orad = c[2];
+        if (Math.abs(ox - px) <= maxR + orad && Math.abs(oz - pz) <= maxR + orad) {
+          circles.push(c);
+        }
+      }
+    }
+
+    const boxes = [];
+    if (this._worldNavBoxes && this._worldNavBoxes.length > 0) {
+      for (let i = 0; i < this._worldNavBoxes.length; i++) {
+        const b = this._worldNavBoxes[i];
+        const bx = b[0];
+        const bz = b[1];
+        const hw = b[2] * 0.5;
+        const hd = b[3] * 0.5;
+        const brot = b[4] || 0;
+        const bound = Math.max(hw, hd) + maxR;
+        if (Math.abs(bx - px) <= bound && Math.abs(bz - pz) <= bound) {
+          boxes.push([bx, bz, hw, hd, Math.cos(brot), Math.sin(brot)]);
+        }
+      }
+    } else if (this._cachedTownsHouseMap) {
+      for (let tIdx = 0; tIdx < this._cachedTownsHouseMap.length; tIdx++) {
+        const entry = this._cachedTownsHouseMap[tIdx];
+        for (let hIdx = 0; hIdx < entry.houses.length; hIdx++) {
+          const hc = entry.houses[hIdx];
+          const hw = (hc.w || (hc.footprintR || 5.0) * 1.4) * 0.5 + 0.35;
+          const hd = (hc.d || (hc.footprintR || 5.0) * 1.4) * 0.5 + 0.35;
+          const brot = hc.rot || 0;
+          const bound = Math.max(hw, hd) + maxR;
+          if (Math.abs(hc.x - px) <= bound && Math.abs(hc.z - pz) <= bound) {
+            boxes.push([hc.x, hc.z, hw, hd, Math.cos(brot), Math.sin(brot)]);
+          }
+        }
+      }
+    }
+
+    const segs = [];
+    if (this._worldObstacleSegments && this._worldObstacleSegments.length > 0) {
+      for (let i = 0; i < this._worldObstacleSegments.length; i++) {
+        const s = this._worldObstacleSegments[i];
+        const x0 = s[0], z0 = s[1], x1 = s[2], z1 = s[3];
+        const thick = s[4] || 0.9;
+        const mx = (x0 + x1) * 0.5;
+        const mz = (z0 + z1) * 0.5;
+        const halfLen = Math.hypot(x1 - x0, z1 - z0) * 0.5 + thick + maxR;
+        if (Math.abs(mx - px) <= halfLen && Math.abs(mz - pz) <= halfLen) {
+          segs.push([x0, z0, x1, z1, thick]);
+        }
+      }
+    }
+    if (this._worldWallSegments && this._worldWallSegments.length > 0) {
+      for (let i = 0; i < this._worldWallSegments.length; i++) {
+        const w = this._worldWallSegments[i];
+        const x0 = w.ax, z0 = w.az, x1 = w.bx, z1 = w.bz;
+        const thick = w.halfThick || 1.25;
+        const mx = (x0 + x1) * 0.5;
+        const mz = (z0 + z1) * 0.5;
+        const halfLen = Math.hypot(x1 - x0, z1 - z0) * 0.5 + thick + maxR;
+        if (Math.abs(mx - px) <= halfLen && Math.abs(mz - pz) <= halfLen) {
+          segs.push([x0, z0, x1, z1, thick]);
+        }
+      }
+    }
+
+    this._nearbyFireflyCircles = circles;
+    this._nearbyFireflyBoxes = boxes;
+    this._nearbyFireflySegs = segs;
+  }
+
+  _isFireflySpotBlocked(wx, wz, pad = 0.85, requireNatural = true) {
+    if (requireNatural) {
+      const isMorgenwacht = this.currentMapId === 'morgenwacht';
+      const maxBound = isMorgenwacht ? 1230 : 515;
+      if (Math.abs(wx) > maxBound || Math.abs(wz) > maxBound) return true;
+      if (isMorgenwacht) {
+        if (wz > 980.0) return true;
+        if (Math.hypot(wx, wz + 180.0) < 82.0 || Math.hypot(wx, wz + 1020.0) < 54.0) return true;
+      }
+      if (this.getOrganicVillageDistance && this.getOrganicVillageDistance(wx, wz, this.currentMapId) < 31.0) {
+        return true;
+      }
+      if (this.getBridgeHeightAt && this.getBridgeHeightAt(wx, wz) !== null) {
+        return true;
+      }
+      if (this.getWaterDistanceInfo) {
+        const wInfo = this.getWaterDistanceInfo(wx, wz);
+        if (wInfo && (wInfo.inRiver || wInfo.inLake)) return true;
+      }
+    }
+    if (this._nearbyFireflyBoxes) {
+      for (let i = 0; i < this._nearbyFireflyBoxes.length; i++) {
+        const [bx, bz, hw, hd, cosR, sinR] = this._nearbyFireflyBoxes[i];
+        const dx = wx - bx;
+        const dz = wz - bz;
+        const lx = dx * cosR - dz * sinR;
+        const lz = dx * sinR + dz * cosR;
+        if (Math.abs(lx) < hw + pad && Math.abs(lz) < hd + pad) return true;
+      }
+    }
+    if (this._nearbyFireflyCircles) {
+      for (let i = 0; i < this._nearbyFireflyCircles.length; i++) {
+        const [ox, oz, orad] = this._nearbyFireflyCircles[i];
+        const dx = wx - ox;
+        const dz = wz - oz;
+        const r = orad + pad;
+        if (dx * dx + dz * dz < r * r) return true;
+      }
+    }
+    if (this._nearbyFireflySegs) {
+      for (let i = 0; i < this._nearbyFireflySegs.length; i++) {
+        const [x0, z0, x1, z1, thick] = this._nearbyFireflySegs[i];
+        const sx = x1 - x0;
+        const sz = z1 - z0;
+        const lenSq = sx * sx + sz * sz;
+        let t = 0;
+        if (lenSq > 0.0001) {
+          t = Math.max(0, Math.min(1, ((wx - x0) * sx + (wz - z0) * sz) / lenSq));
+        }
+        const cx = x0 + t * sx;
+        const cz = z0 + t * sz;
+        const dx = wx - cx;
+        const dz = wz - cz;
+        const r = thick + pad;
+        if (dx * dx + dz * dz < r * r) return true;
+      }
+    }
+    return false;
+  }
+
+  _pickFireflyWorldSpot(px, pz, minR = 6.0, maxR = 46.0) {
+    let bestX = px;
+    let bestZ = pz;
+    let bestScore = -1;
+    for (let attempt = 0; attempt < 18; attempt++) {
+      const ang = Math.random() * Math.PI * 2;
+      const u = Math.random();
+      const rad = Math.sqrt(minR * minR + u * (maxR * maxR - minR * minR));
+      const wx = px + Math.cos(ang) * rad;
+      const wz = pz + Math.sin(ang) * rad;
+      if (this._isFireflySpotBlocked(wx, wz, 1.05, true)) continue;
+      const gs = this.getGrassSuitability ? this.getGrassSuitability(wx, wz) : { suit: 0.7, lush: 0.3 };
+      const score = (gs ? gs.suit * 1.15 + (gs.lush || 0) * 0.50 : 0.5) + 0.18 + Math.random() * 0.28;
+      if (score > bestScore) {
+        bestScore = score;
+        bestX = wx;
+        bestZ = wz;
+      }
+    }
+    if (bestScore >= 0) {
+      return { x: bestX, z: bestZ, valid: true };
+    }
+    const fallbackAng = Math.random() * Math.PI * 2;
+    const fallbackR = (minR + maxR) * 0.5;
+    return {
+      x: px + Math.cos(fallbackAng) * fallbackR,
+      z: pz + Math.sin(fallbackAng) * fallbackR,
+      valid: false,
+    };
+  }
+
+  buildAmbientWildlife() {
+    if (this.wildlifeGroup) {
+      if (this.wildlifeGroup.parent) {
+        this.wildlifeGroup.parent.remove(this.wildlifeGroup);
+      }
+    }
+    this.wildlifeGroup = new THREE.Group();
+    this.wildlifeGroup.name = 'AmbientWildlifeGroup';
+
+    // -------------------------------------------------------------
+    // A) Glühwürmchen bei Nacht (Freier Flug ÜBER dem hohen Gras, Hindernis-Ausweichung & 3D-Umweltbeleuchtung)
+    // -------------------------------------------------------------
+    const ffCount = 32;
+    const ffGeo = new THREE.BufferGeometry();
+    const ffPos = new Float32Array(ffCount * 3);
+    const ffCol = new Float32Array(ffCount * 3);
+    const ffSize = new Float32Array(ffCount);
+    const ffGlow = new Float32Array(ffCount);
+
+    this._fireflyData = [];
+    this._fireflyLightSlots = new Array(8).fill(-1);
+    this._fireflyLastPlayerPos = null;
+    this._clearFireflyShaderLights();
+
+    const startPx = this.localPlayerPos ? this.localPlayerPos.x : 0;
+    const startPz = this.localPlayerPos ? this.localPlayerPos.z : 0;
+    this._refreshNearbyFireflyObstacles(startPx, startPz, 0);
+
+    const colorChoices = [
+      new THREE.Color(0xbef264), // Warmes Chartreuse-Grün
+      new THREE.Color(0xd9f99d), // Weiches Biolumineszenz-Grün
+      new THREE.Color(0xfde047), // Goldenes Glühwürmchen-Licht
+      new THREE.Color(0x86efac), // Zartes Äther-Smaragd
+    ];
+
+    for (let i = 0; i < ffCount; i++) {
+      const spot = this._pickFireflyWorldSpot(startPx, startPz, 6.0, 45.0);
+      // 3D-Grashorste sind ca. 1.5m–1.95m hoch -> Glühwürmchen schweben frei DARÜBER (2.30m–3.85m) im offenen Raum unter den Baumkronen!
+      const isUpperBand = i % 2 === 1;
+      const baseHoverY = isUpperBand
+        ? 2.85 + Math.random() * 0.95
+        : 2.30 + Math.random() * 0.70;
+      const gy = this.getTerrainHeight ? this.getTerrainHeight(spot.x, spot.z, this.currentMapId) : 0;
+      const initY = gy + baseHoverY;
+
+      const c = colorChoices[Math.floor(Math.random() * colorChoices.length)].clone();
+      c.offsetHSL((Math.random() - 0.5) * 0.04, 0, (Math.random() - 0.5) * 0.05);
+      const linColor = new THREE.Color(
+        Math.pow(Math.max(0, c.r), 2.2),
+        Math.pow(Math.max(0, c.g), 2.2),
+        Math.pow(Math.max(0, c.b), 2.2)
+      );
+      const baseSize = 0.38 + Math.random() * 0.14;
+
+      ffPos[i * 3] = spot.x;
+      ffPos[i * 3 + 1] = initY;
+      ffPos[i * 3 + 2] = spot.z;
+
+      ffCol[i * 3] = c.r;
+      ffCol[i * 3 + 1] = c.g;
+      ffCol[i * 3 + 2] = c.b;
+      ffSize[i] = baseSize;
+      ffGlow[i] = 0.0;
+
+      this._fireflyData.push({
+        wx: spot.x,
+        wz: spot.z,
+        homeX: spot.x,
+        homeZ: spot.z,
+        habitatValid: spot.valid,
+        _worldSeeded: Boolean(this.hasInitialServerPos),
+        baseHoverY,
+        y: initY,
+        vx: (Math.random() - 0.5) * 0.32,
+        vz: (Math.random() - 0.5) * 0.32,
+        wanderRadius: 2.6 + Math.random() * 3.6,
+        wanderAngle: Math.random() * Math.PI * 2,
+        wanderSpeed: (0.24 + Math.random() * 0.32) * (Math.random() > 0.5 ? 1 : -1),
+        phase: Math.random() * Math.PI * 2,
+        cycleDur: 5.0 + Math.random() * 4.4,
+        phaseOffset: Math.random() * 14.0,
+        bobFreq: 0.55 + Math.random() * 0.65,
+        bobAmp: 0.28 + Math.random() * 0.44,
+        baseSize,
+        baseColor: c,
+        linColor,
+        spawnFade: spot.valid ? 1.0 : 0.0,
+        currentGlow: 0.0,
+        distSqToPlayer: 9999.0,
+      });
+    }
+
+    const posAttr = new THREE.BufferAttribute(ffPos, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    const colAttr = new THREE.BufferAttribute(ffCol, 3);
+    colAttr.setUsage(THREE.DynamicDrawUsage);
+    const sizeAttr = new THREE.BufferAttribute(ffSize, 1);
+    sizeAttr.setUsage(THREE.DynamicDrawUsage);
+    const glowAttr = new THREE.BufferAttribute(ffGlow, 1);
+    glowAttr.setUsage(THREE.DynamicDrawUsage);
+
+    ffGeo.setAttribute('position', posAttr);
+    ffGeo.setAttribute('aColor', colAttr);
+    ffGeo.setAttribute('aSize', sizeAttr);
+    ffGeo.setAttribute('aGlow', glowAttr);
+
+    const dpr = Math.min(2.0, (typeof window !== 'undefined' && window.devicePixelRatio) || 1.0);
+    const vh = (typeof window !== 'undefined' && window.innerHeight) || 900;
+
+    const ffMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uPixelRatio: { value: dpr },
+        uViewportHeight: { value: vh },
+        uOpacity: { value: 0.0 },
+      },
+      vertexShader: `
+        attribute float aSize;
+        attribute float aGlow;
+        attribute vec3 aColor;
+        varying vec3 vColor;
+        varying float vGlow;
+        varying float vCamFade;
+        uniform float uPixelRatio;
+        uniform float uViewportHeight;
+        void main() {
+          vColor = aColor;
+          vGlow = aGlow;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          float mvDist = max(0.25, -mvPosition.z);
+          vCamFade = smoothstep(1.15, 3.40, mvDist) * (1.0 - smoothstep(38.0, 52.0, mvDist));
+          float projScale = uViewportHeight * 0.60;
+          float rawPx = aSize * (projScale / mvDist) * uPixelRatio;
+          gl_PointSize = (aGlow > 0.003 && vCamFade > 0.003)
+            ? clamp(rawPx, 5.2 * uPixelRatio, 15.5 * uPixelRatio)
+            : 0.0;
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vGlow;
+        varying float vCamFade;
+        uniform float uOpacity;
+        void main() {
+          float fade = vGlow * vCamFade * uOpacity;
+          if (fade <= 0.003) discard;
+          vec2 uv = gl_PointCoord - vec2(0.5);
+          float r = length(uv) * 2.0;
+          if (r > 1.0) discard;
+          float edgeMask = 1.0 - smoothstep(0.68, 1.0, r);
+          float core = exp(-r * r * 18.0) * 1.18;
+          float innerHalo = exp(-r * r * 5.2) * 0.62;
+          float outerHalo = exp(-r * r * 2.1) * 0.24 * edgeMask;
+          vec3 coreCol = mix(vColor, vec3(1.0, 0.99, 0.88), 0.78);
+          vec3 rgb = coreCol * core + vColor * (innerHalo + outerHalo);
+          // WICHTIG: Bei THREE.AdditiveBlending (SRC_ALPHA, ONE) nur im Alpha-Kanal mit fade skalieren (kein fade*fade)!
+          gl_FragColor = vec4(rgb, clamp(fade, 0.0, 1.0));
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthTest: true,
+      depthWrite: false,
+    });
+
+    this.firefliesPoints = new THREE.Points(ffGeo, ffMat);
+    this.firefliesPoints.frustumCulled = false;
+    this.firefliesPoints.renderOrder = 6;
+    this.wildlifeGroup.add(this.firefliesPoints);
+
+    // -------------------------------------------------------------
+    // B) Singvögel / Schwalben bei Tag
+    // -------------------------------------------------------------
+    this._dayBirds = [];
+    const birdCount = 9;
+
+    for (let i = 0; i < birdCount; i++) {
+      const bObj = this.createAmbientBirdModel();
+      this.wildlifeGroup.add(bObj.root);
+
+      const isThermalSoarer = i >= 7;
+      const isPair = i === 5 || i === 6;
+      const angle = (i / birdCount) * Math.PI * 2 + Math.random() * 0.4;
+      const radius = 25.0 + Math.random() * 55.0;
+
+      const px = this.localPlayerPos ? this.localPlayerPos.x : 0;
+      const pz = this.localPlayerPos ? this.localPlayerPos.z : 0;
+      const initX = px + Math.cos(angle) * radius;
+      const initZ = pz + Math.sin(angle) * radius;
+      const baseAlt = isThermalSoarer ? 24.0 + Math.random() * 8.0 : (isPair ? 11.0 + Math.random() * 5.0 : 14.0 + Math.random() * 8.0);
+      const groundY = this.getTerrainHeight ? this.getTerrainHeight(initX, initZ, this.currentMapId) : 0;
+      const initY = groundY + baseAlt;
+
+      bObj.root.position.set(initX, initY, initZ);
+
+      this._dayBirds.push({
+        model: bObj,
+        x: initX,
+        y: initY,
+        z: initZ,
+        yaw: angle + Math.PI / 2,
+        pitch: 0,
+        roll: 0,
+        baseAlt,
+        minAlt: isThermalSoarer ? 18.0 : 7.5,
+        speed: isThermalSoarer ? 6.5 + Math.random() * 1.5 : 8.5 + Math.random() * 3.0,
+        turnRate: 0,
+        targetYaw: angle + Math.PI / 2,
+        isFlapping: true,
+        flapTimer: 1.0 + Math.random() * 1.5,
+        glideTimer: 2.5 + Math.random() * 3.0,
+        wingPhase: Math.random() * Math.PI * 2,
+        wingFlapSpeed: 16.0 + Math.random() * 4.0,
+        isThermalSoarer,
+        circleCenter: new THREE.Vector2(px + (Math.random() - 0.5) * 40, pz + (Math.random() - 0.5) * 40),
+        circleRadius: 35.0 + Math.random() * 30.0,
+        circleSpeed: (0.12 + Math.random() * 0.15) * (Math.random() > 0.5 ? 1 : -1),
+        circleAngle: angle,
+      });
+    }
+
+    this.mapGroup.add(this.wildlifeGroup);
+  }
+
+  updateAmbientWildlife(dt, elapsed) {
+    if (!this.wildlifeGroup) return;
+
+    const px = this.localPlayerPos ? this.localPlayerPos.x : 0;
+    const py = this.localPlayerPos ? this.localPlayerPos.y : 0;
+    const pz = this.localPlayerPos ? this.localPlayerPos.z : 0;
+
+    // 1. Tag- & Nachtfaktoren berechnen (fließender Übergang bei Sonnenauf- & untergang)
+    const h = ((this.env.hourOfDay % 24) + 24) % 24;
+    let nightWeight = 0.0;
+    if (h >= 21.0 || h < 5.0) {
+      nightWeight = 1.0;
+    } else if (h >= 19.5 && h < 21.0) {
+      nightWeight = (h - 19.5) / 1.5;
+    } else if (h >= 5.0 && h < 6.5) {
+      nightWeight = 1.0 - (h - 5.0) / 1.5;
+    } else {
+      nightWeight = 0.0;
+    }
+    nightWeight = Math.max(0.0, Math.min(1.0, nightWeight));
+    const dayWeight = Math.max(0.0, Math.min(1.0, 1.0 - nightWeight));
+
+    const stepDt = Math.min(0.08, Math.max(0.005, dt || 0.016));
+    const windX = this.windField ? this.windField.dir.x * this.windField.strength : 0;
+    const windZ = this.windField ? this.windField.dir.y * this.windField.strength : 0;
+
+    // -------------------------------------------------------------
+    // A) Glühwürmchen bei Nacht (Weltfest verankert, Hindernis-Kollisionsvermeidung & Echtzeit-Umweltlicht)
+    // -------------------------------------------------------------
+    if (this.firefliesPoints && this._fireflyData) {
+      const snowCover = this._grassShaderUniforms?.uGrassSnow?.value || 0;
+      const rainRate = this._terrainSplatUniforms?.uRainRate?.value || 0;
+      const snowFactor = 1.0 - Math.max(0.0, Math.min(1.0, (snowCover - 0.08) / 0.24));
+      const rainFactor = 1.0 - Math.max(0.0, Math.min(1.0, (rainRate - 0.30) / 0.42));
+      const effNightWeight = nightWeight * snowFactor * rainFactor;
+
+      if (effNightWeight <= 0.01) {
+        this.firefliesPoints.visible = false;
+        this._clearFireflyShaderLights();
+      } else {
+        this.firefliesPoints.visible = true;
+        this._fireflyShaderLightsCleared = false;
+
+        const ffUniforms = this.firefliesPoints.material.uniforms;
+        if (ffUniforms) {
+          ffUniforms.uOpacity.value = effNightWeight;
+          if (this.renderer) {
+            ffUniforms.uPixelRatio.value = Math.min(2.0, this.renderer.getPixelRatio ? this.renderer.getPixelRatio() : 1.0);
+          }
+          if (typeof window !== 'undefined' && window.innerHeight) {
+            ffUniforms.uViewportHeight.value = window.innerHeight;
+          }
+        }
+
+        this._refreshNearbyFireflyObstacles(px, pz, elapsed);
+
+        const teleported =
+          this._fireflyLastPlayerPos &&
+          Math.hypot(px - this._fireflyLastPlayerPos.x, pz - this._fireflyLastPlayerPos.z) > 65.0;
+        if (!this._fireflyLastPlayerPos) {
+          this._fireflyLastPlayerPos = { x: px, z: pz };
+        } else {
+          this._fireflyLastPlayerPos.x = px;
+          this._fireflyLastPlayerPos.z = pz;
+        }
+
+        const posAttr = this.firefliesPoints.geometry.attributes.position;
+        const colAttr = this.firefliesPoints.geometry.attributes.aColor;
+        const sizeAttr = this.firefliesPoints.geometry.attributes.aSize;
+        const glowAttr = this.firefliesPoints.geometry.attributes.aGlow;
+        const posArr = posAttr.array;
+        const colArr = colAttr.array;
+        const sizeArr = sizeAttr.array;
+        const glowArr = glowAttr.array;
+
+        const circles = this._nearbyFireflyCircles || [];
+        const boxes = this._nearbyFireflyBoxes || [];
+        const segs = this._nearbyFireflySegs || [];
+
+        for (let i = 0; i < this._fireflyData.length; i++) {
+          const ff = this._fireflyData[i];
+
+          // Welt-Neuplatzierung bei erstem Server-Spawn, Teleport, zu großem Abstand (>52m) oder ungültigem Stadtkern-Slot
+          const dpx = ff.wx - px;
+          const dpz = ff.wz - pz;
+          const distSqP = dpx * dpx + dpz * dpz;
+          const needsInitialSeed = !ff._worldSeeded && Boolean(this.hasInitialServerPos);
+          const needsDormantRetry = !ff.habitatValid && ((i + Math.floor(elapsed * 2.0)) % 16 === 0);
+
+          if (needsInitialSeed || teleported || distSqP > 52.0 * 52.0 || needsDormantRetry) {
+            const minSpawnR = needsInitialSeed || teleported ? 5.5 : 26.0;
+            const maxSpawnR = needsInitialSeed || teleported ? 44.0 : 47.0;
+            const spot = this._pickFireflyWorldSpot(px, pz, minSpawnR, maxSpawnR);
+            ff.wx = spot.x;
+            ff.wz = spot.z;
+            ff.homeX = spot.x;
+            ff.homeZ = spot.z;
+            ff.habitatValid = spot.valid;
+            ff._worldSeeded = Boolean(this.hasInitialServerPos);
+            const gyInit = this.getTerrainHeight ? this.getTerrainHeight(spot.x, spot.z, this.currentMapId) : py;
+            ff.y = gyInit + ff.baseHoverY;
+            ff.vx = 0;
+            ff.vz = 0;
+            ff.spawnFade = needsInitialSeed ? 0.5 : 0.0;
+          }
+
+          if (!ff.habitatValid) {
+            ff.currentGlow = 0.0;
+            ff.distSqToPlayer = 99999.0;
+            glowArr[i] = 0.0;
+            posArr[i * 3] = ff.wx;
+            posArr[i * 3 + 1] = -5000.0;
+            posArr[i * 3 + 2] = ff.wz;
+            continue;
+          }
+
+          ff.spawnFade = Math.min(1.0, ff.spawnFade + stepDt * 0.65);
+
+          // 1. Organisches Kreisen um festen Welt-Heimatpunkt (kein Mitziehen mit Kamera oder Spieler!)
+          ff.wanderAngle += ff.wanderSpeed * stepDt + Math.sin(elapsed * 0.7 + ff.phase) * 0.25 * stepDt;
+          const localR = ff.wanderRadius * (0.65 + 0.35 * Math.sin(elapsed * 0.42 + ff.phase));
+          const targetWX = ff.homeX + Math.cos(ff.wanderAngle) * localR;
+          const targetWZ = ff.homeZ + Math.sin(ff.wanderAngle) * localR;
+
+          ff.vx += ((targetWX - ff.wx) * 0.85 + windX * 0.06 - ff.vx * 1.45) * stepDt;
+          ff.vz += ((targetWZ - ff.wz) * 0.85 + windZ * 0.06 - ff.vz * 1.45) * stepDt;
+
+          // 2. Sanfte Lenkung & harte Kollisionsabweisung um Häuser (OBBs), Felsen/Bäume (Kreise) & Mauern/Zäune (Segmente)
+          for (let bIdx = 0; bIdx < boxes.length; bIdx++) {
+            const [bx, bz, hw, hd, cosR, sinR] = boxes[bIdx];
+            const rx = ff.wx - bx;
+            const rz = ff.wz - bz;
+            if (Math.abs(rx) > hw + hd + 3.0 || Math.abs(rz) > hw + hd + 3.0) continue;
+            const lx = rx * cosR - rz * sinR;
+            const lz = rx * sinR + rz * cosR;
+            const softX = hw + 1.45;
+            const softZ = hd + 1.45;
+            if (Math.abs(lx) < softX && Math.abs(lz) < softZ) {
+              const penX = softX - Math.abs(lx);
+              const penZ = softZ - Math.abs(lz);
+              let pushLX = 0;
+              let pushLZ = 0;
+              if (penX < penZ) {
+                pushLX = lx >= 0 ? 1 : -1;
+              } else {
+                pushLZ = lz >= 0 ? 1 : -1;
+              }
+              const worldNX = pushLX * cosR + pushLZ * sinR;
+              const worldNZ = -pushLX * sinR + pushLZ * cosR;
+              const steer = Math.min(1.0, Math.min(penX, penZ) / 0.95);
+              ff.vx += (worldNX * 2.1 - worldNZ * 0.65) * steer * stepDt;
+              ff.vz += (worldNZ * 2.1 + worldNX * 0.65) * steer * stepDt;
+
+              const hardX = hw + 0.55;
+              const hardZ = hd + 0.55;
+              if (Math.abs(lx) < hardX && Math.abs(lz) < hardZ) {
+                let clampedLX = lx;
+                let clampedLZ = lz;
+                if (hardX - Math.abs(lx) < hardZ - Math.abs(lz)) {
+                  clampedLX = (lx >= 0 ? 1 : -1) * hardX;
+                } else {
+                  clampedLZ = (lz >= 0 ? 1 : -1) * hardZ;
+                }
+                ff.wx = bx + clampedLX * cosR + clampedLZ * sinR;
+                ff.wz = bz - clampedLX * sinR + clampedLZ * cosR;
+                ff.homeX += worldNX * 0.45;
+                ff.homeZ += worldNZ * 0.45;
+              }
+            }
+          }
+
+          let nearTreeCanopyCap = 99.0;
+          for (let cIdx = 0; cIdx < circles.length; cIdx++) {
+            const [ox, oz, orad] = circles[cIdx];
+            // Kleine Büsche (< 0.85m Radius) liegen unterhalb der Flughöhe (2.15m–3.95m)
+            if (orad < 0.85) continue;
+            const cdx = ff.wx - ox;
+            const cdz = ff.wz - oz;
+            const dSq = cdx * cdx + cdz * cdz;
+            if (dSq < 13.5) {
+              nearTreeCanopyCap = Math.min(nearTreeCanopyCap, 3.10);
+            }
+            const softR = orad + 1.35;
+            if (dSq < softR * softR) {
+              const d = Math.max(0.001, Math.sqrt(dSq));
+              const nx = cdx / d;
+              const nz = cdz / d;
+              const steer = (softR - d) / 1.35;
+              const tangSign = (i % 2 === 0) ? 1.0 : -1.0;
+              ff.vx += (nx * 2.05 - nz * 0.90 * tangSign) * steer * stepDt;
+              ff.vz += (nz * 2.05 + nx * 0.90 * tangSign) * steer * stepDt;
+
+              const hardR = orad + 0.55;
+              if (d < hardR) {
+                ff.wx = ox + nx * hardR;
+                ff.wz = oz + nz * hardR;
+                const vDot = ff.vx * nx + ff.vz * nz;
+                if (vDot < 0) {
+                  ff.vx -= vDot * nx;
+                  ff.vz -= vDot * nz;
+                }
+                ff.homeX += nx * 0.40;
+                ff.homeZ += nz * 0.40;
+              }
+            }
+          }
+
+          for (let sIdx = 0; sIdx < segs.length; sIdx++) {
+            const [x0, z0, x1, z1, thick] = segs[sIdx];
+            const sx = x1 - x0;
+            const sz = z1 - z0;
+            const lenSq = sx * sx + sz * sz;
+            let t = 0;
+            if (lenSq > 0.0001) {
+              t = Math.max(0, Math.min(1, ((ff.wx - x0) * sx + (ff.wz - z0) * sz) / lenSq));
+            }
+            const cx = x0 + t * sx;
+            const cz = z0 + t * sz;
+            const sdx = ff.wx - cx;
+            const sdz = ff.wz - cz;
+            const softR = thick + 1.25;
+            const dSq = sdx * sdx + sdz * sdz;
+            if (dSq < softR * softR) {
+              const d = Math.max(0.001, Math.sqrt(dSq));
+              const nx = sdx / d;
+              const nz = sdz / d;
+              const steer = (softR - d) / 1.25;
+              ff.vx += (nx * 2.0 - nz * 0.7) * steer * stepDt;
+              ff.vz += (nz * 2.0 + nx * 0.7) * steer * stepDt;
+
+              const hardR = thick + 0.52;
+              if (d < hardR) {
+                ff.wx = cx + nx * hardR;
+                ff.wz = cz + nz * hardR;
+                ff.homeX += nx * 0.35;
+                ff.homeZ += nz * 0.35;
+              }
+            }
+          }
+
+          // Ruhige, fließende 3D-Insekten-Fluggeschwindigkeit (~0.82 m/s max)
+          const spd = Math.hypot(ff.vx, ff.vz);
+          if (spd > 0.82) {
+            const sc = 0.82 / spd;
+            ff.vx *= sc;
+            ff.vz *= sc;
+          }
+
+          ff.wx += ff.vx * stepDt;
+          ff.wz += ff.vz * stepDt;
+
+          // 3. Freier 3D-Schwebeflug deutlich ÜBER den 3D-Grashalmen (~2.10m–4.05m) & unterhalb tiefer Baumkronen
+          const gy = this.getTerrainHeight ? this.getTerrainHeight(ff.wx, ff.wz, this.currentMapId) : py;
+          const bob =
+            (Math.sin(elapsed * ff.bobFreq + ff.phase * 1.5) * 0.72 +
+              Math.cos(elapsed * (ff.bobFreq * 0.58) + ff.phase * 0.7) * 0.28) *
+            ff.bobAmp;
+          const desiredRelY = Math.min(nearTreeCanopyCap, Math.max(2.10, ff.baseHoverY + bob));
+          const targetY = gy + desiredRelY;
+          ff.y += (targetY - ff.y) * Math.min(1.0, stepDt * 3.0);
+          if (ff.y < gy + 2.05) ff.y = gy + 2.05;
+          if (ff.y > gy + 4.20) ff.y = gy + 4.20;
+
+          posArr[i * 3] = ff.wx;
+          posArr[i * 3 + 1] = ff.y;
+          posArr[i * 3 + 2] = ff.wz;
+
+          // 4. Ruhiger, weicher Biolumineszenz-Puls mit natürlichen Dunkelpausen
+          const cyclePos = (((elapsed + ff.phaseOffset) % ff.cycleDur) + ff.cycleDur) % ff.cycleDur;
+          const cycleFrac = cyclePos / ff.cycleDur;
+          let flash = 0.0;
+          if (cycleFrac < 0.54) {
+            const w = Math.sin((cycleFrac / 0.54) * Math.PI);
+            flash = Math.pow(w, 1.45) * (0.90 + 0.10 * Math.sin(elapsed * 5.8 + ff.phase));
+          }
+          const glow = flash * ff.spawnFade * effNightWeight;
+
+          ff.currentGlow = glow;
+          ff.distSqToPlayer = (ff.wx - px) * (ff.wx - px) + (ff.wz - pz) * (ff.wz - pz);
+
+          sizeArr[i] = ff.baseSize * (0.82 + 0.24 * flash);
+          glowArr[i] = glow;
+          colArr[i * 3] = ff.baseColor.r;
+          colArr[i * 3 + 1] = ff.baseColor.g;
+          colArr[i * 3 + 2] = ff.baseColor.b;
+        }
+
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+        sizeAttr.needsUpdate = true;
+        glowAttr.needsUpdate = true;
+
+        // 5. Echtzeit-3D-Umweltbeleuchtung von oben auf Grasspitzen, Boden, Pfützen, Felsen & Baumrinde (8 Sticky-Slots ohne Popping)
+        const u = this._grassShaderUniforms;
+        if (u && u.uFireflyPosRad && u.uFireflyColInt) {
+          if (!this._fireflyLightSlots || this._fireflyLightSlots.length !== 8) {
+            this._fireflyLightSlots = new Array(8).fill(-1);
+          }
+          const slots = this._fireflyLightSlots;
+          const uPos = u.uFireflyPosRad.value;
+          const uCol = u.uFireflyColInt.value;
+
+          // Bestehende Slots nur in der Dunkelpause (glow <= 0.015) oder außerhalb der Sichtweite (>40m) freigeben
+          for (let s = 0; s < 8; s++) {
+            const idx = slots[s];
+            if (idx >= 0 && idx < this._fireflyData.length) {
+              const ff = this._fireflyData[idx];
+              if (!ff.habitatValid || ff.currentGlow <= 0.015 || ff.distSqToPlayer > 40.0 * 40.0) {
+                slots[s] = -1;
+              }
+            } else {
+              slots[s] = -1;
+            }
+          }
+
+          // Freie Slots den nächstgelegenen aktiv aufleuchtenden Glühwürmchen zuweisen
+          for (let s = 0; s < 8; s++) {
+            if (slots[s] !== -1) continue;
+            let bestIdx = -1;
+            let bestScore = 0.0;
+            for (let i = 0; i < this._fireflyData.length; i++) {
+              const ff = this._fireflyData[i];
+              if (!ff.habitatValid || ff.currentGlow <= 0.025 || ff.distSqToPlayer > 36.0 * 36.0) continue;
+              let alreadyAssigned = false;
+              for (let k = 0; k < 8; k++) {
+                if (slots[k] === i) {
+                  alreadyAssigned = true;
+                  break;
+                }
+              }
+              if (alreadyAssigned) continue;
+              const score = ff.currentGlow / (1.0 + ff.distSqToPlayer * 0.028);
+              if (score > bestScore) {
+                bestScore = score;
+                bestIdx = i;
+              }
+            }
+            if (bestIdx !== -1) {
+              slots[s] = bestIdx;
+            }
+          }
+
+          // GPU-Uniforms aktualisieren: Größerer 3D-Lichtkegel (~6.0m), damit das frei in der Luft schwebende Glühwürmchen
+          // die Grasspitzen darunter, den Waldboden sowie benachbarte Baumstämme & Felsen natürlich von oben anstrahlt!
+          for (let s = 0; s < 8; s++) {
+            const idx = slots[s];
+            if (idx !== -1) {
+              const ff = this._fireflyData[idx];
+              const lightRad = 5.35 + ff.baseSize * 1.8;
+              const lightInt = ff.currentGlow * 0.46;
+              uPos[s].set(ff.wx, ff.y - 0.30, ff.wz, lightRad);
+              uCol[s].set(ff.linColor.r, ff.linColor.g, ff.linColor.b, lightInt);
+            } else {
+              uPos[s].set(0, -5000, 0, 0);
+              uCol[s].set(0, 0, 0, 0);
+            }
+          }
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // B) Singvögel / Schwalben bei Tag
+    // -------------------------------------------------------------
+    if (this._dayBirds && this._dayBirds.length > 0) {
+      if (dayWeight <= 0.01) {
+        for (const b of this._dayBirds) {
+          b.model.root.visible = false;
+        }
+      } else {
+        for (let i = 0; i < this._dayBirds.length; i++) {
+          const b = this._dayBirds[i];
+          b.model.root.visible = true;
+
+          const duskDamp = Math.min(1.0, dayWeight * 1.25);
+
+          if (b.isThermalSoarer) {
+            b.circleAngle += b.circleSpeed * stepDt;
+            const targetX = b.circleCenter.x + Math.cos(b.circleAngle) * b.circleRadius;
+            const targetZ = b.circleCenter.y + Math.sin(b.circleAngle) * b.circleRadius;
+            const dx = targetX - b.x;
+            const dz = targetZ - b.z;
+            b.targetYaw = Math.atan2(dx, dz);
+          } else {
+            const distFromPlayer = Math.hypot(b.x - px, b.z - pz);
+            if (distFromPlayer > 95.0) {
+              b.targetYaw = Math.atan2(px - b.x, pz - b.z);
+            } else if (Math.random() < 0.02) {
+              b.targetYaw += (Math.random() - 0.5) * 0.9;
+            }
+          }
+
+          let dyaw = b.targetYaw - b.yaw;
+          while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+          while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+          const turnStep = Math.max(-1.8 * stepDt, Math.min(1.8 * stepDt, dyaw * 2.2 * stepDt));
+          b.yaw += turnStep;
+          b.turnRate = turnStep / stepDt;
+
+          const fwdX = Math.sin(b.yaw);
+          const fwdZ = Math.cos(b.yaw);
+          b.x += (fwdX * b.speed + windX * 0.35) * stepDt;
+          b.z += (fwdZ * b.speed + windZ * 0.35) * stepDt;
+
+          const gy = this.getTerrainHeight ? this.getTerrainHeight(b.x, b.z, this.currentMapId) : py;
+          const targetAlt = Math.max(b.minAlt, b.baseAlt * duskDamp);
+          const targetFlightY = gy + targetAlt;
+
+          if (b.isFlapping) {
+            b.flapTimer -= stepDt;
+            b.wingPhase += b.wingFlapSpeed * stepDt;
+            b.y += (targetFlightY + 0.6 - b.y) * Math.min(1.0, stepDt * 1.8);
+            b.pitch = -0.06;
+
+            const flapAngle = Math.sin(b.wingPhase) * 0.68;
+            b.model.leftWing.rotation.z = flapAngle;
+            b.model.rightWing.rotation.z = -flapAngle;
+
+            if (b.flapTimer <= 0) {
+              b.isFlapping = false;
+              b.glideTimer = b.isThermalSoarer ? 3.5 + Math.random() * 4.0 : 1.8 + Math.random() * 2.8;
+            }
+          } else {
+            b.glideTimer -= stepDt;
+            b.y += (targetFlightY - 0.4 - b.y) * Math.min(1.0, stepDt * 1.2);
+            b.pitch = 0.04;
+
+            const glideDihedral = 0.12 + Math.sin(elapsed * 2.5 + b.wingPhase) * 0.03;
+            b.model.leftWing.rotation.z = glideDihedral;
+            b.model.rightWing.rotation.z = -glideDihedral;
+
+            if (b.glideTimer <= 0) {
+              b.isFlapping = true;
+              b.flapTimer = 0.9 + Math.random() * 1.4;
+            }
+          }
+
+          const targetRoll = -Math.max(-0.65, Math.min(0.65, b.turnRate * 0.45));
+          b.roll += (targetRoll - b.roll) * Math.min(1.0, stepDt * 5.0);
+
+          b.model.root.position.set(b.x, b.y, b.z);
+          b.model.root.rotation.set(b.pitch, b.yaw, b.roll, 'YXZ');
+        }
+      }
+    }
   }
 
   // ==========================================================================
@@ -22588,8 +24812,9 @@ export class OpenWorld3DEngine {
     const classKey = cfg.classId || 'warrior';
     const HERO_GLB_BY_CLASS = {
       warrior: {
-        glb: '/assets/models/npcs/pewi_tyr.glb',
-        tex: ['/assets/models/npcs/pewi_tyr.png'],
+        glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw2',
+        tex: ['/assets/models/heroes/klingenwaechter_male.png?v=20261031_kw2'],
+        normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw2',
         height: 1.88,
       },
       ninja: {
@@ -22636,6 +24861,7 @@ export class OpenWorld3DEngine {
           color: new THREE.Color(1.22, 1.20, 1.18),
           roughness: 0.52,
           metalness: 0.16,
+          normalMap: heroGlbCfg.normalMap || null,
           emissive: new THREE.Color(plus >= 9 ? 0xf59e0b : plus >= 7 ? 0x38bdf8 : 0xffffff),
           emissiveIntensity: plus >= 9 ? 0.24 : plus >= 7 ? 0.18 : 0.14,
           useMapAsEmissive: true,
@@ -22679,26 +24905,36 @@ export class OpenWorld3DEngine {
 
             if (fallbackHandIdx >= 0) {
               const handBone = glbAct.rigGroup.getObjectByName(`bone_${fallbackHandIdx}`);
+              if (handBone) {
+                glbAct.rightHandBone = handBone;
+              }
               if (handBone && weaponGroup) {
-                heroGlbHolder.updateMatrixWorld(true);
-                const qRootWorld = new THREE.Quaternion();
-                const qHandWorld = new THREE.Quaternion();
-                heroGlbHolder.getWorldQuaternion(qRootWorld);
-                handBone.getWorldQuaternion(qHandWorld);
-                const qHandInRoot = qRootWorld.clone().invert().multiply(qHandWorld);
-
-                // Ziel-Ausrichtung des Schwertes im Charakter-Koordinatensystem (+Z = vorwärts, +Y = oben, -X = rechts):
-                // Klinge (+Z) zeigt im ~28°-Winkel kraftvoll nach vorn-oben und leicht nach rechts-außen (kein Körper-/Boden-Clipping!)
-                const targetSwordQuatInRoot = new THREE.Quaternion().setFromEuler(
-                  new THREE.Euler(-0.50, -0.16, 0.32, 'YXZ')
-                );
                 const weaponSocket = new THREE.Group();
                 weaponSocket.name = 'weaponSocket';
-                // In Biped-Handknochen zeigt lokales +X vom Handgelenk zu den Fingern (~6.2cm bis zur geschlossenen Faustmitte)
-                weaponSocket.position.set(6.2, 0.6, 0.0);
-                weaponSocket.quaternion.copy(qHandInRoot).invert().multiply(targetSwordQuatInRoot);
+                if (heroGlbCfg.glb.includes('klingenwaechter_male')) {
+                  // Exakt anatomisch aus R_Hand-Bindpose (Knöchel-Achse +X, Handflächen-Normale +Y, Daumen/Klinge +Z)
+                  // berechneter lokaler Faust-Socket – 100 % unabhängig von der aktuellen Mixer-Animationsphase!
+                  weaponSocket.position.set(-0.0177, -0.0118, 0.0389);
+                  weaponSocket.quaternion.set(0.04521, 0.66362, 0.67493, -0.31941);
+                } else {
+                  heroGlbHolder.updateMatrixWorld(true);
+                  const qRootWorld = new THREE.Quaternion();
+                  const qHandWorld = new THREE.Quaternion();
+                  heroGlbHolder.getWorldQuaternion(qRootWorld);
+                  handBone.getWorldQuaternion(qHandWorld);
+                  const qHandInRoot = qRootWorld.clone().invert().multiply(qHandWorld);
+                  const targetSwordQuatInRoot = new THREE.Quaternion().setFromEuler(
+                    new THREE.Euler(-0.50, -0.16, 0.32, 'YXZ')
+                  );
+                  if (tpl.isYUp) {
+                    weaponSocket.position.set(-0.022, -0.028, 0.032);
+                  } else {
+                    weaponSocket.position.set(6.2, 0.6, 0.0);
+                  }
+                  weaponSocket.quaternion.copy(qHandInRoot).invert().multiply(targetSwordQuatInRoot);
+                }
                 const invScale = 1.0 / Math.max(0.005, glbAct.rigGroup.scale.x || 0.01);
-                weaponSocket.scale.setScalar(invScale * 0.86);
+                weaponSocket.scale.setScalar(invScale * (tpl.isYUp ? 0.92 : 0.86));
 
                 weaponGroup.position.set(0, 0, 0);
                 weaponGroup.rotation.set(0, 0, 0);
@@ -22707,6 +24943,18 @@ export class OpenWorld3DEngine {
                 handBone.add(weaponSocket);
                 glbAct.weaponSocket = weaponSocket;
               }
+            }
+            const leftHandIdx = tpl.nodes.findIndex((n) =>
+              /^(bip01 l hand|l_hand|l hand|lefthand)$/i.test((n.name || '').trim())
+            );
+            if (leftHandIdx >= 0) {
+              glbAct.leftHandBone = glbAct.rigGroup.getObjectByName(`bone_${leftHandIdx}`) || null;
+            }
+            const headIdx = tpl.nodes.findIndex((n) =>
+              /^(bip01 head|head)$/i.test((n.name || '').trim())
+            );
+            if (headIdx >= 0) {
+              glbAct.headBone = glbAct.rigGroup.getObjectByName(`bone_${headIdx}`) || null;
             }
 
             // 2. Foot-IK Knochenreferenzen & lokale Welt-X-Pitch-Achsen für Two-Bone-IK auf Unebenheiten/Schrägen ermitteln
@@ -22902,11 +25150,28 @@ export class OpenWorld3DEngine {
       let targetClip = 'wait';
       let speedMult = 1.0;
       let fadeTime = 0.14;
+      let forceRestart = false;
+      if ((actor._activeSkillTimer || 0) > 0) {
+        actor._activeSkillTimer = Math.max(0, actor._activeSkillTimer - dt);
+      }
       if (isDead) {
         targetClip = 'dead';
+      } else if (!isMounted && (actor._activeSkillTimer || 0) > 0 && actor._activeSkillClip) {
+        targetClip = actor._activeSkillClip;
+        speedMult = actor._activeSkillSpeed || 1.18;
+        fadeTime = 0.06;
+        if (actor._activeSkillForceRestart) {
+          forceRestart = true;
+          actor._activeSkillForceRestart = false;
+        }
       } else if (isMounted) {
         if (isAttacking) {
-          targetClip = heroGlbAct.clips?.mount_attack ? 'mount_attack' : 'attack1';
+          const useSecondMountSlash = ((comboStep || 0) % 2 === 1) && heroGlbAct.clips?.mount_attack2;
+          targetClip = useSecondMountSlash
+            ? 'mount_attack2'
+            : heroGlbAct.clips?.mount_attack
+            ? 'mount_attack'
+            : 'attack1';
           speedMult = 1.15;
           fadeTime = 0.08;
         } else if (isMoving) {
@@ -22915,29 +25180,34 @@ export class OpenWorld3DEngine {
         } else {
           targetClip = heroGlbAct.clips?.mount_idle ? 'mount_idle' : 'wait';
         }
+      } else if (gatherMode === 'mining' && heroGlbAct.clips?.mining) {
+        targetClip = 'mining';
+        speedMult = 1.05;
+        fadeTime = 0.10;
       } else if (isAttacking || gatherMode === 'mining') {
-        const stepIdx = ((comboStep || 0) % 6) + 1;
+        const comboLen = heroGlbAct.clips?.attack7 ? 7 : 6;
+        const stepIdx = ((comboStep || 0) % comboLen) + 1;
         const stepKey = `attack${stepIdx}`;
         targetClip = heroGlbAct.clips?.[stepKey]
           ? stepKey
           : heroGlbAct.clips?.attack1
           ? 'attack1'
           : 'attack';
-        speedMult = stepIdx >= 5 ? 1.0 : 1.06;
-        fadeTime = 0.08;
+        speedMult = stepIdx >= 6 ? 1.06 : 1.14;
+        fadeTime = 0.07;
       } else if (isJumping && heroGlbAct.clips?.jump) {
         targetClip = 'jump';
         speedMult = 1.0;
         fadeTime = 0.10;
       } else if (isMoving) {
         targetClip = isSprinting && heroGlbAct.clips?.run ? 'run' : 'walk';
-        speedMult = isSprinting ? 1.18 : 1.12;
+        speedMult = isSprinting ? 1.14 : 1.08;
       } else if (isTurningInPlace) {
         targetClip = 'walk';
         speedMult = 0.72;
       }
 
-      heroGlbAct.playAnim(targetClip, fadeTime, isDead);
+      heroGlbAct.playAnim(targetClip, fadeTime, isDead || targetClip.startsWith('skill_'), forceRestart);
       heroGlbAct.mixer.update(dt * speedMult);
 
       // Post-Mixer Two-Bone Foot-IK & Landungs-Dämpfung direkt auf die echten GLB-Beinknochen anwenden
@@ -22978,6 +25248,9 @@ export class OpenWorld3DEngine {
         }
       }
     }
+
+    // 1b. Aktive Metin2- & L-Skill-Waffen-/Körper-Buff-Loops (Tiers 1..5) animieren
+    this.updateActorMetinBuffLoop(actor, dt, elapsed);
 
     // 2. +7 / +8 / +9 Rüstungs- & Waffen-Funkeln (Metin2 Shinings) rotieren & pulsieren lassen
     for (const shGroup of [actor.armorShining, actor.weaponShining]) {
@@ -25641,6 +27914,17 @@ export class OpenWorld3DEngine {
     }
     this.hasActiveWeaponBuff = Array.isArray(comp.activeBuffs) && comp.activeBuffs.length > 0;
     this.localPlayerActor.auraRing.visible = (comp.weaponPlus || 0) >= 7 || this.hasActiveWeaponBuff;
+    this.localPlayerClassId = p.classId || 'warrior';
+    this.localPlayerGender = p.gender || 'm';
+    this.localPlayerDoctrine = p.doctrine || '';
+    this.localPlayerSkills = p.skills || {};
+    this.syncActorMetinBuffState(
+      this.localPlayerActor,
+      comp.activeBuffs,
+      this.localPlayerClassId,
+      this.localPlayerDoctrine,
+      this.localPlayerGender
+    );
 
     // Auto-Farm-Ring & Sammel-Modus (fishing / mining) anzeigen wenn aktiv + Bot-System-Daten gedrosselt einspeisen
     const af = p.autofarm || {};
@@ -26555,34 +28839,66 @@ export class OpenWorld3DEngine {
         this.spawnRingWave(ev.x, y + 0.22, ev.z, 0x38bdf8, 2.2);
       }
     } else if (ev.type === 'skill_cast') {
-      if (isLocalPlayerEvent) {
+      const casterActor = isLocalPlayerEvent ? this.localPlayerActor : this.otherPlayerMeshes.get(d.playerId);
+      const metinSk = this.triggerMetinSkillExecution(casterActor, ev.x, y, ev.z, d.skillId, {
+        classId: d.classId,
+        doctrine: d.doctrine,
+        skillLevel: d.skillLevel,
+        skillTier: d.skillTier,
+        gender: d.gender,
+        isLocal: isLocalPlayerEvent,
+        eventType: 'skill_cast',
+        radius: d.radius,
+      });
+      const hasGlbCaster = Boolean(casterActor?.heroGlbHolder?.userData?.glbActor);
+      if (isLocalPlayerEvent && !hasGlbCaster && ['palbang', 'charyun', 'yonggwon'].includes(metinSk?.code)) {
         this.localWhirlwindTimer = 0.58;
       }
       const isCrit = Boolean(d.crit);
       const isPierce = Boolean(d.pierce);
-      const skillColor = isCrit ? '#ff2a2a' : isPierce ? '#22c55e' : d.color || '#38bdf8';
+      const isLSkill = Boolean(metinSk?.isLSkill) || Number(d.skillTier) === 5;
+      const skillColor = isLSkill ? '#e879f9' : isCrit ? '#ff2a2a' : isPierce ? '#22c55e' : d.color || '#38bdf8';
       const suffix = isCrit && isPierce ? ' (KRIT + DB!)' : isCrit ? ' (KRIT!)' : isPierce ? ' (DB!)' : '!';
-      this.spawnFloatingText(ev.x, y + 2.85, ev.z, `⚡ ${d.skillName}${suffix}`, skillColor);
-      const vortexMode = isCrit && isPierce ? 'crit_pierce' : isCrit ? 'crit' : isPierce ? 'pierce' : 'default';
-      this.spawnDarkVortexVFX(ev.x, y + 1.18, ev.z, Math.min(3.8, (d.radius || 4.5) * 0.65), vortexMode);
-      this.spawnRingWave(ev.x, y + 0.25, ev.z, new THREE.Color(d.color || '#a855f7').getHex(), d.radius || 4.8);
+      const displaySkillName = metinSk?.name || d.skillName;
+      const prefixIcon = isLSkill ? '👑 ' : '⚡ ';
+      this.spawnFloatingText(ev.x, y + 2.85, ev.z, `${prefixIcon}${displaySkillName}${suffix}`, skillColor);
+      if (!metinSk) {
+        const vortexMode = isCrit && isPierce ? 'crit_pierce' : isCrit ? 'crit' : isPierce ? 'pierce' : 'default';
+        this.spawnDarkVortexVFX(ev.x, y + 1.18, ev.z, Math.min(3.8, (d.radius || 4.5) * 0.65), vortexMode);
+        this.spawnRingWave(ev.x, y + 0.25, ev.z, new THREE.Color(isLSkill ? '#c084fc' : d.color || '#a855f7').getHex(), d.radius || 4.8);
+      }
       if (isCrit) {
-        this.spawnRingWave(ev.x, y + 0.34, ev.z, 0xff1e1e, (d.radius || 4.8) * 1.08);
+        this.spawnRingWave(ev.x, y + 0.34, ev.z, 0xff1e1e, (d.radius || 4.8) * 1.04);
         this.spawnHitSparkVFX(ev.x, y + 1.25, ev.z, true, true, false);
       }
       if (isPierce) {
-        this.spawnRingWave(ev.x, y + 0.4, ev.z, 0x22c55e, (d.radius || 4.8) * 1.04);
+        this.spawnRingWave(ev.x, y + 0.4, ev.z, 0x22c55e, (d.radius || 4.8) * 1.02);
         this.spawnHitSparkVFX(ev.x, y + 1.25, ev.z, false, true, true);
       }
     } else if (ev.type === 'skill_buff' || ev.type === 'heal') {
+      const casterActor = isLocalPlayerEvent ? this.localPlayerActor : this.otherPlayerMeshes.get(d.playerId);
+      const metinSk = this.triggerMetinSkillExecution(casterActor, ev.x, y, ev.z, d.skillId || (ev.type === 'heal' ? 'natures_heal' : 'aura_sword'), {
+        classId: d.classId,
+        doctrine: d.doctrine,
+        skillLevel: d.skillLevel,
+        skillTier: d.skillTier,
+        gender: d.gender,
+        isLocal: isLocalPlayerEvent,
+        eventType: ev.type,
+      });
+      const hasGlbCaster = Boolean(casterActor?.heroGlbHolder?.userData?.glbActor);
       if (isLocalPlayerEvent && ev.type === 'skill_buff') {
-        this.localBuffAnimTimer = 0.72;
+        if (!hasGlbCaster) this.localBuffAnimTimer = 0.72;
         this.hasActiveWeaponBuff = true;
       }
-      const label = ev.type === 'heal' ? `💚 +${d.amount} TP` : `✨ ${d.skillName}`;
-      this.spawnFloatingText(ev.x, y + 2.75, ev.z, label, d.color || '#2dd4bf');
-      this.spawnRingWave(ev.x, y + 0.25, ev.z, new THREE.Color(d.color || '#2dd4bf').getHex(), 3.2);
-      this.spawnRingWave(ev.x, y + 0.85, ev.z, 0x34d399, 2.2);
+      const isLSkill = Boolean(metinSk?.isLSkill) || Number(d.skillTier) === 5;
+      const displayBuffName = metinSk?.name || d.skillName;
+      const label = ev.type === 'heal' ? `💚 +${d.amount} TP (${displayBuffName})` : `${isLSkill ? '👑' : '✨'} ${displayBuffName}`;
+      this.spawnFloatingText(ev.x, y + 2.75, ev.z, label, isLSkill ? '#e879f9' : d.color || '#2dd4bf');
+      if (!metinSk) {
+        this.spawnRingWave(ev.x, y + 0.25, ev.z, new THREE.Color(isLSkill ? '#c084fc' : d.color || '#2dd4bf').getHex(), isLSkill ? 4.2 : 3.2);
+        this.spawnRingWave(ev.x, y + 0.85, ev.z, isLSkill ? 0xfbbf24 : 0x34d399, isLSkill ? 2.8 : 2.2);
+      }
     } else if (ev.type === 'player_death') {
       this.spawnFloatingText(ev.x, y + 2.85, ev.z, '💀 GEFALLEN!', '#ef4444');
       this.spawnRingWave(ev.x, y + 0.25, ev.z, 0xdc2626, 4.6);
@@ -28812,17 +31128,17 @@ export class OpenWorld3DEngine {
           if (cStep === 0 || cStep === 2) {
             if (mesh.torso) mesh.torso.rotation.set(0.22 * swing, 0.52 - sweep * 1.08, -0.10 * swing);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-2.20 + sweep * 1.55, -0.35 + sweep * 0.75, -0.58 + sweep * 0.95);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.18 * swing : 0.35 * swing, 0, opHasGlbHero ? 0 : -0.30 + sweep * 0.55);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.35 * swing, 0, opHasGlbHero ? 0 : -0.30 + sweep * 0.55);
           } else if (cStep === 1 || cStep === 3) {
             if (mesh.torso) mesh.torso.rotation.set(0.18 * swing, -0.56 + sweep * 1.15, 0.10 * swing);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-1.72 + Math.cos(rawPhase * Math.PI) * 0.52, 0.48 - sweep * 0.92, 0.72 - sweep * 1.32);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.16 * swing : 0.26, 0, opHasGlbHero ? 0 : 0.42 - sweep * 0.82);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.26, 0, opHasGlbHero ? 0 : 0.42 - sweep * 0.82);
           } else {
             const windup = rawPhase < 0.28 ? rawPhase / 0.28 : 1.0 - (rawPhase - 0.28) / 0.72;
             const strike = rawPhase < 0.28 ? 0.0 : Math.min(1.0, (rawPhase - 0.28) / 0.42);
             if (mesh.torso) mesh.torso.rotation.set(-0.24 * windup + 0.42 * strike, -0.34 + strike * 0.76, 0);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-2.78 + strike * 2.24, 0, -0.20 + strike * 0.36);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.30 * strike : 0.58 * strike, 0, 0);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.58 * strike, 0, 0);
           }
         } else {
           // Sitzende Reiter-Oberkörperhaltung für andere Spieler
@@ -28845,21 +31161,21 @@ export class OpenWorld3DEngine {
             if (mesh.torso) mesh.torso.rotation.set(0.16 * swing, 0.58 - sweep * 1.18, 0);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-2.15 + sweep * 1.35, -0.35 + sweep * 0.85, -0.65 + sweep * 1.25);
             if (mesh.leftArmPivot) mesh.leftArmPivot.rotation.set(-0.55 - swing * 0.35, 0.25, 0.32);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.20 * swing : 0.28 * swing, 0, opHasGlbHero ? 0 : -0.35 + sweep * 0.7);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.28 * swing, 0, opHasGlbHero ? 0 : -0.35 + sweep * 0.7);
             if (mesh.leftLeg) mesh.leftLeg.rotation.x = -0.32 * swing;
             if (mesh.rightLeg) mesh.rightLeg.rotation.x = 0.32 * swing;
           } else if (cStep === 1) {
             if (mesh.torso) mesh.torso.rotation.set(0.14 * swing, -0.62 + sweep * 1.24, 0);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-1.68 + Math.cos(rawPhase * Math.PI) * 0.55, 0.45 - sweep * 0.95, 0.78 - sweep * 1.45);
             if (mesh.leftArmPivot) mesh.leftArmPivot.rotation.set(-0.48, -0.30, 0.42 * swing);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.16 * swing : 0.22, 0, opHasGlbHero ? 0 : 0.45 - sweep * 0.9);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.22, 0, opHasGlbHero ? 0 : 0.45 - sweep * 0.9);
             if (mesh.leftLeg) mesh.leftLeg.rotation.x = 0.28 * swing;
             if (mesh.rightLeg) mesh.rightLeg.rotation.x = -0.28 * swing;
           } else if (cStep === 3) {
             if (mesh.torso) mesh.torso.rotation.set(0.22 * swing, sweep * Math.PI * 2.0, 0);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-1.55, 0, -0.75);
             if (mesh.leftArmPivot) mesh.leftArmPivot.rotation.set(-1.15, 0, 0.55);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.22 * swing : 0.42, 0, opHasGlbHero ? 0 : -0.45);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.42, 0, opHasGlbHero ? 0 : -0.45);
             if (mesh.leftLeg) mesh.leftLeg.rotation.x = -0.25 * swing;
             if (mesh.rightLeg) mesh.rightLeg.rotation.x = 0.25 * swing;
           } else {
@@ -28868,7 +31184,7 @@ export class OpenWorld3DEngine {
             if (mesh.torso) mesh.torso.rotation.set(-0.28 * windup + 0.38 * strike, 0.28 - strike * 0.56, 0);
             if (mesh.rightArmPivot) mesh.rightArmPivot.rotation.set(-2.82 + strike * 2.18, -0.18 + strike * 0.32, -0.22 + strike * 0.38);
             if (mesh.leftArmPivot) mesh.leftArmPivot.rotation.set(-0.92 + strike * 0.48, 0, 0.34);
-            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0.26 * strike : 0.52 * strike, 0, 0);
+            if (mesh.weaponGroup) mesh.weaponGroup.rotation.set(opHasGlbHero ? 0 : 0.52 * strike, 0, 0);
             if (mesh.leftLeg) mesh.leftLeg.rotation.x = -0.42 * strike;
             if (mesh.rightLeg) mesh.rightLeg.rotation.x = 0.42 * strike;
           }
@@ -29710,7 +32026,7 @@ export class OpenWorld3DEngine {
       lp.torso.rotation.set(0.18, 0, 0);
       lp.rightArmPivot.rotation.set(-1.55, 0, -0.85);
       lp.leftArmPivot.rotation.set(-1.35, 0, 0.75);
-      lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.25 : 0.35, 0, 0);
+      lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.35, 0, 0);
     } else if (this.localBuffAnimTimer > 0) {
       if (lp.bodyGroup) lp.bodyGroup.rotation.x = 0;
       // Buff-Aktivierungs-Pose (Schwert-Aura, Kampfrausch, Hilfe des Drachens, Segen, Verzauberte Klinge etc. – auch animiert sitzend auf dem Pferd!)
@@ -29722,12 +32038,12 @@ export class OpenWorld3DEngine {
         lp.torso.rotation.set(-0.22 * raise + 0.08 * (1 - raise), Math.sin(bPhase * Math.PI * 2.0) * 0.12 * raise, 0);
         lp.rightArmPivot.rotation.set(-2.78 * raise - 0.42 * (1 - raise), -0.10, -0.16 * raise - 0.12 * (1 - raise));
         lp.leftArmPivot.rotation.set(-1.45 * raise - 0.68 * (1 - raise), 0.28, 0.22 * raise + 0.14 * (1 - raise));
-        lp.weaponGroup.rotation.set(hasGlbHeroSocket ? -0.18 * raise : -0.42 * raise + 0.10 * (1 - raise), 0, 0);
+        lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : -0.42 * raise + 0.10 * (1 - raise), 0, 0);
       } else {
         lp.torso.rotation.set(-0.18 * raise, 0, 0);
         lp.rightArmPivot.rotation.set(-2.85 * raise - 0.35 * (1 - raise), 0, -0.12 * raise);
         lp.leftArmPivot.rotation.set(-1.65 * raise - 0.25 * (1 - raise), 0, 0.25 * raise);
-        lp.weaponGroup.rotation.set(hasGlbHeroSocket ? -0.22 * raise : -0.45 * raise, 0, 0);
+        lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : -0.45 * raise, 0, 0);
       }
     } else {
       if (lp.bodyGroup) lp.bodyGroup.rotation.x = 0;
@@ -29747,43 +32063,43 @@ export class OpenWorld3DEngine {
             // Reit-Hieb 1: Weit geschwungener Kavallerie-Abwärtshieb rechts vom Sattel
             lp.torso.rotation.set(0.22 * swing, 0.52 - sweep * 1.08, -0.10 * swing);
             lp.rightArmPivot.rotation.set(-2.20 + sweep * 1.55, -0.35 + sweep * 0.75, -0.58 + sweep * 0.95);
-            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.18 * swing : 0.35 * swing, 0, hasGlbHeroSocket ? 0 : -0.30 + sweep * 0.55);
+            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.35 * swing, 0, hasGlbHeroSocket ? 0 : -0.30 + sweep * 0.55);
           } else if (this.localComboStep === 1) {
             // Reit-Hieb 2: Schneller Rückhand-Säbelstreich von links über den Pferdehals nach rechts
             lp.torso.rotation.set(0.18 * swing, -0.56 + sweep * 1.15, 0.10 * swing);
             lp.rightArmPivot.rotation.set(-1.72 + Math.cos(rawPhase * Math.PI) * 0.52, 0.48 - sweep * 0.92, 0.72 - sweep * 1.32);
-            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.16 * swing : 0.26, 0, hasGlbHeroSocket ? 0 : 0.42 - sweep * 0.82);
+            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.26, 0, hasGlbHeroSocket ? 0 : 0.42 - sweep * 0.82);
           } else if (this.localComboStep === 2) {
             // Reit-Hieb 3: Weiter diagonaler Kreuzhieb vom Sattel aus
             lp.torso.rotation.set(0.24 * swing, 0.64 - sweep * 1.28, -0.12 * swing);
             lp.rightArmPivot.rotation.set(-1.95 + sweep * 1.38, -0.42 + sweep * 0.88, -0.72 + sweep * 1.15);
-            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.20 * swing : 0.38, 0, hasGlbHeroSocket ? 0 : -0.40 + sweep * 0.75);
+            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.38, 0, hasGlbHeroSocket ? 0 : -0.40 + sweep * 0.75);
           } else if (this.localComboStep === 3) {
             // Reit-Hieb 4: Aufsteigender Flanken-Säbelstreich
             lp.torso.rotation.set(0.14 * swing, -0.68 + sweep * 1.34, 0.12 * swing);
             lp.rightArmPivot.rotation.set(-1.55 + Math.cos(rawPhase * Math.PI) * 0.62, 0.54 - sweep * 1.06, 0.84 - sweep * 1.52);
-            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.18 * swing : 0.30, 0, hasGlbHeroSocket ? 0 : 0.48 - sweep * 0.92);
+            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.30, 0, hasGlbHeroSocket ? 0 : 0.48 - sweep * 0.92);
           } else if (this.localComboStep === 4) {
             // Reit-Hieb 5: Wuchtiger Sattel-Lanzenstich / Überkopf-Spalter
             const windup = rawPhase < 0.30 ? rawPhase / 0.30 : 1.0 - (rawPhase - 0.30) / 0.70;
             const strike = rawPhase < 0.30 ? 0.0 : Math.min(1.0, (rawPhase - 0.30) / 0.42);
             lp.torso.rotation.set(-0.18 * windup + 0.34 * strike, 0.38 - strike * 0.74, -0.08 * strike);
             lp.rightArmPivot.rotation.set(-2.58 + strike * 2.02, -0.18 + strike * 0.34, -0.22 + strike * 0.42);
-            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.24 * strike : 0.48 * strike, 0, 0);
+            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.48 * strike, 0, 0);
           } else {
             // Reit-Hieb 6 (Finisher): Schwerer überkopf geführter Kavallerie-Spalter vom Sattel herab
             const windup = rawPhase < 0.28 ? rawPhase / 0.28 : 1.0 - (rawPhase - 0.28) / 0.72;
             const strike = rawPhase < 0.28 ? 0.0 : Math.min(1.0, (rawPhase - 0.28) / 0.42);
             lp.torso.rotation.set(-0.24 * windup + 0.42 * strike, -0.34 + strike * 0.76, 0);
             lp.rightArmPivot.rotation.set(-2.78 + strike * 2.24, 0, -0.20 + strike * 0.36);
-            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.30 * strike : 0.58 * strike, 0, 0);
+            lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.58 * strike, 0, 0);
           }
         } else if (this.localComboStep === 0) {
           // Schlag 1: Weit gezogener diagonaler Rechts-nach-Links-Schwerthieb mit Oberkörper-Drehung
           lp.torso.rotation.set(0.16 * swing, 0.58 - sweep * 1.18, 0);
           lp.rightArmPivot.rotation.set(-2.15 + sweep * 1.35, -0.35 + sweep * 0.85, -0.65 + sweep * 1.25);
           lp.leftArmPivot.rotation.set(-0.55 - swing * 0.35, 0.25, 0.32);
-          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.20 * swing : 0.28 * swing, 0, hasGlbHeroSocket ? 0 : -0.35 + sweep * 0.7);
+          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.28 * swing, 0, hasGlbHeroSocket ? 0 : -0.35 + sweep * 0.7);
           lp.leftLeg.rotation.x = -0.32 * swing;
           lp.rightLeg.rotation.x = 0.32 * swing;
         } else if (this.localComboStep === 1) {
@@ -29791,7 +32107,7 @@ export class OpenWorld3DEngine {
           lp.torso.rotation.set(0.14 * swing, -0.62 + sweep * 1.24, 0);
           lp.rightArmPivot.rotation.set(-1.68 + Math.cos(rawPhase * Math.PI) * 0.55, 0.45 - sweep * 0.95, 0.78 - sweep * 1.45);
           lp.leftArmPivot.rotation.set(-0.48, -0.30, 0.42 * swing);
-          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.16 * swing : 0.22, 0, hasGlbHeroSocket ? 0 : 0.45 - sweep * 0.9);
+          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.22, 0, hasGlbHeroSocket ? 0 : 0.45 - sweep * 0.9);
           lp.leftLeg.rotation.x = 0.28 * swing;
           lp.rightLeg.rotation.x = -0.28 * swing;
         } else if (this.localComboStep === 2) {
@@ -29799,7 +32115,7 @@ export class OpenWorld3DEngine {
           lp.torso.rotation.set(-0.10 * swing + 0.24 * sweep, 0.66 - sweep * 1.32, -0.08 * swing);
           lp.rightArmPivot.rotation.set(-0.92 - sweep * 1.18, -0.38 + sweep * 0.78, -0.72 + sweep * 1.36);
           lp.leftArmPivot.rotation.set(-0.62 - swing * 0.28, 0.22, 0.36);
-          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.22 * swing : 0.36 * swing, 0, hasGlbHeroSocket ? 0 : -0.42 + sweep * 0.84);
+          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.36 * swing, 0, hasGlbHeroSocket ? 0 : -0.42 + sweep * 0.84);
           lp.leftLeg.rotation.x = -0.36 * swing;
           lp.rightLeg.rotation.x = 0.30 * swing;
         } else if (this.localComboStep === 3) {
@@ -29807,7 +32123,7 @@ export class OpenWorld3DEngine {
           lp.torso.rotation.set(0.22 * swing, sweep * Math.PI * 2.0, 0);
           lp.rightArmPivot.rotation.set(-1.55, 0, -0.75);
           lp.leftArmPivot.rotation.set(-1.15, 0, 0.55);
-          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.22 * swing : 0.42, 0, hasGlbHeroSocket ? 0 : -0.45);
+          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.42, 0, hasGlbHeroSocket ? 0 : -0.45);
           lp.leftLeg.rotation.x = -0.25 * swing;
           lp.rightLeg.rotation.x = 0.25 * swing;
         } else if (this.localComboStep === 4) {
@@ -29817,7 +32133,7 @@ export class OpenWorld3DEngine {
           lp.torso.rotation.set(-0.28 * windup + 0.38 * strike, 0.28 - strike * 0.56, 0);
           lp.rightArmPivot.rotation.set(-2.82 + strike * 2.18, -0.18 + strike * 0.32, -0.22 + strike * 0.38);
           lp.leftArmPivot.rotation.set(-0.92 + strike * 0.48, 0, 0.34);
-          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.26 * strike : 0.52 * strike, 0, 0);
+          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.52 * strike, 0, 0);
           lp.leftLeg.rotation.x = -0.42 * strike;
           lp.rightLeg.rotation.x = 0.42 * strike;
         } else {
@@ -29827,7 +32143,7 @@ export class OpenWorld3DEngine {
           lp.torso.rotation.set(-0.28 * windup + 0.46 * strike, -0.42 + strike * 0.88, 0);
           lp.rightArmPivot.rotation.set(-2.85 + strike * 2.26, 0, -0.18 + strike * 0.40);
           lp.leftArmPivot.rotation.set(-0.88 + strike * 0.48, 0, 0.40);
-          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0.32 * strike : 0.60 * strike, 0, 0);
+          lp.weaponGroup.rotation.set(hasGlbHeroSocket ? 0 : 0.60 * strike, 0, 0);
           lp.leftLeg.rotation.x = -0.50 * strike;
           lp.rightLeg.rotation.x = 0.50 * strike;
         }
@@ -30035,6 +32351,8 @@ export class OpenWorld3DEngine {
     // 3B. 24h-Tag/Nacht-Zyklus, Jahreszeiten-Atmosphäre & 3D-Wetterpartikel aktualisieren
     this.updateEnvironmentLighting(dt);
     this.updateWeatherParticles(dt, elapsed);
+    // 3B-2. Ambiente Tierwelt aktualisieren (Glühwürmchen nachts, Vögel tagsüber)
+    this.updateAmbientWildlife(dt, elapsed);
 
     const curMinute = Math.floor(((this.env.hourOfDay % 24) + 24) % 24 * 60);
     if (curMinute !== this._lastEnvHudMinute) {
@@ -31508,7 +33826,8 @@ export class OpenWorld3DEngine {
       this.clickIndicator.material.opacity = this.clickIndicatorTimer;
     }
 
-    // 6. Temporäre VFX (Schadenszahlen, Schwert-Sicheln, Hit-Sparks, Dunkler Vortex & Schockwellen) aktualisieren
+    // 6. Temporäre VFX (inkl. Metin2 .mde 3D-Effektmeshes & .mse Partikel/Boden-Runen) aktualisieren
+    this.updateMetinScheduledEvents(dt);
     for (let i = this.vfxList.length - 1; i >= 0; i--) {
       const v = this.vfxList[i];
       v.age += dt;
@@ -31684,6 +34003,124 @@ export class OpenWorld3DEngine {
             em.position.z += em.userData.vz * dt;
             em.userData.vy -= 8.5 * dt;
             em.material.opacity = fade * 0.95;
+          }
+        }
+      } else if (v.type === 'metin_mde') {
+        if (v.followActor?.root && v.mesh) {
+          if (v.followBone) {
+            const att = this.getActorMetinAttachWorldPos(
+              v.followActor,
+              v.followBone,
+              [0, 0, 0],
+              v.followActor.root.position.x,
+              v.followActor.root.position.y,
+              v.followActor.root.position.z,
+              v.followActor.root.rotation.y
+            );
+            v.mesh.position.set(att.x, att.y, att.z);
+          } else {
+            v.mesh.position.x = v.followActor.root.position.x + (v.offsetX || 0);
+            v.mesh.position.y = v.followActor.root.position.y + (v.offsetY || 0.08);
+            v.mesh.position.z = v.followActor.root.position.z + (v.offsetZ || 0);
+          }
+        }
+        const fIdx = Math.floor(v.age / (v.frameDelay || 0.025)) % Math.max(1, v.frameCount || 1);
+        const fade = ratio > 0.75 ? Math.max(0, (1.0 - ratio) / 0.25) : 1.0;
+        if (v.submeshNodes) {
+          for (const sn of v.submeshNodes) {
+            const fr = sn.sub.frames[fIdx];
+            if (fr) {
+              sn.geo.attributes.position.array.set(fr.posArr);
+              sn.geo.attributes.position.needsUpdate = true;
+              sn.geo.attributes.uv.array.set(fr.uvArr);
+              sn.geo.attributes.uv.needsUpdate = true;
+              sn.mat.opacity = Math.max(0, Math.min(0.96, (fr.vis ?? 0.92) * fade));
+            }
+          }
+        }
+      } else if (v.type === 'metin_particles') {
+        if (v.followActor?.root && v.mesh) {
+          if (v.followBone) {
+            const att = this.getActorMetinAttachWorldPos(
+              v.followActor,
+              v.followBone,
+              [0, 0, 0],
+              v.followActor.root.position.x,
+              v.followActor.root.position.y,
+              v.followActor.root.position.z,
+              v.followActor.root.rotation.y
+            );
+            v.mesh.position.set(att.x, att.y, att.z);
+            v.mesh.rotation.y = v.followActor.root.rotation.y;
+          } else {
+            v.mesh.position.x = v.followActor.root.position.x + (v.offsetX || 0);
+            v.mesh.position.y = v.followActor.root.position.y + (v.offsetY || 0.03);
+            v.mesh.position.z = v.followActor.root.position.z + (v.offsetZ || 0);
+          }
+        }
+        if (v.groundRings) {
+          for (const gr of v.groundRings) {
+            const lAge = v.age - (gr.delay || 0);
+            if (lAge < 0) {
+              gr.mat.opacity = 0;
+              continue;
+            }
+            const u = Math.min(1.0, lAge / Math.max(0.18, gr.life || 0.72));
+            const ease = 1.0 - Math.pow(1.0 - u, 1.85);
+            const sc = gr.s0 + (gr.s1 - gr.s0) * ease;
+            gr.mesh.scale.setScalar(sc);
+            gr.mesh.rotation.z += dt * (gr.spinSpeed || 0);
+            if (gr.c0 && gr.c1) {
+              gr.mat.color.copy(gr.c0).lerp(gr.c1, u);
+            }
+            const alphaEnv = u < 0.12 ? u / 0.12 : Math.pow(Math.max(0, 1.0 - (u - 0.12) / 0.88), 1.18);
+            gr.mat.opacity = (gr.peakAlpha ?? 0.92) * alphaEnv;
+          }
+        }
+        if (v.verticalPlanes) {
+          for (const vp of v.verticalPlanes) {
+            const lAge = v.age - (vp.delay || 0);
+            if (lAge < 0) {
+              vp.mat.opacity = 0;
+              continue;
+            }
+            const u = Math.min(1.0, lAge / Math.max(0.18, vp.life || 0.65));
+            const ease = 1.0 - Math.pow(1.0 - u, 1.7);
+            const sc = vp.s0 + (vp.s1 - vp.s0) * ease;
+            vp.mesh.scale.set(sc, sc * (vp.aspectY || 1.0), 1);
+            if (vp.rotZ) vp.mesh.rotation.z += dt * vp.rotZ;
+            if (vp.c0 && vp.c1) {
+              vp.mat.color.copy(vp.c0).lerp(vp.c1, u);
+            }
+            const alphaEnv = u < 0.14 ? u / 0.14 : Math.pow(Math.max(0, 1.0 - (u - 0.14) / 0.86), 1.2);
+            vp.mat.opacity = (vp.peakAlpha ?? 0.92) * alphaEnv;
+          }
+        }
+        if (v.sprites) {
+          for (const sp of v.sprites) {
+            const ud = sp.userData;
+            const lAge = v.age - (ud.delay || 0);
+            if (lAge < 0) {
+              sp.material.opacity = 0;
+              continue;
+            }
+            const u = Math.min(1.0, lAge / Math.max(0.18, ud.life || 0.65));
+            const c = Math.cos(ud.swirl * dt);
+            const s = Math.sin(ud.swirl * dt);
+            const nx = sp.position.x * c - sp.position.z * s;
+            const nz = sp.position.x * s + sp.position.z * c;
+            sp.position.x = nx + ud.vx * dt;
+            sp.position.y += ud.vy * dt;
+            sp.position.z = nz + ud.vz * dt;
+            ud.vy *= 1.0 - dt * 1.15;
+            if (ud.rotSpd) sp.material.rotation += ud.rotSpd * dt;
+            const sz = ud.s0 + (ud.s1 - ud.s0) * u;
+            sp.scale.set(sz, sz, 1);
+            if (ud.c0 && ud.c1) {
+              sp.material.color.copy(ud.c0).lerp(ud.c1, u);
+            }
+            const alphaEnv = u < 0.15 ? u / 0.15 : Math.pow(Math.max(0, 1.0 - (u - 0.15) / 0.85), 1.15);
+            sp.material.opacity = (ud.peakAlpha ?? 0.9) * alphaEnv;
           }
         }
       }
