@@ -274,7 +274,7 @@ CHARACTER_CLASSES = {
             "accentColor": 0x10B981,
             "capeColor": 0x047857,
             "helmetType": "hood",
-            "defaultWeapon": "wpn_holz_sword",
+            "defaultWeapon": "wpn_holz_ninja_sword",
             "hasShield": False,
         },
         "skills": [
@@ -413,7 +413,7 @@ CHARACTER_CLASSES = {
             "accentColor": 0xA855F7,
             "capeColor": 0x581C87,
             "helmetType": "knight",
-            "defaultWeapon": "wpn_holz_sword",
+            "defaultWeapon": "wpn_holz_sura_sword",
             "hasShield": True,
         },
         "skills": [
@@ -2646,16 +2646,16 @@ EQUIPMENT_SLOTS = [
 
 CLASS_STARTER_WEAPON = {
     "warrior": "wpn_holz_sword",
-    "ninja": "wpn_holz_sword",
-    "sura": "wpn_holz_sword",
+    "ninja": "wpn_holz_ninja_sword",
+    "sura": "wpn_holz_sura_sword",
     "shaman": "wpn_holz_staff",
 }
 
 CLASS_STARTER_ARMOR = {
-    "warrior": "arm_holz_armor",
-    "ninja": "arm_holz_armor",
-    "sura": "arm_holz_armor",
-    "shaman": "arm_holz_armor",
+    "warrior": "arm_holz_warrior",
+    "ninja": "arm_holz_ninja",
+    "sura": "arm_holz_sura",
+    "shaman": "arm_holz_shaman",
 }
 
 ITEM_TEMPLATES = {
@@ -4546,7 +4546,8 @@ def _register_10_tier_equipment():
         dss_tag = " Besitzt feste DSS- & FKS-Werte!" if has_dss_fks else ""
 
         def _reg(item_id: str, name: str, slot: str, slot_size: int, classes: list, icon: str,
-                 s0: dict, s9: dict, price_mult: float = 1.0, desc_extra: str = "", w_sub: str = ""):
+                 s0: dict, s9: dict, price_mult: float = 1.0, desc_extra: str = "",
+                 w_sub: str = "", custom_icon: str = "", weapon_visual: str = ""):
             ip = int(round(p * price_mult))
             full_desc = (
                 f"Stufe {t['tier']} ({pref}, Lv. {lv}){craft_tag} — {desc_extra}".strip(" —")
@@ -4573,64 +4574,107 @@ def _register_10_tier_equipment():
                 "desc": full_desc,
                 "description": full_desc,
             }
+            if custom_icon:
+                entry["customIcon"] = custom_icon
             if w_sub:
                 entry["weaponSubType"] = w_sub
                 entry["weaponSubtype"] = w_sub
+            if weapon_visual:
+                entry["weaponVisual"] = weapon_visual
             ITEM_TEMPLATES[item_id] = entry
 
         w0 = {"atk": t["wpnAtk0"], "atkSpeedPct": t["wpnAs"]}
         w9 = {"atk": t["wpnAtk9"], "atkSpeedPct": t["wpnAs"]}
         wm0 = {"atk": t["wpnAtk0"], "magicAtk": t["wpnAtk0"], "atkSpeedPct": t["wpnAs"]}
         wm9 = {"atk": t["wpnAtk9"], "magicAtk": t["wpnAtk9"], "atkSpeedPct": t["wpnAs"]}
+        arm0 = {"def": t["armDef0"], "magicDef": int(round(t["armDef0"] * 0.75)), "hp": t["armHp0"]}
+        arm9 = {"def": t["armDef9"], "magicDef": int(round(t["armDef9"] * 0.75)), "hp": t["armHp9"]}
 
-        # 1–5. Waffen: Einhand (2 Slots), Zweihand (3 Slots), Dolche (1 Slot), Bogen (3 Slots), Stab (3 Slots)
-        _reg(f"wpn_{tkey}_sword", f"{pref}-Schwert", "weapon", 2,
-             ["warrior", "ninja", "assassin", "sura", "runemage"], t["weaponIcon"], wm0, wm9, 1.0,
-             f"Einhandwaffe (2 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "one_hand")
+        # 1–7. Klassenspezifische Waffen (Jede Waffe strikt für EINE Klasse!):
+        # Klingenwächter (Einhand 2 Slots & Zweihand 3 Slots)
+        _reg(f"wpn_{tkey}_sword", f"{pref}-Kriegsschwert", "weapon", 2,
+             ["warrior"], "wood_sword", w0, w9, 1.0,
+             f"Einhand-Kriegsschwert für Klingenwächter (2 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "one_hand", "./assets/icons/items/equipment/1/wood_sword.png", "sword")
         _reg(f"wpn_{tkey}_greatsword", f"{pref}-Zweihänder", "weapon", 3,
-             ["warrior"], "🪓", w0, w9, 1.15,
-             f"Zweihandwaffe für Klingenwächter (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "two_hand")
+             ["warrior"], "wood_axe", w0, w9, 1.15,
+             f"Zweihandwaffe für Klingenwächter (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "two_hand", "./assets/icons/items/equipment/1/wood_axe.png", "rsb")
+        # Schattenjäger (Schattenklinge Einhand 2 Slots, Dolche 1 Slot, Bogen 3 Slots)
+        _reg(f"wpn_{tkey}_ninja_sword", f"{pref}-Schattenklinge", "weapon", 2,
+             ["ninja", "assassin"], "wood_sword", w0, w9, 1.0,
+             f"Einhand-Schattenklinge für Schattenjäger (2 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "one_hand", "./assets/icons/items/equipment/1/wood_sword.png", "sword")
         _reg(f"wpn_{tkey}_daggers", f"{pref}-Dolche", "weapon", 1,
-             ["ninja", "assassin"], "🗡️", w0, w9, 1.0,
-             f"Dolche für Schattenjäger (1 Slot): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "dagger")
+             ["ninja", "assassin"], "wood_sword", w0, w9, 1.0,
+             f"Zwillingsdolche für Schattenjäger (1 Slot): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "dagger", "./assets/icons/items/equipment/1/wood_sword.png", "dagger")
         _reg(f"wpn_{tkey}_bow", f"{pref}-Bogen", "weapon", 3,
-             ["ninja", "assassin"], "🏹", w0, w9, 1.1,
-             f"Fernkampfbogen für Schattenjäger (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "bow")
-        _reg(f"wpn_{tkey}_staff", f"{pref}-Stab", "weapon", 3,
-             ["shaman"], "🪄", wm0, wm9, 1.1,
-             f"Stab für Seelenweber (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}", "staff")
+             ["ninja", "assassin"], "wood_bow", w0, w9, 1.1,
+             f"Fernkampfbogen für Schattenjäger (3 Slots): +{t['wpnAtk0']} AW (+0) ➔ +{t['wpnAtk9']} AW (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "bow", "./assets/icons/items/equipment/1/wood_bow.png", "bow")
+        # Runenkrieger (Runenschwert Einhand 2 Slots mit AW + Magie-AW)
+        _reg(f"wpn_{tkey}_sura_sword", f"{pref}-Runenschwert", "weapon", 2,
+             ["sura", "runemage"], "wood_wand", wm0, wm9, 1.05,
+             f"Einhand-Runenschwert für Runenmagier (2 Slots): +{t['wpnAtk0']} AW & Magie-AW (+0) ➔ +{t['wpnAtk9']} (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "one_hand", "./assets/icons/items/equipment/1/wood_wand.png", "sword")
+        # Seelenweber (Seelenstab 3 Slots mit AW + Magie-AW)
+        _reg(f"wpn_{tkey}_staff", f"{pref}-Seelenstab", "weapon", 3,
+             ["shaman"], "wood_staff", wm0, wm9, 1.1,
+             f"Seelenstab für Seelenweber (3 Slots): +{t['wpnAtk0']} AW & Magie-AW (+0) ➔ +{t['wpnAtk9']} (+9), +{t['wpnAs']}% Angriffsgeschw.{dss_tag}",
+             "staff", "./assets/icons/items/equipment/1/wood_staff.png", "staff")
 
-        # 6. Körperrüstung (2 Slots)
-        _reg(f"arm_{tkey}_armor", f"{pref}-Rüstung", "armor", 2, all_classes, t["armorIcon"],
-             {"def": t["armDef0"], "magicDef": int(round(t["armDef0"] * 0.75)), "hp": t["armHp0"]},
-             {"def": t["armDef9"], "magicDef": int(round(t["armDef9"] * 0.75)), "hp": t["armHp9"]}, 1.0,
-             f"Körperrüstung (2 Slots): +{t['armDef0']} DEF / +{t['armHp0']} TP (+0) ➔ +{t['armDef9']} DEF / +{t['armHp9']} TP (+9).")
+        # 8–11. Klassenspezifische Körperrüstungen (2 Slots, jede Rüstung strikt für EINE Klasse!):
+        _reg(f"arm_{tkey}_warrior", f"{pref}-Plattenpanzer", "armor", 2, ["warrior"], "wood_armor_warrior",
+             arm0, arm9, 1.0,
+             f"Plattenpanzer für Klingenwächter (2 Slots): +{t['armDef0']} DEF / +{t['armHp0']} TP (+0) ➔ +{t['armDef9']} DEF / +{t['armHp9']} TP (+9).",
+             "", "./assets/icons/items/equipment/1/wood_armor_warrior.png")
+        _reg(f"arm_{tkey}_ninja", f"{pref}-Schattenanzug", "armor", 2, ["ninja", "assassin"], "wood_armor_ninja",
+             arm0, arm9, 1.0,
+             f"Schattenanzug für Schattenjäger (2 Slots): +{t['armDef0']} DEF / +{t['armHp0']} TP (+0) ➔ +{t['armDef9']} DEF / +{t['armHp9']} TP (+9).",
+             "", "./assets/icons/items/equipment/1/wood_armor_ninja.png")
+        _reg(f"arm_{tkey}_sura", f"{pref}-Runenharnisch", "armor", 2, ["sura", "runemage"], "wood_armor_sura",
+             arm0, arm9, 1.0,
+             f"Runenharnisch für Runenmagier (2 Slots): +{t['armDef0']} DEF / +{t['armHp0']} TP (+0) ➔ +{t['armDef9']} DEF / +{t['armHp9']} TP (+9).",
+             "", "./assets/icons/items/equipment/1/wood_armor_sura.png")
+        _reg(f"arm_{tkey}_shaman", f"{pref}-Seelengewand", "armor", 2, ["shaman"], "wood_armor_shaman",
+             arm0, arm9, 1.0,
+             f"Seelengewand für Seelenweber (2 Slots): +{t['armDef0']} DEF / +{t['armHp0']} TP (+0) ➔ +{t['armDef9']} DEF / +{t['armHp9']} TP (+9).",
+             "", "./assets/icons/items/equipment/1/wood_armor_shaman.png")
 
-        # 7–14. Schild, Helm, Handschuhe, Schuhe, Kette, Armband, Ohrringe, Gürtel (je 1 Slot)
-        _reg(f"eq_{tkey}_shield", f"{pref}-Schild", "shield", 1, all_classes, "🛡️",
+        # 12–19. Schild, Helm, Handschuhe, Schuhe, Kette, Armband, Ohrringe, Gürtel (je 1 Slot, alle Klassen)
+        _reg(f"eq_{tkey}_shield", f"{pref}-Schild", "shield", 1, all_classes, "wood_shield",
              {"def": t["shdDef0"]}, {"def": t["shdDef9"]}, 0.85,
-             f"Kampfschild: +{t['shdDef0']} DEF (+0) ➔ +{t['shdDef9']} DEF (+9).")
-        _reg(f"eq_{tkey}_helmet", f"{pref}-Helm", "helmet", 1, all_classes, "🪖",
+             f"Kampfschild: +{t['shdDef0']} DEF (+0) ➔ +{t['shdDef9']} DEF (+9).",
+             "", "./assets/icons/items/equipment/1/wood_shield.png")
+        _reg(f"eq_{tkey}_helmet", f"{pref}-Helm", "helmet", 1, all_classes, "wood_helm",
              {"def": t["hlmDef0"]}, {"def": t["hlmDef9"]}, 0.80,
-             f"Kopfschutz: +{t['hlmDef0']} DEF (+0) ➔ +{t['hlmDef9']} DEF (+9).")
-        _reg(f"eq_{tkey}_gloves", f"{pref}-Handschuhe", "gloves", 1, all_classes, "🧤",
+             f"Kopfschutz: +{t['hlmDef0']} DEF (+0) ➔ +{t['hlmDef9']} DEF (+9).",
+             "", "./assets/icons/items/equipment/1/wood_helm2.png" if lv >= 10 else "./assets/icons/items/equipment/1/wood_helm.png")
+        _reg(f"eq_{tkey}_gloves", f"{pref}-Handschuhe", "gloves", 1, all_classes, "wood_gloves",
              {"atk": t["glvAtk0"]}, {"atk": t["glvAtk9"]}, 0.75,
-             f"Panzerhandschuhe: +{t['glvAtk0']} AW (+0) ➔ +{t['glvAtk9']} AW (+9).")
-        _reg(f"eq_{tkey}_shoes", f"{pref}-Schuhe", "shoes", 1, all_classes, "🥾",
+             f"Panzerhandschuhe: +{t['glvAtk0']} AW (+0) ➔ +{t['glvAtk9']} AW (+9).",
+             "", "./assets/icons/items/equipment/1/wood_gloves.png")
+        _reg(f"eq_{tkey}_shoes", f"{pref}-Schuhe", "shoes", 1, all_classes, "wood_boots",
              {"def": t["shoDef0"], "moveSpeedPct": t["shoMs"]}, {"def": t["shoDef9"], "moveSpeedPct": t["shoMs"]}, 0.75,
-             f"Kampfstiefel: +{t['shoDef0']} DEF (+0) ➔ +{t['shoDef9']} DEF (+9), +{t['shoMs']}% Bewegungsgeschw.")
-        _reg(f"eq_{tkey}_necklace", f"{pref}-Kette", "necklace", 1, all_classes, "📿",
+             f"Kampfstiefel: +{t['shoDef0']} DEF (+0) ➔ +{t['shoDef9']} DEF (+9), +{t['shoMs']}% Bewegungsgeschw.",
+             "", "./assets/icons/items/equipment/1/wood_greaves.png" if lv >= 10 else "./assets/icons/items/equipment/1/wood_boots.png")
+        _reg(f"eq_{tkey}_necklace", f"{pref}-Kette", "necklace", 1, all_classes, "wood_necklace",
              {"castSpeedPct": t["nckCs0"]}, {"castSpeedPct": t["nckCs9"]}, 0.85,
-             f"Halskette: +{t['nckCs0']}% Zaubergeschw. (+0) ➔ +{t['nckCs9']}% (+9).")
-        _reg(f"eq_{tkey}_bracelet", f"{pref}-Armband", "bracelet", 1, all_classes, "⌚",
+             f"Halskette: +{t['nckCs0']}% Zaubergeschw. (+0) ➔ +{t['nckCs9']}% (+9).",
+             "", "./assets/icons/items/equipment/1/wood_necklace.png")
+        _reg(f"eq_{tkey}_bracelet", f"{pref}-Armband", "bracelet", 1, all_classes, "wood_bracelet",
              {"atkSpeedPct": t["brcAs0"]}, {"atkSpeedPct": t["brcAs9"]}, 0.85,
-             f"Armband: +{t['brcAs0']}% Angriffsgeschw. (+0) ➔ +{t['brcAs9']}% (+9).")
-        _reg(f"eq_{tkey}_earrings", f"{pref}-Ohrringe", "earrings", 1, all_classes, "💍",
+             f"Armband: +{t['brcAs0']}% Angriffsgeschw. (+0) ➔ +{t['brcAs9']}% (+9).",
+             "", "./assets/icons/items/equipment/1/wood_bracelet2.png" if lv >= 10 else "./assets/icons/items/equipment/1/wood_bracelet.png")
+        _reg(f"eq_{tkey}_earrings", f"{pref}-Ohrringe", "earrings", 1, all_classes, "wood_earrings",
              {"atk": t["earAtk0"]}, {"atk": t["earAtk9"]}, 0.85,
-             f"Ohrringe: +{t['earAtk0']} AW (+0) ➔ +{t['earAtk9']} AW (+9).")
-        _reg(f"eq_{tkey}_belt", f"{pref}-Gürtel", "belt", 1, all_classes, "🎗️",
+             f"Ohrringe: +{t['earAtk0']} AW (+0) ➔ +{t['earAtk9']} AW (+9).",
+             "", "./assets/icons/items/equipment/1/wood_earrings.png")
+        _reg(f"eq_{tkey}_belt", f"{pref}-Gürtel", "belt", 1, all_classes, "wood_bracers",
              {"hp": t["bltHp0"]}, {"hp": t["bltHp9"]}, 0.80,
-             f"Gürtel (1 Slot): +{t['bltHp0']} Max. TP (+0) ➔ +{t['bltHp9']} Max. TP (+9).")
+             f"Gürtel (1 Slot): +{t['bltHp0']} Max. TP (+0) ➔ +{t['bltHp9']} Max. TP (+9).",
+             "", "./assets/icons/items/equipment/1/wood_bracers.png")
 
 
 _register_10_tier_equipment()
@@ -7072,10 +7116,15 @@ DROPPABLE_EQUIP_TIERS = [row for row in EQUIP_TIERS if row[0] <= 70]
 EQUIP_TIER_SLOT_PATTERNS = {
     "sword": "wpn_{t}_sword",
     "greatsword": "wpn_{t}_greatsword",
+    "ninja_sword": "wpn_{t}_ninja_sword",
     "daggers": "wpn_{t}_daggers",
     "bow": "wpn_{t}_bow",
+    "sura_sword": "wpn_{t}_sura_sword",
     "staff": "wpn_{t}_staff",
-    "armor": "arm_{t}_armor",
+    "armor_warrior": "arm_{t}_warrior",
+    "armor_ninja": "arm_{t}_ninja",
+    "armor_sura": "arm_{t}_sura",
+    "armor_shaman": "arm_{t}_shaman",
     "shield": "eq_{t}_shield",
     "helmet": "eq_{t}_helmet",
     "gloves": "eq_{t}_gloves",
@@ -7086,6 +7135,33 @@ EQUIP_TIER_SLOT_PATTERNS = {
     "belt": "eq_{t}_belt",
 }
 _TIER_ID_PREFIXES = tuple(f"{p}_{t}_" for t in (*EQUIP_TIER_KEYS, "donnerstahl") for p in ("wpn", "arm", "eq"))
+
+CLASS_TIER_ARMOR_SUFFIX = {
+    "warrior": "warrior",
+    "ninja": "ninja",
+    "assassin": "ninja",
+    "sura": "sura",
+    "runemage": "sura",
+    "shaman": "shaman",
+}
+CLASS_TIER_WEAPON_SUFFIXES = {
+    "warrior": ["sword", "greatsword"],
+    "ninja": ["ninja_sword", "daggers", "bow"],
+    "assassin": ["ninja_sword", "daggers", "bow"],
+    "sura": ["sura_sword"],
+    "runemage": ["sura_sword"],
+    "shaman": ["staff"],
+}
+
+
+def class_armor_for_tier(tier_key: str, class_id: str) -> str:
+    suf = CLASS_TIER_ARMOR_SUFFIX.get(str(class_id or "warrior").lower(), "warrior")
+    return f"arm_{tier_key}_{suf}"
+
+
+def class_weapons_for_tier(tier_key: str, class_id: str) -> list:
+    sufs = CLASS_TIER_WEAPON_SUFFIXES.get(str(class_id or "warrior").lower(), ["sword"])
+    return [f"wpn_{tier_key}_{s}" for s in sufs if f"wpn_{tier_key}_{s}" in ITEM_TEMPLATES]
 
 
 def equip_tier_for_level(level: int) -> str:
@@ -7107,7 +7183,7 @@ def equip_tier_for_drop_level(level: int) -> str:
 
 
 def equip_tier_item_ids(tier_key: str) -> list:
-    """Komplettes Set eines Tiers (alle 5 Waffenarten + Rüstung + Schild + Helm + Handschuhe + Schuhe + Schmuck + Gürtel)."""
+    """Komplettes Set eines Tiers (7 klassenspezifische Waffen + 4 klassenspezifische Rüstungen + 8 universelle Teile = 19 Items)."""
     return [p.format(t=tier_key) for p in EQUIP_TIER_SLOT_PATTERNS.values() if p.format(t=tier_key) in ITEM_TEMPLATES]
 
 
@@ -7125,21 +7201,25 @@ def _legacy_weapon_kind(tid: str, tpl: dict) -> str:
         return "staff"
     if tpl.get("weaponSubType") == "two_hand" or "glaive" in low:
         return "greatsword"
+    if "ninja" in low:
+        return "ninja_sword"
+    if "sura" in low:
+        return "sura_sword"
     return "sword"
 
 
 EXPLICIT_LEGACY_EQUIP_MAP = {
-    # Lv. 1 Holz-Equipment
+    # Lv. 1 Holz-Equipment (einzeln pro Klasse!)
     "sword_broadsword": "wpn_holz_sword",
     "glaive_iron": "wpn_holz_greatsword",
     "bell_amber": "wpn_holz_staff",
     "dagger_shadow": "wpn_holz_daggers",
-    "sword_ninja_starter": "wpn_holz_sword",
-    "sword_sura_starter": "wpn_holz_sword",
-    "armor_leather": "arm_holz_armor",
-    "armor_ninja_starter": "arm_holz_armor",
-    "armor_sura_starter": "arm_holz_armor",
-    "armor_shaman_starter": "arm_holz_armor",
+    "sword_ninja_starter": "wpn_holz_ninja_sword",
+    "sword_sura_starter": "wpn_holz_sura_sword",
+    "armor_leather": "arm_holz_warrior",
+    "armor_ninja_starter": "arm_holz_ninja",
+    "armor_sura_starter": "arm_holz_sura",
+    "armor_shaman_starter": "arm_holz_shaman",
     "helm_wood": "eq_holz_helmet",
     "helm_iron": "eq_holz_helmet",
     "shield_wood": "eq_holz_shield",
@@ -7161,7 +7241,7 @@ EXPLICIT_LEGACY_EQUIP_MAP = {
     "sword_rsb": "wpn_kupfer_greatsword",
     "staff_dragon": "wpn_kupfer_staff",
     "dagger_soulless": "wpn_kupfer_daggers",
-    "armor_tiger": "arm_kupfer_armor",
+    "armor_tiger": "arm_kupfer_warrior",
 
     # Lv. 20 Eisen-Equipment
     "gloves_iron": "eq_eisen_gloves",
@@ -7171,13 +7251,23 @@ EXPLICIT_LEGACY_EQUIP_MAP = {
     "necklace_ebony": "eq_ebenholz_necklace",
     "earrings_ebony": "eq_ebenholz_earrings",
     "sword_sternenreisser": "wpn_ebenholz_sword",
-    "armor_dragonscale": "arm_ebenholz_armor",
+    "armor_dragonscale": "arm_ebenholz_warrior",
     "sword_grudge": "wpn_ebenholz_greatsword",
-    "armor_blacksteel": "arm_ebenholz_armor",
+    "armor_blacksteel": "arm_ebenholz_warrior",
 
     # Lv. 40 Silber-Equipment
     "sword_silver": "wpn_silber_sword",
     "bracelet_silver": "eq_silber_bracelet",
+
+    # Verbrauchs-Alias (Tapferkeitsumhang)
+    "item_bravery_cape": "cape_bravery",
+
+    # Ehemalige geteilte arm_{t}_armor -> arm_{t}_warrior (Spieler-DB migriert zusätzlich exakt nach Charakterklasse!)
+    **{
+        f"arm_{t}_armor": f"arm_{t}_warrior"
+        for t in EQUIP_TIER_KEYS
+    },
+    "arm_donnerstahl_armor": "arm_schwarzstahl_warrior",
 
     # Lv. 70 Donnerstahl -> Schwarzstahl Migration (SSOT Stufe 8)
     **{
@@ -7205,11 +7295,16 @@ for _req, _tkey in EQUIP_TIERS:
 
 CLASS_STARTER_WEAPON.update({
     "warrior": "wpn_holz_sword",
-    "ninja": "wpn_holz_sword",
-    "sura": "wpn_holz_sword",
+    "ninja": "wpn_holz_ninja_sword",
+    "sura": "wpn_holz_sura_sword",
     "shaman": "wpn_holz_staff",
 })
-CLASS_STARTER_ARMOR.update({c: "arm_holz_armor" for c in ("warrior", "ninja", "sura", "shaman")})
+CLASS_STARTER_ARMOR.update({
+    "warrior": "arm_holz_warrior",
+    "ninja": "arm_holz_ninja",
+    "sura": "arm_holz_sura",
+    "shaman": "arm_holz_shaman",
+})
 for _cid, _cdef in CHARACTER_CLASSES.items():
     if isinstance(_cdef, dict) and _cdef.get("defaultWeapon"):
         _cdef["defaultWeapon"] = CLASS_STARTER_WEAPON.get(_cid, resolve_item_template_id(_cdef["defaultWeapon"]))
@@ -7234,38 +7329,70 @@ def is_boss_monolith_only_drop(template_id: str) -> bool:
     return (ITEM_TEMPLATES.get(template_id) or {}).get("type") in ("skill_book", "passive_skill_book", "spirit_stone")
 
 
-for _mtpl in MONSTER_TEMPLATES.values():
+_ALL_ARMOR_SUFFIXES = ("warrior", "ninja", "sura", "shaman")
+_ALL_WEAPON_SUFFIXES = ("sword", "greatsword", "ninja_sword", "daggers", "bow", "sura_sword", "staff")
+
+for _mob_idx, _mtpl in enumerate(MONSTER_TEMPLATES.values()):
     _is_metin = _mtpl.get("kind") == "metin"
     _is_boss = bool(_mtpl.get("isBoss"))
     _mlvl = int(_mtpl.get("level", 1) or 1)
     _m_tier = equip_tier_for_drop_level(_mlvl)
     _new_drops, _seen = [], set()
     for _d in _mtpl.get("drops", []) or []:
-        _iid = resolve_item_template_id(_d.get("itemId") or "")
-        if not _iid or _iid == "pferdemedaille":
+        _raw_iid = str(_d.get("itemId") or "").strip()
+        if not _raw_iid or _raw_iid == "pferdemedaille":
             continue
-        _tpl = ITEM_TEMPLATES.get(_iid) or {}
-        if _tpl.get("craftOnly"):
-            continue
-        if _tpl.get("type") == "equipment" and not is_tier_equipment(_iid) and _iid in LEGACY_EQUIP_MAP:
-            _slot_tid = LEGACY_EQUIP_MAP[_iid]
-            for _old_t in EQUIP_TIER_KEYS:
-                if f"_{_old_t}_" in _slot_tid:
-                    _slot_tid = _slot_tid.replace(f"_{_old_t}_", f"_{_m_tier}_", 1)
-                    break
-            _iid = _slot_tid if _slot_tid in ITEM_TEMPLATES else LEGACY_EQUIP_MAP[_iid]
-        if is_boss_monolith_only_drop(_iid) and not (_is_boss or _is_metin):
-            continue
-        if _iid in ("scroll_blessing", "item_bonus_adder", "item_bonus_changer") and _is_metin and not _is_boss and _mlvl < 60:
-            continue
-        if _iid == "mat_monolith_shard" and not _is_metin:
-            continue
-        if _iid in _seen:
-            continue
-        _seen.add(_iid)
-        _nd = dict(_d)
-        _nd["itemId"] = _iid
-        _new_drops.append(_nd)
+        # Ehemalige geteilte Rüstungen/Schwerter fair auf die einzelnen Klassen verteilen:
+        #  - Monolithen & Bosse: alle 4 Klassen-Rüstungen bzw. alle 4 Klassen-Hauptwaffen im Pool
+        #  - Normale Monster: deterministisch rotierendes 2er-Paar pro Mob-Rasse ("nicht alles von einem Monster droppen lassen")
+        _expanded_iids = []
+        if _raw_iid.startswith("arm_") and _raw_iid.endswith("_armor"):
+            _parts = _raw_iid.split("_")
+            _t_part = "schwarzstahl" if (len(_parts) >= 3 and _parts[1] == "donnerstahl") else (_parts[1] if len(_parts) >= 3 else _m_tier)
+            if _is_metin or _is_boss:
+                _expanded_iids = [f"arm_{_t_part}_{s}" for s in _ALL_ARMOR_SUFFIXES]
+            else:
+                _s1 = _ALL_ARMOR_SUFFIXES[_mob_idx % 4]
+                _s2 = _ALL_ARMOR_SUFFIXES[(_mob_idx + 2) % 4]
+                _expanded_iids = [f"arm_{_t_part}_{_s1}", f"arm_{_t_part}_{_s2}"]
+        elif _raw_iid.startswith("wpn_") and _raw_iid.endswith("_sword") and not _raw_iid.endswith(("_ninja_sword", "_sura_sword", "_greatsword")):
+            _parts = _raw_iid.split("_")
+            _t_part = "schwarzstahl" if (len(_parts) >= 3 and _parts[1] == "donnerstahl") else (_parts[1] if len(_parts) >= 3 else _m_tier)
+            if _is_metin or _is_boss:
+                _expanded_iids = [f"wpn_{_t_part}_{s}" for s in _ALL_WEAPON_SUFFIXES]
+            else:
+                _w1 = _ALL_WEAPON_SUFFIXES[(_mob_idx * 2) % len(_ALL_WEAPON_SUFFIXES)]
+                _w2 = _ALL_WEAPON_SUFFIXES[(_mob_idx * 2 + 3) % len(_ALL_WEAPON_SUFFIXES)]
+                _expanded_iids = [f"wpn_{_t_part}_{_w1}", f"wpn_{_t_part}_{_w2}"]
+        else:
+            _expanded_iids = [_raw_iid]
+
+        for _cand_raw in _expanded_iids:
+            _iid = resolve_item_template_id(_cand_raw)
+            if not _iid or _iid == "pferdemedaille":
+                continue
+            _tpl = ITEM_TEMPLATES.get(_iid) or {}
+            if _tpl.get("craftOnly"):
+                continue
+            if _tpl.get("type") == "equipment" and not is_tier_equipment(_iid) and _iid in LEGACY_EQUIP_MAP:
+                _slot_tid = LEGACY_EQUIP_MAP[_iid]
+                for _old_t in EQUIP_TIER_KEYS:
+                    if f"_{_old_t}_" in _slot_tid:
+                        _slot_tid = _slot_tid.replace(f"_{_old_t}_", f"_{_m_tier}_", 1)
+                        break
+                _iid = _slot_tid if _slot_tid in ITEM_TEMPLATES else LEGACY_EQUIP_MAP[_iid]
+            if is_boss_monolith_only_drop(_iid) and not (_is_boss or _is_metin):
+                continue
+            if _iid in ("scroll_blessing", "item_bonus_adder", "item_bonus_changer") and _is_metin and not _is_boss and _mlvl < 60:
+                continue
+            if _iid == "mat_monolith_shard" and not _is_metin:
+                continue
+            if _iid in _seen:
+                continue
+            _seen.add(_iid)
+            _nd = dict(_d)
+            _nd["itemId"] = _iid
+            _new_drops.append(_nd)
     _mtpl["drops"] = _new_drops
 
 for _q in QUEST_TEMPLATES:
@@ -7291,10 +7418,10 @@ BOT_GAME_RULES_MEMORY = [
         "botAction": "Exakt ab Level 23 sofort über die Brücken nach Map 2 wechseln und ab Level 30 ins tiefere Map-2-Gebiet vorrücken.",
     },
     {
-        "id": "ssot_drops_and_monoliths_v1",
-        "topic": "3. Drop-, Upp- & Monolithen-Ökonomie",
-        "note": "Monster droppen Equipment +0..+4, Schlafende Monolithen +0..+4, Instabile/Erweckte Monolithen +0..+6, Bosse +4..+6. Rissmonolithen droppen immer garantiert 1x aktives FB + Geiststeine +0..+4. Seltene Items (Segensschriftrollen, Switcher/Adder) niemals von normalen Mobs oder Standard-Monolithen < Lv. 60. Passive FBs nur ab Instabilen Monolithen, Bossen & Dungeons.",
-        "botAction": "Monolithen gezielt für FBs & Geiststeine farmen; Erweckte Monolithen (Worldboss) nur in koordinierter Gruppe bekämpfen.",
+        "id": "ssot_drops_and_monoliths_v2",
+        "topic": "3. Drop-, Upp- & Monolithen-Ökonomie (Klassenspezifische Waffen & Rüstungen)",
+        "note": "Monster droppen klassenspezifische Waffen & Rüstungen sowie universellen Schmuck (+0..+4, rassen-/mobspezifisch verteilt), Schlafende Monolithen +0..+4, Instabile/Erweckte Monolithen +0..+6, Bosse +4..+6. Rissmonolithen droppen immer garantiert 1x aktives FB + Geiststeine +0..+4. Seltene Items (Segensschriftrollen, Switcher/Adder) niemals von normalen Mobs oder Standard-Monolithen < Lv. 60. Passive FBs nur ab Instabilen Monolithen, Bossen & Dungeons.",
+        "botAction": "Eigene Klassen-Waffen & Klassen-Rüstungen ausrüsten/uppen; fremde Klassen-Drops im NPC-Shop verkaufen oder im Offline-Shop / Spielerhandel anbieten.",
     },
     {
         "id": "ssot_fairness_economy_v1",
@@ -7317,7 +7444,7 @@ BOT_GAME_RULES_MEMORY = [
     {
         "id": "ssot_classes_pets_horse_lock_v1",
         "topic": "7. Klassen-Builds, Pet-Skills & Pferdemedaillen-Sperre",
-        "note": "Klingenwächter (STR>VIT), Schattenjäger (DEX>VIT), Runenkrieger (INT>STR>VIT), Seelenweber (INT>VIT). WICHTIG: Pferdemedaillen droppen ausschließlich von Affen (noch nicht im Spiel) -> 0% Drop & KEIN Bot darf sein Pferd über Level 1 steigern!",
+        "note": "Klingenwächter (STR>VIT • Kriegsschwert/Zweihänder & Plattenpanzer), Schattenjäger (DEX>VIT • Schattenklinge/Dolche/Bogen & Schattenanzug), Runenkrieger (INT>STR>VIT • Runenschwert & Runenharnisch), Seelenweber (INT>VIT • Seelenstab & Seelengewand). WICHTIG: Pferdemedaillen droppen ausschließlich von Affen (noch nicht im Spiel) -> 0% Drop & KEIN Bot darf sein Pferd über Level 1 steigern!",
         "botAction": "Status- & Pet-Skills strikt nach Klassen-Build verteilen; Reittier nur auf Lv. 1 nutzen und niemals Pferde-Level erhöhen.",
     },
     {
@@ -7327,10 +7454,10 @@ BOT_GAME_RULES_MEMORY = [
         "botAction": "Primärskill zuerst auf 20 (M1) bringen, passende FBs & Seelensteine lesen.",
     },
     {
-        "id": "ssot_equipment_10_tiers_v1",
-        "topic": "9. 10 Equipment-Stufen (+0..+9), Boni & Stark gg. Monster",
-        "note": "10 Tiers (Holz Lv. 1 bis Schwarzstahl Lv. 70 droppbar; Blaustahl Lv. 80 & Ätherium Lv. 90 nur craftbar), je 14 Teile inkl. Gürtel (1 Slot). Boni: 1–5 Weiß/Grün + 6./7. Gold. Seltenheiten: Gewöhnlich, Gut, Episch, Legendär, Instabil (Max-Roll Leuchteffekt). 'Stark gegen Monster' wirkt NUR gegen normale Monster (NICHT gegen Bosse oder Rissmonolithen!).",
-        "botAction": "Ausrüstung regulär mit Gold & Map1/Map2-Upp-Items beim Schmied verbessern (ab +6 mit Segensschriftrolle/Magischem Metall schützen).",
+        "id": "ssot_equipment_10_tiers_class_v2",
+        "topic": "9. 10 Equipment-Stufen (+0..+9), 19 Teile pro Tier (Waffen & Rüstungen einzeln je Klasse!)",
+        "note": "10 Tiers (Holz Lv. 1 bis Schwarzstahl Lv. 70 droppbar; Blaustahl Lv. 80 & Ätherium Lv. 90 nur craftbar). Pro Tier 19 Teile: 7 klassenspezifische Waffen (Kriegsschwert, Zweihänder | Schattenklinge, Dolche, Bogen | Runenschwert | Seelenstab) + 4 klassenspezifische Rüstungen (Plattenpanzer, Schattenanzug, Runenharnisch, Seelengewand) + 8 universelle Teile inkl. Gürtel (1 Slot). Boni: 1–5 Weiß/Grün + 6./7. Gold. Seltenheiten: Gewöhnlich, Gut, Episch, Legendär, Instabil (Max-Roll). 'Stark gegen Monster' wirkt NUR gegen normale Monster!",
+        "botAction": "Nur klasseneigene Waffen & Rüstungen anlegen und regulär mit Gold & Map1/Map2-Upp-Items beim Schmied verbessern (ab +6 mit Segensschriftrolle/Magischem Metall schützen).",
     },
 ]
-BOT_GAME_RULES_MEMORY_VERSION = "2026-10-31_SSOT_ULTIMATE"
+BOT_GAME_RULES_MEMORY_VERSION = "2026-10-31_SSOT_CLASS_EQ_V2"

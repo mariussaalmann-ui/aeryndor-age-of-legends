@@ -1511,14 +1511,19 @@ class WorldAuthority:
         dex_v = max(0, min(MAX_PET_STAT_POINTS, int(raw_pet.get("dex", 0) or 0)))
         int_v = max(0, min(MAX_PET_STAT_POINTS, int(raw_pet.get("int", 0) or 0)))
         spent_stat_pts = vit_v + str_v + dex_v + int_v
-        if spent_stat_pts > total_expected_stat_pts and spent_stat_pts > 0:
+        is_sa_owner = bool(
+            p.get("isSA")
+            or str(p.get("name") or "").upper().startswith("[SA]")
+            or (isinstance(p.get("quests"), dict) and p["quests"].get("__is_sa__"))
+        )
+        if not is_sa_owner and spent_stat_pts > total_expected_stat_pts and spent_stat_pts > 0:
             scale_st = total_expected_stat_pts / float(spent_stat_pts)
             vit_v = int(vit_v * scale_st)
             str_v = int(str_v * scale_st)
             dex_v = int(dex_v * scale_st)
             int_v = int(int_v * scale_st)
             spent_stat_pts = vit_v + str_v + dex_v + int_v
-        avail_stat_pts = max(0, total_expected_stat_pts - spent_stat_pts)
+        avail_stat_pts = 0 if (is_sa_owner and spent_stat_pts >= total_expected_stat_pts) else max(0, total_expected_stat_pts - spent_stat_pts)
 
         total_expected_skill_pts = 2 + (pet_lvl - 1) * 1
         spent_skill_pts = max(0, sum(norm_skills.values()) - 1)
@@ -5952,7 +5957,7 @@ class WorldAuthority:
             # Rote & Blaue Tränke sowie Grüne/Violette Tränke & Tapferkeitsumhänge ehrlich gegen Gold kaufen
             self._auto_restock_potions(bot, now=now, force=True, include_mp=True)
             bot = self.players.get(bid_m) or bot
-            for shop_tid, min_have, buy_qty in (("potion_speed", 3, 5), ("potion_atk_speed", 3, 5), ("item_bravery_cape", 4, 5)):
+            for shop_tid, min_have, buy_qty in (("potion_speed", 3, 5), ("potion_atk_speed", 3, 5), ("cape_bravery", 4, 5)):
                 s_tpl = ITEM_TEMPLATES.get(shop_tid, {})
                 b_price = int(s_tpl.get("buyPrice", 0) or 0)
                 if b_price <= 0:
@@ -8616,8 +8621,26 @@ class WorldAuthority:
             def _pick_equip(cands: List[str]) -> str:
                 if not cands:
                     return random.choice(equip_pool)
-                # SSOT: Lv. 30+ Waffen mit DSS & FKS droppen seltener als Rüstung/Schmuck
-                weights = [0.38 if ITEM_TEMPLATES.get(cid, {}).get("hasDssFks") else 1.0 for cid in cands]
+                # Faire Gleichverteilung über alle 4 Klassen (Klingenwächter: 2 Waffen, Schattenjäger: 3 Waffen, Runenmagier: 1 Waffe, Seelenweber: 1 Waffe;
+                # Rüstungen: je 1 pro Klasse) + SSOT-Regel: Lv. 30+ Waffen mit DSS & FKS droppen seltener!
+                weights = []
+                for cid in cands:
+                    ctpl = ITEM_TEMPLATES.get(cid, {})
+                    cslot = ctpl.get("slot")
+                    ccls = ctpl.get("classes") or []
+                    w = 1.0
+                    if cslot == "weapon":
+                        if "ninja" in ccls:
+                            w = 1.0 / 3.0
+                        elif "warrior" in ccls:
+                            w = 0.50
+                        else:
+                            w = 1.0
+                        if ctpl.get("hasDssFks"):
+                            w *= 0.38
+                    elif cslot == "armor":
+                        w = 0.55
+                    weights.append(w)
                 return random.choices(cands, weights=weights, k=1)[0]
 
             killer_cls = str(killer.get("class_id", "warrior"))
@@ -8756,7 +8779,7 @@ class WorldAuthority:
 
                 # 3. Verbrauchsgegenstände & Erweckungssteine (Instabil ab und zu, Erweckt sehr selten)
                 if random.random() < 0.055 * rate_scale:
-                    selected_item_ids.append(random.choice(["potion_hp_medium", "potion_mp_medium", "potion_speed", "potion_atk_speed", "item_bravery_cape"]))
+                    selected_item_ids.append(random.choice(["potion_hp_medium", "potion_mp_medium", "potion_speed", "potion_atk_speed", "cape_bravery"]))
                 shard_mob_ch = 0.045 if (is_el or mob.get("isMonolithGuard")) else 0.014
                 if random.random() < shard_mob_ch * lvl_penalty:
                     selected_item_ids.append("mat_monolith_shard")
@@ -10665,24 +10688,33 @@ class WorldAuthority:
             if not self.db.consume_item_by_template(player_id, tpl_id, 1):
                 return False, "Truhe konnte nicht geöffnet werden."
             if tpl_id in ("chest_monolith_legend", "chest_bloodleaf"):
-                rewards = ["wpn_ebenholz_sword", "wpn_ebenholz_greatsword", "scroll_blessing", "item_bonus_changer", "mat_soul_stone"]
+                rewards = [
+                    "wpn_ebenholz_sword", "wpn_ebenholz_greatsword",
+                    "wpn_ebenholz_ninja_sword", "wpn_ebenholz_daggers", "wpn_ebenholz_bow",
+                    "wpn_ebenholz_sura_sword", "wpn_ebenholz_staff",
+                    "arm_ebenholz_warrior", "arm_ebenholz_ninja", "arm_ebenholz_sura", "arm_ebenholz_shaman",
+                    "scroll_blessing", "item_bonus_changer", "mat_soul_stone",
+                ]
             elif tpl_id == "chest_moonlight":
                 rewards = [
                     "potion_speed",
                     "potion_atk_speed",
-                    "item_bravery_cape",
+                    "cape_bravery",
                     "book_skill",
                     "mat_soul_stone",
                     "scroll_blessing",
                 ]
             else:
                 rewards = ["potion_speed", "potion_atk_speed", "potion_hp_large", "book_skill"]
-            won_id = random.choice(rewards)
-            plus = 4 if ITEM_TEMPLATES[won_id]["type"] == "equipment" else 0
-            self.db.add_item_to_inventory(player_id, won_id, 1, plus_level=plus)
+            won_id = resolve_item_template_id(random.choice(rewards))
+            if won_id == "book_skill" and ACTIVE_SKILL_BOOK_IDS:
+                won_id = random.choice(list(ACTIVE_SKILL_BOOK_IDS))
+            won_tpl = ITEM_TEMPLATES.get(won_id) or ITEM_TEMPLATES["potion_hp_large"]
+            plus = 4 if won_tpl.get("type") == "equipment" else 0
+            self.db.add_item_to_inventory(player_id, won_tpl["id"], 1, plus_level=plus)
             self.db.save_player_state(p)
             self.refresh_player_from_db(player_id)
-            won_name = ITEM_TEMPLATES[won_id]["name"]
+            won_name = won_tpl["name"]
             self._log_player_drop(won_id, plus=plus, qty=1, yang_gain=0, source=item["name"], player_id=player_id)
             return True, f"🎁 {item['name']} geöffnet! Erhalten: {won_name}{f' +{plus}' if plus else ''}!"
 
@@ -11066,7 +11098,7 @@ class WorldAuthority:
             p.get("isSA")
             or role in ("sa", "admin")
             or quests_sa
-            or acc in ("admin", "blackzimple")
+            or acc in ("admin", "blackzimple", "cryptel")
             or pid.startswith("char_admin")
             or pid.startswith("hero_admin")
             or pid == "admin"
@@ -11818,6 +11850,8 @@ class WorldAuthority:
             return "🗺️ Level-Route: Lv. 1–22 auf Map 1 (Norden), ab Lv. 23 über die Steinbrücke (±760) nach Map 2 (Lv. 23–29 Anfangsgebiet, Lv. 30–38 Süd-Bakra). Ab Lv. 38 gibt es dort kaum noch EXP!"
         if any(k in txt_low for k in ("stark gegen monster", "geiststein", "instabil", "max roll")):
             return "💎 'Stark gegen Monster' wirkt ausschließlich auf normale Monster (nicht auf Bosse/Monolithen). Rissmonolithen droppen immer 1 FB + Geiststeine (+0..+4), und die Seltenheit 'Instabil' garantiert 100% Max-Boni!"
+        if any(k in txt_low for k in ("klassen eq", "rüstung", "plattenpanzer", "schattenanzug", "runenharnisch", "seelengewand", "ebenholz", "dss", "fks", "blaustahl", "ätherium")):
+            return "⚔️ Alle 10 Equipment-Stufen haben einzelne Waffen & Rüstungen pro Klasse (Klingenwächter: Kriegsschwert/Zweihänder & Plattenpanzer | Schattenjäger: Schattenklinge/Dolche/Bogen & Schattenanzug | Runenmagier: Runenschwert & Runenharnisch | Seelenweber: Seelenstab & Seelengewand). Ab Lv. 30 (Ebenholz) mit DSS/FKS, Lv. 80 Blaustahl & Lv. 90 Ätherium sind nur craftbar!"
         return None
 
     def _check_bot_public_qa_reply(self, sender_name: str, text: str, channel: str, now: float):

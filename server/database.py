@@ -19,16 +19,22 @@ from game_data import (
     CLASS_ALLOWED_WEAPONS,
     CLASS_STARTER_ARMOR,
     CLASS_STARTER_WEAPON,
+    EQUIP_TIER_KEYS,
     EXPLICIT_LEGACY_EQUIP_MAP,
+    class_armor_for_tier,
     resolve_item_template_id,
     DEFAULT_DROP_FILTER,
     ITEM_TEMPLATES,
+    MAX_HORSE_LEVEL,
     MAX_PET_LEVEL,
     MAX_PET_STAT_POINTS,
+    MAX_PLAYER_LEVEL,
     PASSIVE_SKILL_DEFS,
     PET_SKILL_DEFS,
     QUEST_TEMPLATES,
     RARITIES,
+    RUNE_67_BONUS_POOL,
+    RUNE_BONUS_BY_ID,
     calculate_item_effective_stats,
     get_item_slot_size,
     get_required_pet_exp,
@@ -286,9 +292,11 @@ class GameDatabase:
                 self._deduplicate_player_names_conn(conn)
                 self._migrate_starter_eq_plus0_conn(conn)
                 self._migrate_starter_shoes_conn(conn)
+                self._migrate_class_specific_eq_conn(conn)
                 self._cleanup_unintended_sa_characters_conn(conn)
                 self._ensure_sa_admin_account_conn(conn)
                 self._ensure_sa_blackzimple_account_conn(conn)
+                self._ensure_sa_cryptel_account_conn(conn)
                 conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_players_unique_name ON players(LOWER(TRIM(name)));")
                 conn.commit()
             finally:
@@ -307,7 +315,7 @@ class GameDatabase:
 
     def _cleanup_unintended_sa_characters_conn(self, conn: sqlite3.Connection):
         """Bereinigt alle unautorisierten Charaktere mit eckigen Klammern [ ] oder Team-Tags (z.B. [GM]Test)."""
-        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
         for acc_row in conn.execute("SELECT username_key, characters_json FROM accounts").fetchall():
             ukey = acc_row["username_key"]
             try:
@@ -442,6 +450,485 @@ class GameDatabase:
             (json.dumps(chars, ensure_ascii=False), now),
         )
 
+    def _ensure_sa_cryptel_account_conn(self, conn: sqlite3.Connection):
+        """Richtet den SA-Admin-Account 'cryptel' (Passwort '1234') samt Charakter '[SA]Cryptel'
+        (Klingenwächter Körper, Lv. 99 Max-Level, alle Körper-Skills L1 Legendär, Maximal-EQ +9) ein."""
+        now = time.time()
+        pid = "hero_warrior_cryptel"
+        char_name = "[SA]Cryptel"
+
+        def mk_bonus(bid: str, val: int, max_val: Optional[int] = None) -> dict:
+            meta = RUNE_BONUS_BY_ID.get(bid, {"id": bid, "name": bid, "unit": "%"})
+            mv = max_val if max_val is not None else val
+            return {
+                "id": bid,
+                "name": meta.get("name", bid),
+                "value": val,
+                "maxValue": mv,
+                "unit": meta.get("unit", "%"),
+            }
+
+        def mk_67(bid: str, val: int) -> dict:
+            meta67 = next((x for x in RUNE_67_BONUS_POOL if x["id"] == bid), {"id": bid, "name": bid, "unit": "%"})
+            return {
+                "id": bid,
+                "name": meta67.get("name", bid),
+                "value": val,
+                "maxValue": val,
+                "unit": meta67.get("unit", "%"),
+                "isYellow67": True,
+            }
+
+        def mk_stone(stone_id: str) -> dict:
+            st = ITEM_TEMPLATES.get(stone_id, {})
+            st_stat = st.get("stoneStat", "vsMonsterPct")
+            default_unit = "" if st_stat in ("hp", "def") else "%"
+            return {
+                "id": "socket_stone",
+                "stoneId": stone_id,
+                "stoneFamily": st.get("stoneFamily", stone_id),
+                "stoneGrade": int(st.get("stoneGrade", 4)),
+                "stoneStat": st_stat,
+                "name": f"💎 {st.get('name', stone_id)}",
+                "value": st.get("stoneValue", 8),
+                "unit": st.get("stoneUnit", default_unit),
+            }
+
+        prow = conn.execute("SELECT player_id, quests_json FROM players WHERE player_id = ?", (pid,)).fetchone()
+        existing_q = {}
+        if prow:
+            try:
+                existing_q = json.loads(prow["quests_json"] or "{}")
+                if not isinstance(existing_q, dict):
+                    existing_q = {}
+            except Exception:
+                existing_q = {}
+
+        if not prow or not existing_q.get("__cryptel_max_provisioned_v2__"):
+            # Falls ein anderer Datensatz '[SA]Cryptel' belegt, vorab bereinigen
+            clash = conn.execute(
+                "SELECT player_id FROM players WHERE LOWER(TRIM(name)) = '[sa]cryptel' AND player_id != ?",
+                (pid,),
+            ).fetchall()
+            for cr in clash:
+                self._delete_player_cascade_conn(conn, cr["player_id"])
+
+            cdef = CHARACTER_CLASSES["warrior"]
+            max_skills = {sk["id"]: 50 for sk in cdef["skills"]}
+            max_passives = {ps_id: int(ps_def.get("maxLevel", 20)) for ps_id, ps_def in PASSIVE_SKILL_DEFS.items()}
+
+            quests_data = dict(existing_q)
+            bio_bonuses = {}
+            for qtpl in QUEST_TEMPLATES:
+                qid = qtpl["id"]
+                req_cnt = int(qtpl.get("required", 1) or 1)
+                quests_data[qid] = {
+                    "progress": req_cnt,
+                    "accepted": True,
+                    "ready": False,
+                    "completed": True,
+                    "claimed": True,
+                    "userAccepted": True,
+                    "timesCompleted": 1,
+                }
+                if qtpl.get("category") == "biologist" and isinstance(qtpl.get("biologistBonus"), dict):
+                    bio_bonuses[qid] = dict(qtpl["biologistBonus"])
+
+            quests_data["__biologist_bonuses__"] = bio_bonuses
+            quests_data["__starter_eq_v3__"] = True
+            quests_data["__starter_eq_plus0_v1__"] = True
+            quests_data["__starter_shoes_v1__"] = True
+            quests_data["__passives_reset_fb_only_v2__"] = True
+            quests_data["__empire__"] = "kaeryu"
+            quests_data["__new_spawn_wall_v1__"] = True
+            quests_data["__is_sa__"] = True
+            quests_data["__guild_name__"] = "Serverleitung"
+            quests_data["__completed_dungeons__"] = [
+                "dungeon_spider_queen",
+                "dungeon_demon_tower",
+                "dungeon_dragon_lair",
+                "dungeon_aether_citadel",
+            ]
+            quests_data["__mount_profile__"] = {
+                "level": 50,
+                "maxLevel": 50,
+                "tier": 3,
+                "tierName": "Militärgaul (Stufe 50)",
+                "tierShort": "Militärgaul",
+                "customName": "Kaiserliches Schlachtross",
+                "statPoints": 0,
+                "dmgPoints": 60,
+                "hpPoints": 40,
+                "equippedSkin": "skin_rift_charger",
+                "skillsUnlocked": True,
+                "starterMedalsGranted": True,
+            }
+            quests_data["__pet_profile__"] = {
+                "petId": "pet_fire_phoenix",
+                "customName": "Astralphönix",
+                "level": MAX_PET_LEVEL,
+                "exp": 0,
+                "maxExp": get_required_pet_exp(MAX_PET_LEVEL),
+                "skillPoints": 0,
+                "statPoints": 0,
+                "vit": MAX_PET_STAT_POINTS,
+                "str": MAX_PET_STAT_POINTS,
+                "dex": MAX_PET_STAT_POINTS,
+                "int": MAX_PET_STAT_POINTS,
+                "skills": {sk_d["id"]: int(sk_d["maxLevel"]) for sk_d in PET_SKILL_DEFS},
+                "cooldowns": {},
+            }
+            quests_data["__cryptel_max_provisioned_v2__"] = True
+
+            autofarm_data = {
+                "enabled": False,
+                "mode": "all",
+                "radius": 135,
+                "prioritizeElites": True,
+                "attackBosses": True,
+                "autoLoot": True,
+                "autoPotion": True,
+                "autoPotionHpPct": 55,
+                "autoSkills": True,
+                "retreatHpPct": 20,
+                "respectInventoryLimit": True,
+                "dropFilter": {
+                    **DEFAULT_DROP_FILTER,
+                    "categories": dict(DEFAULT_DROP_FILTER["categories"]),
+                },
+            }
+
+            if prow:
+                conn.execute(
+                    """
+                    UPDATE players
+                    SET name = ?, class_id = 'warrior', gender = 'male', level = ?, exp = 0,
+                        hp = 52000, max_hp = 52000, mp = 9500, max_mp = 9500,
+                        vit = 120, int_stat = 120, str = 120, dex = 120,
+                        stat_points = 0, skill_points = 0,
+                        yang = 999999999, shards = 99999, reputation = 200000,
+                        active_pet = 'pet_fire_phoenix',
+                        skills_json = ?, passives_json = ?, quests_json = ?, autofarm_json = ?, updated_at = ?
+                    WHERE player_id = ?
+                    """,
+                    (
+                        char_name,
+                        MAX_PLAYER_LEVEL,
+                        json.dumps(max_skills, ensure_ascii=False),
+                        json.dumps(max_passives, ensure_ascii=False),
+                        json.dumps(quests_data, ensure_ascii=False),
+                        json.dumps(autofarm_data, ensure_ascii=False),
+                        now,
+                        pid,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO players (
+                        player_id, name, class_id, gender, level, exp, hp, max_hp, mp, max_mp,
+                        vit, int_stat, str, dex, stat_points, skill_points, yang, shards, reputation,
+                        map_id, pos_x, pos_z, rot_y, active_mount, active_pet,
+                        skills_json, passives_json, quests_json, autofarm_json, updated_at
+                    ) VALUES (?, ?, 'warrior', 'male', ?, 0, 52000, 52000, 9500, 9500,
+                              120, 120, 120, 120, 0, 0, 999999999, 99999, 200000,
+                              'morgenwacht', -708.0, -772.0, 1.35, NULL, 'pet_fire_phoenix',
+                              ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pid,
+                        char_name,
+                        MAX_PLAYER_LEVEL,
+                        json.dumps(max_skills, ensure_ascii=False),
+                        json.dumps(max_passives, ensure_ascii=False),
+                        json.dumps(quests_data, ensure_ascii=False),
+                        json.dumps(autofarm_data, ensure_ascii=False),
+                        now,
+                    ),
+                )
+
+            # Komplettes Maximal-Equipment (Stufe 10 Ätherium Lv. 90 +9 Mythisch + 1-5 Max-Roll + 6/7 Max-Roll + Geiststeine +4 + alle Spezialringe & Kostüme)
+            conn.execute("DELETE FROM inventory_items WHERE player_id = ? AND reserved_shop_id IS NULL", (pid,))
+
+            wpn_bonuses = [
+                {"id": "bonus_dss", "name": "Durchschn. Schaden (DSS)", "value": 55, "maxValue": 55, "unit": "%"},
+                {"id": "bonus_fks", "name": "Fertigkeitsschaden (FKS)", "value": 30, "maxValue": 30, "unit": "%"},
+                mk_bonus("bonus_vs_monster", 25),
+                mk_bonus("bonus_crit", 15),
+                mk_bonus("bonus_str", 16),
+                mk_67("bonus_atk", 95),
+                mk_67("bonus_vs_metin", 25),
+                mk_stone("stone_monster_4"),
+                mk_stone("stone_crit_4"),
+                mk_stone("stone_metin_4"),
+            ]
+            equipped_loadout = [
+                ("wpn_aetherium_sword", "weapon", 9, "mythic", wpn_bonuses),
+                (
+                    "arm_aetherium_warrior",
+                    "armor",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_hp", 4000),
+                        mk_bonus("bonus_atk", 75),
+                        mk_bonus("bonus_hp_absorb", 15),
+                        mk_bonus("bonus_cast_speed", 25),
+                        mk_bonus("bonus_res_magic", 20),
+                        mk_67("bonus_hp", 4500),
+                        mk_67("bonus_atk", 95),
+                        mk_stone("stone_vitality_4"),
+                        mk_stone("stone_defense_4"),
+                        mk_stone("stone_haste_4"),
+                    ],
+                ),
+                (
+                    "eq_aetherium_helmet",
+                    "helmet",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_vs_monster", 20),
+                        mk_bonus("bonus_atk_speed", 12),
+                        mk_bonus("bonus_poison_chance", 15),
+                        mk_bonus("bonus_vs_halfhuman", 15),
+                        mk_bonus("bonus_res_magic", 20),
+                        mk_67("bonus_vs_metin", 25),
+                        mk_67("bonus_vs_boss", 25),
+                    ],
+                ),
+                (
+                    "eq_aetherium_shield",
+                    "shield",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_stun_immune", 1),
+                        mk_bonus("bonus_block", 20),
+                        mk_bonus("bonus_str", 16),
+                        mk_bonus("bonus_vs_monster", 20),
+                        mk_bonus("bonus_vs_halfhuman", 15),
+                        mk_67("bonus_atk", 95),
+                        mk_67("bonus_vs_boss", 25),
+                    ],
+                ),
+                (
+                    "eq_aetherium_bracelet",
+                    "bracelet",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_hp", 4000),
+                        mk_bonus("bonus_hp_absorb", 15),
+                        mk_bonus("bonus_pierce", 15),
+                        mk_bonus("bonus_vs_monster", 20),
+                        mk_bonus("bonus_vs_halfhuman", 15),
+                        mk_67("bonus_vs_metin", 25),
+                        mk_67("bonus_atk", 95),
+                    ],
+                ),
+                (
+                    "eq_aetherium_necklace",
+                    "necklace",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_hp", 4000),
+                        mk_bonus("bonus_crit", 15),
+                        mk_bonus("bonus_pierce", 15),
+                        mk_bonus("bonus_stun_chance", 10),
+                        mk_bonus("bonus_def_sword", 15),
+                        mk_67("bonus_vs_monster", 25),
+                        mk_67("bonus_vs_metin", 25),
+                    ],
+                ),
+                (
+                    "eq_aetherium_earrings",
+                    "earrings",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_hp", 2000),
+                        mk_bonus("bonus_str", 12),
+                        mk_bonus("bonus_crit", 10),
+                        mk_bonus("bonus_pierce", 10),
+                        mk_bonus("bonus_vs_halfhuman", 15),
+                        mk_67("bonus_vs_monster", 25),
+                        mk_67("bonus_atk", 95),
+                    ],
+                ),
+                (
+                    "eq_aetherium_shoes",
+                    "shoes",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_hp", 4000),
+                        mk_bonus("bonus_crit", 15),
+                        mk_bonus("bonus_pierce", 15),
+                        mk_bonus("bonus_speed", 20),
+                        mk_bonus("bonus_atk_speed", 8),
+                        mk_67("bonus_vs_monster", 25),
+                        mk_67("bonus_vs_boss", 25),
+                    ],
+                ),
+                (
+                    "eq_aetherium_gloves",
+                    "gloves",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_vs_monster", 20),
+                        mk_bonus("bonus_vs_metin", 20),
+                        mk_bonus("bonus_crit", 15),
+                        mk_bonus("bonus_atk_speed", 12),
+                        mk_bonus("bonus_str", 12),
+                        mk_67("bonus_atk", 95),
+                        mk_67("bonus_vs_boss", 25),
+                    ],
+                ),
+                (
+                    "eq_aetherium_belt",
+                    "belt",
+                    9,
+                    "mythic",
+                    [
+                        mk_bonus("bonus_hp", 3000),
+                        mk_bonus("bonus_vs_monster", 20),
+                        mk_bonus("bonus_vs_metin", 20),
+                        mk_bonus("bonus_vs_boss", 15),
+                        mk_bonus("bonus_hp_regen", 30),
+                        mk_67("bonus_hp", 4500),
+                        mk_67("bonus_atk", 95),
+                    ],
+                ),
+                ("spec_exp_ring", "exp_ring", 0, "epic", []),
+                ("spec_thief_gloves", "thief_gloves", 0, "epic", []),
+                ("spec_luck_medal", "luck_medal", 0, "epic", []),
+                ("spec_wind_shoes", "wind_shoes", 0, "epic", []),
+                ("spec_lolly", "lolly", 0, "legendary", []),
+                ("spec_hmr", "hmr", 0, "legendary", []),
+                ("costume_weapon_star", "costume_weapon", 0, "legendary", []),
+                ("costume_shadow_lord", "costume_armor", 0, "legendary", []),
+                ("costume_hair_royal", "costume_hair", 0, "epic", []),
+                ("costume_pet_skin_phoenix", "costume_pet_skin", 0, "legendary", []),
+                ("costume_mount_skin_royal", "costume_mount_skin", 0, "legendary", []),
+            ]
+
+            for tpl_id, eq_slot, plus_lv, rar, b_list in equipped_loadout:
+                if tpl_id not in ITEM_TEMPLATES:
+                    continue
+                cat = get_item_category(tpl_id)
+                conn.execute(
+                    """
+                    INSERT INTO inventory_items (
+                        item_uid, player_id, template_id, category, slot_index,
+                        equipped_slot, plus_level, quantity, bonuses_json, rarity, created_at
+                    ) VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, ?, ?)
+                    """,
+                    (
+                        f"itm_{uuid.uuid4().hex[:12]}",
+                        pid,
+                        tpl_id,
+                        cat,
+                        eq_slot,
+                        plus_lv,
+                        json.dumps(b_list, ensure_ascii=False),
+                        rar,
+                        now,
+                    ),
+                )
+
+            # Zusätzlich im Inventar: Ätherium-Zweihänder +9 (Max-Roll) + Tränke
+            bag_items = [
+                ("wpn_aetherium_greatsword", 0, 9, 1, "mythic", wpn_bonuses),
+                ("potion_hp_large", 1, 0, 200, "common", []),
+                ("potion_mp_medium", 2, 0, 200, "common", []),
+                ("potion_speed", 3, 0, 200, "rare", []),
+                ("potion_atk_speed", 4, 0, 200, "rare", []),
+            ]
+            for tpl_id, s_idx, plus_lv, qty, rar, b_list in bag_items:
+                if tpl_id not in ITEM_TEMPLATES:
+                    continue
+                cat = get_item_category(tpl_id)
+                conn.execute(
+                    """
+                    INSERT INTO inventory_items (
+                        item_uid, player_id, template_id, category, slot_index,
+                        equipped_slot, plus_level, quantity, bonuses_json, rarity, created_at
+                    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        f"itm_{uuid.uuid4().hex[:12]}",
+                        pid,
+                        tpl_id,
+                        cat,
+                        s_idx,
+                        plus_lv,
+                        qty,
+                        json.dumps(b_list, ensure_ascii=False),
+                        rar,
+                        now,
+                    ),
+                )
+
+        cryptel_slot = {
+            "playerId": pid,
+            "name": char_name,
+            "classId": "warrior",
+            "doctrineIdx": 0,
+            "empire": "kaeryu",
+            "gender": "male",
+            "hairIndex": 3,
+            "level": MAX_PLAYER_LEVEL,
+            "playTimeMin": 1,
+            "mapName": "Morgenwacht & Grenzland",
+            "guild": "Serverleitung",
+            "role": "SA",
+            "isSA": True,
+            "isGM": True,
+            "isNewCharSpawn": False,
+        }
+
+        arow = conn.execute("SELECT * FROM accounts WHERE username_key = 'cryptel'").fetchone()
+        if arow is None:
+            chars = [cryptel_slot, None, None, None]
+            conn.execute(
+                """
+                INSERT INTO accounts (username_key, username, password, email, delete_code, coins, characters_json, updated_at)
+                VALUES ('cryptel', 'cryptel', '1234', 'cryptel@aeryndor.de', '1234', 999999, ?, ?)
+                """,
+                (json.dumps(chars, ensure_ascii=False), now),
+            )
+        else:
+            try:
+                chars = json.loads(arow["characters_json"] or "[null,null,null,null]")
+                if not isinstance(chars, list):
+                    chars = [None, None, None, None]
+            except Exception:
+                chars = [None, None, None, None]
+            chars = (chars + [None, None, None, None])[:4]
+            found_idx = next(
+                (i for i, c in enumerate(chars) if isinstance(c, dict) and (c.get("playerId") == pid or str(c.get("name") or "").lower() == "[sa]cryptel")),
+                -1,
+            )
+            if found_idx >= 0:
+                p_cur = conn.execute("SELECT level FROM players WHERE player_id = ?", (pid,)).fetchone()
+                cryptel_slot["level"] = int(p_cur["level"]) if p_cur else MAX_PLAYER_LEVEL
+                chars[found_idx] = {**chars[found_idx], **cryptel_slot}
+            else:
+                free_idx = next((i for i, c in enumerate(chars) if not isinstance(c, dict)), 0)
+                chars[free_idx] = cryptel_slot
+            conn.execute(
+                """
+                UPDATE accounts
+                SET username = 'cryptel', password = '1234', delete_code = '1234', coins = MAX(coins, 999999),
+                    characters_json = ?, updated_at = ?
+                WHERE username_key = 'cryptel'
+                """,
+                (json.dumps(chars, ensure_ascii=False), now),
+            )
+
     def _ensure_sa_admin_account_conn(self, conn: sqlite3.Connection):
         """Richtet den offiziellen SA-Account ('admin' / Passwort '123') ein und versieht alle seine Charaktere automatisch mit [SA]."""
         now = time.time()
@@ -468,7 +955,7 @@ class GameDatabase:
                 continue
             cpid = str(ch.get("playerId") or "").strip()
             cname = str(ch.get("name") or "").strip()
-            legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+            legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
             if cname.upper().startswith("[SA]") and (cname.lower() in legitimate_sa_names or cpid == "hero_admin_sa"):
                 cname = self._normalize_sa_char_name(cname)
                 ch["name"] = cname
@@ -591,6 +1078,91 @@ class GameDatabase:
                 "UPDATE players SET quests_json = ? WHERE player_id = ?",
                 (json.dumps(q_dict, ensure_ascii=False), pid),
             )
+
+    def _migrate_class_specific_eq_conn(self, conn: sqlite3.Connection):
+        """Migriert ehemalige geteilte Rüstungen (arm_{t}_armor) & Schwerter (wpn_{t}_sword)
+        sauber auf die einzelnen klassenspezifischen Waffen & Rüstungen jedes Spielers/Bots."""
+        cls_wpn_map = {
+            "warrior": "sword",
+            "ninja": "ninja_sword",
+            "assassin": "ninja_sword",
+            "sura": "sura_sword",
+            "runemage": "sura_sword",
+            "shaman": "staff",
+        }
+        for _t in (*EQUIP_TIER_KEYS, "donnerstahl"):
+            _dst_t = "schwarzstahl" if _t == "donnerstahl" else _t
+            conn.execute(
+                "UPDATE offline_shop_listings SET template_id = ? WHERE template_id = ?",
+                (f"arm_{_dst_t}_warrior", f"arm_{_t}_armor"),
+            )
+            conn.execute(
+                "UPDATE offline_shop_listings SET template_id = ? WHERE template_id = ?",
+                (f"wpn_{_dst_t}_sword", f"wpn_{_t}_sword"),
+            )
+
+        prows = conn.execute("SELECT player_id, class_id, quests_json FROM players").fetchall()
+        for pr in prows:
+            pid = str(pr["player_id"] or "")
+            bot_prof = self.BOT_CANONICAL_PROFILES.get(pid)
+            p_cls = str(bot_prof["class_id"] if bot_prof else (pr["class_id"] or "warrior")).lower()
+            try:
+                q_dict = json.loads(pr["quests_json"] or "{}")
+                if not isinstance(q_dict, dict):
+                    q_dict = {}
+            except Exception:
+                q_dict = {}
+            already_mig = bool(q_dict.get("__class_specific_eq_v1__"))
+
+            irows = conn.execute(
+                "SELECT item_uid, template_id, equipped_slot FROM inventory_items WHERE player_id = ?",
+                (pid,),
+            ).fetchall()
+            for ir in irows:
+                raw_tid = str(ir["template_id"] or "")
+                eq_slot = ir["equipped_slot"]
+                new_tid = None
+                # 1. Jegliches veraltete arm_{t}_armor immer auf die Klassenrüstung umstellen
+                if raw_tid.startswith("arm_") and raw_tid.endswith("_armor"):
+                    parts = raw_tid.split("_")
+                    t_key = "schwarzstahl" if (len(parts) >= 3 and parts[1] == "donnerstahl") else (parts[1] if len(parts) >= 3 else "holz")
+                    if t_key in EQUIP_TIER_KEYS:
+                        new_tid = class_armor_for_tier(t_key, p_cls)
+                elif raw_tid in ("armor_leather", "armor_ninja_starter", "armor_sura_starter", "armor_shaman_starter"):
+                    new_tid = class_armor_for_tier("holz", p_cls)
+                # 2. Ausgerüstete (oder noch nicht einmalig migrierte) alte geteilte Schwerter/Rüstungen an Charakterklasse anpassen
+                elif (eq_slot == "armor" or not already_mig) and raw_tid.startswith("arm_"):
+                    parts = raw_tid.split("_")
+                    t_key = "schwarzstahl" if (len(parts) >= 3 and parts[1] == "donnerstahl") else (parts[1] if len(parts) >= 3 else "")
+                    tpl_chk = ITEM_TEMPLATES.get(resolve_item_template_id(raw_tid), {})
+                    if t_key in EQUIP_TIER_KEYS and tpl_chk.get("classes") and p_cls not in tpl_chk["classes"]:
+                        new_tid = class_armor_for_tier(t_key, p_cls)
+                elif (eq_slot == "weapon" or not already_mig) and (
+                    (raw_tid.startswith("wpn_") and raw_tid.endswith("_sword") and not raw_tid.endswith(("_ninja_sword", "_sura_sword", "_greatsword")))
+                    or raw_tid in ("sword_broadsword", "sword_ninja_starter", "sword_sura_starter")
+                ):
+                    if raw_tid.startswith("wpn_"):
+                        parts = raw_tid.split("_")
+                        t_key = "schwarzstahl" if (len(parts) >= 3 and parts[1] == "donnerstahl") else (parts[1] if len(parts) >= 3 else "holz")
+                    else:
+                        t_key = "holz"
+                    w_suf = cls_wpn_map.get(p_cls, "sword")
+                    cand_tid = f"wpn_{t_key}_{w_suf}"
+                    if cand_tid != raw_tid and cand_tid in ITEM_TEMPLATES:
+                        new_tid = cand_tid
+
+                if new_tid and new_tid != raw_tid and new_tid in ITEM_TEMPLATES:
+                    conn.execute(
+                        "UPDATE inventory_items SET template_id = ? WHERE item_uid = ?",
+                        (new_tid, ir["item_uid"]),
+                    )
+
+            if not already_mig:
+                q_dict["__class_specific_eq_v1__"] = True
+                conn.execute(
+                    "UPDATE players SET quests_json = ? WHERE player_id = ?",
+                    (json.dumps(q_dict, ensure_ascii=False), pid),
+                )
 
     def _delete_player_cascade_conn(self, conn: sqlite3.Connection, pid: str):
         if not pid:
@@ -934,7 +1506,8 @@ class GameDatabase:
                         "pos_x": 834.0,
                         "pos_z": -758.0,
                         "items": [
-                            ("arm_kupfer_armor", 6, 1, [{"id": "bonus_hp", "name": "Max. TP", "value": 800, "unit": ""}], 2900),
+                            ("arm_kupfer_sura", 6, 1, [{"id": "bonus_hp", "name": "Max. TP", "value": 800, "unit": ""}], 2900),
+                            ("wpn_kupfer_sura_sword", 5, 1, [{"id": "bonus_vs_monster", "name": "Stark gegen Monster", "value": 15, "unit": "%"}], 4600),
                             ("item_bonus_changer", 0, 3, [], 1400),
                             ("item_bonus_adder", 0, 2, [], 1100),
                             ("chest_moonlight", 0, 1, [], 1950),
@@ -970,7 +1543,7 @@ class GameDatabase:
     @staticmethod
     def _build_starter_items(class_id: str) -> List[tuple]:
         w_tpl = CLASS_STARTER_WEAPON.get(class_id, "wpn_holz_sword")
-        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "arm_holz_armor")
+        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "arm_holz_warrior")
         return [
             # Ausgerüstet (nur das offizielle 10-Stufen-Holz-Start-EQ +0, je nach Klasse):
             (w_tpl, 0, 0, "weapon", 0, 1, []),
@@ -993,7 +1566,7 @@ class GameDatabase:
     def ensure_class_starter_equipment(self, player_id: str, class_id: str) -> None:
         """Stellt beim Klassenwechsel sicher, dass Start-Waffe und Start-Rüstung zur Klasse passen."""
         w_tpl = CLASS_STARTER_WEAPON.get(class_id, "wpn_holz_sword")
-        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "arm_holz_armor")
+        a_tpl = CLASS_STARTER_ARMOR.get(class_id, "arm_holz_warrior")
         starter_weapons = set(CLASS_STARTER_WEAPON.values())
         starter_armors = set(CLASS_STARTER_ARMOR.values())
         with DB_LOCK:
@@ -1048,7 +1621,7 @@ class GameDatabase:
             empire = bot_prof["empire"]
         clean_empire = "kaeryu" if str(empire or "").lower() == "kaeryu" else "seiryu"
         clean_name = (name or "AeryndorHeld").strip()[:28] or "AeryndorHeld"
-        legitimate_sa = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
+        legitimate_sa = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
         is_sa_char = bool(
             (clean_name.lower() in legitimate_sa or str(player_id or "").lower() in ("hero_admin_sa", "char_admin_sa"))
             and not bot_prof
@@ -1749,24 +2322,34 @@ class GameDatabase:
                 if not is_sa_eq and player_level < tpl.get("reqLevel", 1):
                     return False, f"Benötigt Charakter-Level {tpl.get('reqLevel', 1)}!"
 
-                if not item["equipped_slot"] and slot == "weapon":
+                if not item["equipped_slot"]:
                     prow = conn.execute("SELECT class_id FROM players WHERE player_id = ?", (player_id,)).fetchone()
                     p_class = str(prow["class_id"] if prow else "warrior")
-                    w_sub = str(tpl.get("weaponSubType") or "one_hand")
-                    allowed_subs = CLASS_ALLOWED_WEAPONS.get(p_class, ["one_hand"])
                     allowed_classes = tpl.get("classes")
-                    if (allowed_classes and p_class not in allowed_classes) or (w_sub not in allowed_subs):
-                        if w_sub == "two_hand":
-                            return False, "⚠️ Nur der Klingenwächter kann Zweihandwaffen tragen!"
-                        if w_sub in ("dagger", "bow"):
-                            return False, "⚠️ Nur der Schattenjäger kann Dolche und Bögen tragen!"
-                        if w_sub in ("staff", "bell", "fan"):
-                            return False, "⚠️ Nur der Seelenweber kann Stäbe tragen!"
-                        if p_class == "sura":
-                            return False, "⚠️ Der Runenmagier kann ausschließlich Einhand-Schwerter tragen!"
-                        if p_class == "shaman":
-                            return False, "⚠️ Der Seelenweber trägt ausschließlich Stäbe!"
-                        return False, "⚠️ Deine Klasse kann diesen Waffentyp nicht tragen!"
+                    cls_labels = {
+                        "warrior": "Klingenwächter",
+                        "ninja": "Schattenjäger",
+                        "assassin": "Schattenjäger",
+                        "sura": "Runenmagier",
+                        "runemage": "Runenmagier",
+                        "shaman": "Seelenweber",
+                    }
+                    if allowed_classes and p_class not in allowed_classes:
+                        uniq_names = list(dict.fromkeys(cls_labels.get(c, c) for c in allowed_classes))
+                        allowed_str = " / ".join(uniq_names)
+                        kind_str = "Rüstung" if slot == "armor" else ("Waffe" if slot == "weapon" else "Ausrüstung")
+                        return False, f"⚠️ Diese {kind_str} kann nur von {allowed_str} getragen werden!"
+                    if slot == "weapon":
+                        w_sub = str(tpl.get("weaponSubType") or "one_hand")
+                        allowed_subs = CLASS_ALLOWED_WEAPONS.get(p_class, ["one_hand"])
+                        if w_sub not in allowed_subs:
+                            if w_sub == "two_hand":
+                                return False, "⚠️ Nur der Klingenwächter kann Zweihandwaffen tragen!"
+                            if w_sub in ("dagger", "bow"):
+                                return False, "⚠️ Nur der Schattenjäger kann Dolche und Bögen tragen!"
+                            if w_sub in ("staff", "bell", "fan"):
+                                return False, "⚠️ Nur der Seelenweber kann Stäbe tragen!"
+                            return False, "⚠️ Deine Klasse kann diesen Waffentyp nicht tragen!"
 
                 cat = int(item["category"])
                 size_y = get_item_slot_size(item["template_id"])
@@ -2444,7 +3027,7 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]"):
+                            if ukey in ("admin", "blackzimple", "cryptel") and cname.upper().startswith("[SA]"):
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
@@ -2466,7 +3049,7 @@ class GameDatabase:
                         "email": clean_email or f"{ukey}@aeryndor.de",
                         "deleteCode": clean_code,
                         "characters": chars,
-                        "isSA": ukey in ("admin", "blackzimple"),
+                        "isSA": ukey in ("admin", "blackzimple", "cryptel"),
                     }
                     conn.execute(
                         """
@@ -2488,7 +3071,7 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]"):
+                            if ukey in ("admin", "blackzimple", "cryptel") and cname.upper().startswith("[SA]"):
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
@@ -2510,7 +3093,7 @@ class GameDatabase:
                         "email": (client_account_obj or {}).get("email") or f"{ukey}@aeryndor.de",
                         "deleteCode": "123" if ukey in ("admin", "blackzimple") else ((client_account_obj or {}).get("deleteCode") or "1234"),
                         "characters": chars,
-                        "isSA": ukey in ("admin", "blackzimple"),
+                        "isSA": ukey in ("admin", "blackzimple", "cryptel"),
                     }
                     conn.execute(
                         """
@@ -2546,8 +3129,8 @@ class GameDatabase:
                         if not isinstance(ch, dict):
                             continue
                         cname = str(ch.get("name") or "").strip()
-                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
-                        if ukey in ("admin", "blackzimple") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
+                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
+                        if ukey in ("admin", "blackzimple", "cryptel") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                             cname = self._normalize_sa_char_name(cname)
                             ch["isSA"] = True
                             ch["isGM"] = True
@@ -2586,8 +3169,8 @@ class GameDatabase:
                 dirty_chars = False
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
-                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
-                        if ukey in ("admin", "blackzimple") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
+                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
+                        if ukey in ("admin", "blackzimple", "cryptel") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
                             norm_n = self._normalize_sa_char_name(ch.get("name") or "Admin")
                             if ch.get("name") != norm_n or not ch.get("isSA"):
                                 ch["name"] = norm_n
@@ -2613,7 +3196,7 @@ class GameDatabase:
                                 ch["level"] = new_lvl
                                 dirty_chars = True
                             db_name = str(prow["name"] or "").strip()
-                            if ukey in ("admin", "blackzimple") and db_name and db_name.upper().startswith("[SA]"):
+                            if ukey in ("admin", "blackzimple", "cryptel") and db_name and db_name.upper().startswith("[SA]"):
                                 db_name = self._normalize_sa_char_name(db_name)
                                 if prow["name"] != db_name:
                                     conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (db_name, ch["playerId"]))
@@ -2632,7 +3215,7 @@ class GameDatabase:
                     "email": row["email"] or f"{ukey}@aeryndor.de",
                     "deleteCode": "123" if ukey in ("admin", "blackzimple") else (row["delete_code"] or "1234"),
                     "characters": srv_chars,
-                    "isSA": ukey in ("admin", "blackzimple"),
+                    "isSA": ukey in ("admin", "blackzimple", "cryptel"),
                 }
                 return True, "Erfolgreich eingeloggt.", acc_obj
             finally:
@@ -2680,8 +3263,8 @@ class GameDatabase:
                     cname = str(ch.get("name") or "").strip()[:28]
                     if not cpid or not cname:
                         continue
-                    legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung"}
-                    if ukey in ("admin", "blackzimple") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
+                    legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
+                    if ukey in ("admin", "blackzimple", "cryptel") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                         cname = self._normalize_sa_char_name(cname)
                         ch["isSA"] = True
                         ch["isGM"] = True
@@ -2721,7 +3304,7 @@ class GameDatabase:
                     new_pids.add(cpid)
                     ch["name"] = cname
                     clean_chars[idx] = ch
-                    if ukey in ("admin", "blackzimple"):
+                    if ukey in ("admin", "blackzimple", "cryptel"):
                         conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (cname, cpid))
 
                 # Gelöschte Charaktere dieses Accounts auch aus der players-Tabelle löschen, damit der Name wieder frei wird

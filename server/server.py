@@ -43,7 +43,7 @@ TEAM_RANKS = {
     "DEV": "Developer",
     "SUP": "Supporter",
 }
-TEAM_ACCOUNTS = {"admin", "blackzimple"}
+TEAM_ACCOUNTS = {"admin", "blackzimple", "cryptel"}
 
 def get_team_rank_tag(raw_name: str) -> Optional[str]:
     """Prüft, ob der Name ein geschütztes Team-Kürzel enthält oder damit beginnt."""
@@ -726,7 +726,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
             # [SA]-Prefix nur normalisieren wenn der Name bereits [SA] hat und Account berechtigt ist
-            if req_name.upper().startswith("[SA]") and (account_key in ("admin", "blackzimple") or player_id == "hero_admin_sa"):
+            if req_name.upper().startswith("[SA]") and (account_key in ("admin", "blackzimple", "cryptel") or player_id == "hero_admin_sa"):
                 req_name = DB._normalize_sa_char_name(req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
@@ -735,7 +735,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         # UND der Account autorisiert ist!
         char_name = str(p.get("name") or "").strip()
         is_name_sa = char_name.upper().startswith("[SA]") or player_id == "hero_admin_sa"
-        is_account_authorized = account_key in ("admin", "blackzimple") or player_id == "hero_admin_sa"
+        is_account_authorized = account_key in ("admin", "blackzimple", "cryptel") or player_id == "hero_admin_sa"
         is_sa_join = is_name_sa and is_account_authorized
         if is_sa_join:
             p["name"] = DB._normalize_sa_char_name(p.get("name") or "Admin")
@@ -2337,18 +2337,20 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
                         elif slot_id == "weapon":
                             if w_sub == "bow" or "bogen" in it_name:
                                 icon_url = "/assets/icons/items/equipment/1/wood_bow.png"
-                            elif sz == 3 and ("stab" in it_name or "glocke" in it_name or cls_id == "shaman"):
+                            elif sz == 3 and ("stab" in it_name or "glocke" in it_name or tid.endswith("_staff")):
+                                icon_url = "/assets/icons/items/equipment/1/wood_staff.png"
+                            elif "runenschwert" in it_name or tid.endswith("_sura_sword"):
                                 icon_url = "/assets/icons/items/equipment/1/wood_wand.png"
                             elif sz == 3:
                                 icon_url = "/assets/icons/items/equipment/1/wood_axe.png"
                             else:
                                 icon_url = "/assets/icons/items/equipment/1/wood_sword.png"
                         elif slot_id == "armor":
-                            if cls_id == "ninja":
+                            if "schatten" in it_name or tid.endswith("_ninja") or (not tid.startswith("arm_") and cls_id == "ninja"):
                                 icon_url = "/assets/icons/items/equipment/1/wood_armor_ninja.png"
-                            elif cls_id == "sura":
+                            elif "runen" in it_name or tid.endswith("_sura") or (not tid.startswith("arm_") and cls_id == "sura"):
                                 icon_url = "/assets/icons/items/equipment/1/wood_armor_sura.png"
-                            elif cls_id == "shaman":
+                            elif "seelen" in it_name or tid.endswith("_shaman") or (not tid.startswith("arm_") and cls_id == "shaman"):
                                 icon_url = "/assets/icons/items/equipment/1/wood_armor_shaman.png"
                             else:
                                 icon_url = "/assets/icons/items/equipment/1/wood_armor_warrior.png"
@@ -4413,6 +4415,7 @@ class AeryndorMMOHandler(http.server.SimpleHTTPRequestHandler):
 class ThreadedMMOServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
     daemon_threads = True
+    request_queue_size = 128
 
     def handle_error(self, request, client_address):
         exc = sys.exc_info()[1]

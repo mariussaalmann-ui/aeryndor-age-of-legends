@@ -1388,7 +1388,7 @@ def setup_bot_player(world: WorldAuthority, cfg: dict, reset_to_level_1: bool = 
         # Zweihänder aus dem 10-Stufen-Tier-Set passend zum Bot-Level (Holz/Kupfer/Eisen/...)
         _bot_lvl = int(p.get("level", 1) or 1)
         _tier_rank = sum(1 for _req in (1, 10, 20, 30, 40, 50, 60, 70, 80, 90) if _bot_lvl >= _req) - 1
-        _tier_key = ("holz", "kupfer", "eisen", "ebenholz", "silber", "gold", "drachengold", "donnerstahl", "blaustahl", "aetherium")[max(0, _tier_rank)]
+        _tier_key = ("holz", "kupfer", "eisen", "ebenholz", "silber", "gold", "drachengold", "schwarzstahl", "blaustahl", "aetherium")[max(0, _tier_rank)]
         two_hand_id = f"wpn_{_tier_key}_greatsword"
         has_2h = str((p.get("equipment", {}).get("weapon") or {}).get("templateId", "")).endswith("_greatsword") or any(
             it.get("templateId") == two_hand_id for it in p.get("inventory", [])

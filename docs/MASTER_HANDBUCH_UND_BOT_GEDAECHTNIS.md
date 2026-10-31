@@ -36,10 +36,11 @@ Diese Direktiven gelten absolut verbindlich für alle 12 Test- und Spiel-Bots. C
 
 ## 🎁 3. Drop-, Upp- & Seltenheitsregeln (Item-Ökonomie)
 
-* **Ausrüstungs-Grades beim Drop:**
-  * *Monster:* Droppen Equipment im Bereich von **+0 bis +4** (strikt basierend auf rassen- und mobspezifischen Drop-Pools; jede Monster-Rasse besitzt exakt dieselbe prozentuale Fundchance, aber nicht alles von einem Monster droppen lassen).
-  * *Monolithen:* Droppen Equipment von **+0 bis +4** (Instabile und höhere Rissmonolithen droppen sogar von **+0 bis +6**).
-  * *Bosse:* Droppen hochwertige Ausrüstung im Bereich von **+4 bis +6**, Bonus-Switcher & -Hinzufügen & weitere seltene Items.
+* **Ausrüstungs-Grades & Klassentrennung beim Drop:**
+  * *Einzelne Waffen & Rüstungen pro Klasse:* In allen 10 Equipment-Stufen sind Waffen (7 klassenspezifische Waffentypen) und Körperrüstungen (4 klassenspezifische Rüstungen: *Plattenpanzer*, *Schattenanzug*, *Runenharnisch*, *Seelengewand*) **strikt einzeln pro Klasse getrennt** und droppen mit exakt gleicher Klassen-Gewichtung!
+  * *Monster:* Droppen klassenspezifische Waffen & Rüstungen sowie universellen Schmuck im Bereich von **+0 bis +4** (strikt basierend auf rassen- und mobspezifischen Drop-Pools; jede Monster-Rasse besitzt exakt dieselbe prozentuale Fundchance, aber nicht alles von einem Monster droppen lassen).
+  * *Monolithen:* Droppen klassenspezifische Waffen/Rüstungen & Schmuck von **+0 bis +4** (Instabile und höhere Rissmonolithen droppen sogar von **+0 bis +6**).
+  * *Bosse:* Droppen hochwertige klassenspezifische Ausrüstung im Bereich von **+4 bis +6**, Bonus-Switcher & -Hinzufügen & weitere seltene Items.
 
 * **Erweckungssteine für Monolithen:**
   * *Stufe-2-Steine (Instabil):* Besitzen eine stark reduzierte Drop-Chance (droppen ab und zu), um den Fluss der Beschwörungen zu balancieren.
@@ -149,10 +150,14 @@ Diese Direktiven gelten absolut verbindlich für alle 12 Test- und Spiel-Bots. C
 * 🟡 **Legendär** (Gold) – Perfekt optimierte Boni (sehr selten).
 * 💠 **Instabil** (Leuchteffekt) – Alle Boni auf absolutem Maximalwert (äußerst selten)!
 
-### Basis-Werte der 10 Equipment-Stufen (+0 bis +9)
+### Basis-Werte der 10 Equipment-Stufen (+0 bis +9 • 19 Teile pro Stufe: Waffen & Rüstungen einzeln je Klasse!)
 Nur dieses Equipment darf droppen (`+0` bis `+6`, gemäß Drop-Grades; Stufe 9 & 10 nur craftbar!):
 
-#### 🗡️ Waffen (Einhand [2 Slots], Zweihand [3 Slots], Dolche [1 Slot], Bogen [3 Slots], Stab [3 Slots])
+#### 🗡️ Klassenspezifische Waffen (7 einzelne Waffen pro Stufe — jede Waffe strikt für EINE Klasse!)
+* **Klingenwächter (Krieger):** `{Präfix}-Kriegsschwert` (Einhand, 2 Slots) & `{Präfix}-Zweihänder` (Zweihand, 3 Slots)
+* **Schattenjäger (Ninja):** `{Präfix}-Schattenklinge` (Einhand, 2 Slots), `{Präfix}-Dolche` (Dolche, 1 Slot) & `{Präfix}-Bogen` (Bogen, 3 Slots)
+* **Runenmagier (Sura):** `{Präfix}-Runenschwert` (Einhand, 2 Slots — AW + Magischer AW)
+* **Seelenweber (Schamane):** `{Präfix}-Seelenstab` (Stab, 3 Slots — AW + Magischer AW)
 * **Stufe 1 (Lv. 1, Holz):** `+10 AW (+0)` ➔ `+38 AW (+9)` | `+3% Angriffsgeschwindigkeit`
 * **Stufe 2 (Lv. 10, Kupfer):** `+18 AW (+0)` ➔ `+56 AW (+9)` | `+4% Angriffsgeschwindigkeit`
 * **Stufe 3 (Lv. 20, Eisen):** `+28 AW (+0)` ➔ `+82 AW (+9)` | `+5% Angriffsgeschwindigkeit`
@@ -164,7 +169,11 @@ Nur dieses Equipment darf droppen (`+0` bis `+6`, gemäß Drop-Grades; Stufe 9 &
 * **Stufe 9 (Lv. 80, Blaustahl – Nur Craftbar):** `+180 AW (+0)` ➔ `+445 AW (+9)` | `+11% Angriffsgeschwindigkeit`
 * **Stufe 10 (Lv. 90, Ätherium – Nur Craftbar):** `+240 AW (+0)` ➔ `+560 AW (+9)` | `+12% Angriffsgeschwindigkeit`
 
-#### 🛡️ Rüstungen (Körperrüstung)
+#### 🛡️ Klassenspezifische Körperrüstungen (4 einzelne Rüstungen pro Stufe — jede Rüstung strikt für EINE Klasse!)
+* **Klingenwächter (Krieger):** `{Präfix}-Plattenpanzer` (2 Slots)
+* **Schattenjäger (Ninja):** `{Präfix}-Schattenanzug` (2 Slots)
+* **Runenmagier (Sura):** `{Präfix}-Runenharnisch` (2 Slots)
+* **Seelenweber (Schamane):** `{Präfix}-Seelengewand` (2 Slots)
 * **Stufe 1 (Lv. 1, Holz):** `+12 DEF, +300 TP (+0)` ➔ `+42 DEF, +1.200 TP (+9)`
 * **Stufe 2 (Lv. 10, Kupfer):** `+22 DEF, +650 TP (+0)` ➔ `+72 DEF, +2.100 TP (+9)`
 * **Stufe 3 (Lv. 20, Eisen):** `+35 DEF, +1.100 TP (+0)` ➔ `+110 DEF, +3.100 TP (+9)`
