@@ -310,12 +310,12 @@ class GameDatabase:
             return "Held"
         if raw.upper().startswith("[SA]"):
             base = raw[4:].strip()
-            return f"[SA]{base}"[:28] if base else "[SA]Admin"
+            return f"[SA]{base}"[:28] if base else "[SA]Nemesis"
         return raw[:28]
 
     def _cleanup_unintended_sa_characters_conn(self, conn: sqlite3.Connection):
         """Bereinigt alle unautorisierten Charaktere mit eckigen Klammern [ ] oder Team-Tags (z.B. [GM]Test)."""
-        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
+        legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
         for acc_row in conn.execute("SELECT username_key, characters_json FROM accounts").fetchall():
             ukey = acc_row["username_key"]
             try:
@@ -331,7 +331,7 @@ class GameDatabase:
                 cname = str(ch.get("name") or "").strip()
                 cpid = str(ch.get("playerId") or "").strip()
                 # Wenn der Name eckige Klammern enthält und kein autorisierter SA-Charakter ist:
-                if ("[" in cname or "]" in cname) and cname.lower() not in legitimate_sa_names and cpid != "hero_admin_sa":
+                if ("[" in cname or "]" in cname) and cname.lower() not in legitimate_sa_names:
                     base_name = re.sub(r'\[.*?\]', '', cname).strip()
                     base_name = re.sub(r'[\[\]]', '', base_name).strip()
                     if not base_name:
@@ -368,7 +368,7 @@ class GameDatabase:
         for prow in conn.execute("SELECT player_id, name, quests_json FROM players").fetchall():
             pid = str(prow["player_id"] or "").strip()
             pname = str(prow["name"] or "").strip()
-            if not pid or pid.startswith("bot_") or pid == "hero_admin_sa":
+            if not pid or pid.startswith("bot_"):
                 continue
             if pname.lower() in legitimate_sa_names:
                 continue
@@ -987,79 +987,12 @@ class GameDatabase:
         )
 
     def _ensure_sa_admin_account_conn(self, conn: sqlite3.Connection):
-        """Richtet den offiziellen SA-Account ('admin' / Passwort '123') ein und versieht alle seine Charaktere automatisch mit [SA]."""
-        now = time.time()
-        row = conn.execute("SELECT * FROM accounts WHERE username_key = 'admin'").fetchone()
-        if row is None:
-            conn.execute(
-                """
-                INSERT INTO accounts (username_key, username, password, email, delete_code, coins, characters_json, updated_at)
-                VALUES ('admin', 'admin', '123', 'admin@aeryndor.de', '123', 999999, '[null,null,null,null]', ?)
-                """,
-                (now,),
-            )
-            return
-
-        try:
-            chars = json.loads(row["characters_json"] or "[null,null,null,null]")
-            if not isinstance(chars, list):
-                chars = [None, None, None, None]
-        except Exception:
-            chars = [None, None, None, None]
-        chars = (chars + [None, None, None, None])[:4]
-        for idx, ch in enumerate(chars):
-            if not isinstance(ch, dict):
-                continue
-            cpid = str(ch.get("playerId") or "").strip()
-            cname = str(ch.get("name") or "").strip()
-            legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
-            if cname.upper().startswith("[SA]") and (cname.lower() in legitimate_sa_names or cpid == "hero_admin_sa"):
-                cname = self._normalize_sa_char_name(cname)
-                ch["name"] = cname
-                ch["isSA"] = True
-                ch["isGM"] = True
-                ch["role"] = "SA"
-                if not ch.get("guild") or ch.get("guild") == "Keine Gilde":
-                    ch["guild"] = "Serverleitung"
-                if cpid:
-                    conn.execute(
-                        "UPDATE players SET name = ? WHERE player_id = ?",
-                        (cname, cpid),
-                    )
-            else:
-                ch["isSA"] = False
-                ch["isGM"] = False
-                if ch.get("role") in ("SA", "sa"):
-                    ch["role"] = "player"
-                if ch.get("guild") == "Serverleitung":
-                    ch["guild"] = ""
-                if "[" in cname or "]" in cname:
-                    clean_n = re.sub(r'\[.*?\]', '', cname).strip()
-                    clean_n = re.sub(r'[\[\]]', '', clean_n).strip()
-                    if not clean_n:
-                        clean_n = f"Held_{cpid[-4:]}"
-                    ch["name"] = clean_n
-                    if cpid:
-                        conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (clean_n, cpid))
-                if cpid:
-                    prow = conn.execute("SELECT quests_json FROM players WHERE player_id = ?", (cpid,)).fetchone()
-                    if prow:
-                        try:
-                            q = json.loads(prow["quests_json"] or "{}")
-                            if isinstance(q, dict) and "__is_sa__" in q:
-                                q.pop("__is_sa__", None)
-                                conn.execute("UPDATE players SET quests_json = ? WHERE player_id = ?", (json.dumps(q, ensure_ascii=False), cpid))
-                        except Exception:
-                            pass
-        conn.execute(
-            """
-            UPDATE accounts
-            SET username = 'admin', password = '123', delete_code = '123', coins = MAX(coins, 999999),
-                characters_json = ?, updated_at = ?
-            WHERE username_key = 'admin'
-            """,
-            (json.dumps(chars, ensure_ascii=False), now),
-        )
+        """Entfernt den veralteten Test-SA-Account ('admin' / '[SA]Admin'), damit ausschließlich 'blackzimple' und 'cryptel' als SA-Accounts existieren."""
+        conn.execute("DELETE FROM accounts WHERE username_key = 'admin'")
+        for r in conn.execute(
+            "SELECT player_id FROM players WHERE player_id IN ('hero_admin_sa', 'char_admin_sa') OR LOWER(TRIM(name)) = '[sa]admin'"
+        ).fetchall():
+            self._delete_player_cascade_conn(conn, r["player_id"])
 
     def _migrate_starter_eq_plus0_conn(self, conn: sqlite3.Connection):
         """Setzt einmalig bei allen bisher erstellten Charakteren und Bots das gesamte Start-EQ (ab Lv. 1) auf +0."""
@@ -1678,9 +1611,9 @@ class GameDatabase:
             empire = bot_prof["empire"]
         clean_empire = "kaeryu" if str(empire or "").lower() == "kaeryu" else "seiryu"
         clean_name = (name or "AeryndorHeld").strip()[:28] or "AeryndorHeld"
-        legitimate_sa = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
+        legitimate_sa = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
         is_sa_char = bool(
-            (clean_name.lower() in legitimate_sa or str(player_id or "").lower() in ("hero_admin_sa", "char_admin_sa"))
+            clean_name.lower() in legitimate_sa
             and not bot_prof
         )
         if is_sa_char and not bot_prof:
@@ -1896,11 +1829,7 @@ class GameDatabase:
         p["autofarm"] = json.loads(p.pop("autofarm_json", "{}") or "{}")
         is_sa_p = bool(
             not bot_prof
-            and (
-                str(p.get("name") or "").upper().startswith("[SA]")
-                or str(p.get("player_id") or "").lower().startswith("hero_admin")
-                or str(p.get("player_id") or "").lower().startswith("char_admin")
-            )
+            and str(p.get("name") or "").strip().lower() in ("`[sa]nemesis`", "[sa]nemesis", "[sa]serverleitung", "[sa]cryptel")
         )
         if is_sa_p:
             p["name"] = self._normalize_sa_char_name(p.get("name") or "Admin")
@@ -3058,12 +2987,12 @@ class GameDatabase:
             return False, "⚠️ Bitte gültigen Accountnamen (2–24 Zeichen) eingeben.", None
         if any(ch in uname for ch in ("<", ">", '"', "'", "`", ";", "\\", "/", "\x00")):
             return False, "⚠️ Accountname enthält unerlaubte Sonderzeichen.", None
-        if ukey == "admin" and pw not in ("123", "9274"):
-            return False, "⚠️ Ungültiges Passwort für SA-Account (admin / 123).", None
+        if ukey == "admin":
+            return False, "⚠️ Dieser Account existiert nicht.", None
         clean_email = (email or "").strip()[:80]
         if any(ch in clean_email for ch in ("<", ">", '"', "'", "`", ";", "\x00")):
             clean_email = ""
-        clean_code = "".join(ch for ch in str(delete_code or "1234") if ch.isdigit())[:4] or ("123" if ukey in ("admin", "blackzimple") else "1234")
+        clean_code = "".join(ch for ch in str(delete_code or "1234") if ch.isdigit())[:4] or ("123" if ukey == "blackzimple" else "1234")
 
         with DB_LOCK:
             conn = self._connect()
@@ -3085,7 +3014,7 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey in ("admin", "blackzimple", "cryptel") and cname.upper().startswith("[SA]"):
+                            if ukey in ("blackzimple", "cryptel") and cname.upper().startswith("[SA]"):
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
@@ -3107,14 +3036,14 @@ class GameDatabase:
                         "email": clean_email or f"{ukey}@aeryndor.de",
                         "deleteCode": clean_code,
                         "characters": chars,
-                        "isSA": ukey in ("admin", "blackzimple", "cryptel"),
+                        "isSA": ukey in ("blackzimple", "cryptel"),
                     }
                     conn.execute(
                         """
                         INSERT INTO accounts (username_key, username, password, email, delete_code, characters_json, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (ukey, uname, "123" if ukey == "admin" else pw, acc_obj["email"], acc_obj["deleteCode"], json.dumps(chars, ensure_ascii=False), time.time()),
+                        (ukey, uname, pw, acc_obj["email"], acc_obj["deleteCode"], json.dumps(chars, ensure_ascii=False), time.time()),
                     )
                     conn.commit()
                     return True, "Account erfolgreich registriert.", acc_obj
@@ -3129,7 +3058,7 @@ class GameDatabase:
                             if not isinstance(ch, dict):
                                 continue
                             cname = str(ch.get("name") or "").strip()
-                            if ukey in ("admin", "blackzimple", "cryptel") and cname.upper().startswith("[SA]"):
+                            if ukey in ("blackzimple", "cryptel") and cname.upper().startswith("[SA]"):
                                 cname = self._normalize_sa_char_name(cname)
                                 ch["isSA"] = True
                                 ch["isGM"] = True
@@ -3149,25 +3078,22 @@ class GameDatabase:
                     acc_obj = {
                         "username": uname,
                         "email": (client_account_obj or {}).get("email") or f"{ukey}@aeryndor.de",
-                        "deleteCode": "123" if ukey in ("admin", "blackzimple") else ((client_account_obj or {}).get("deleteCode") or "1234"),
+                        "deleteCode": "123" if ukey == "blackzimple" else ((client_account_obj or {}).get("deleteCode") or "1234"),
                         "characters": chars,
-                        "isSA": ukey in ("admin", "blackzimple", "cryptel"),
+                        "isSA": ukey in ("blackzimple", "cryptel"),
                     }
                     conn.execute(
                         """
                         INSERT INTO accounts (username_key, username, password, email, delete_code, characters_json, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (ukey, uname, "123" if ukey == "admin" else pw, acc_obj["email"], acc_obj["deleteCode"], json.dumps(chars, ensure_ascii=False), time.time()),
+                        (ukey, uname, pw, acc_obj["email"], acc_obj["deleteCode"], json.dumps(chars, ensure_ascii=False), time.time()),
                     )
                     conn.commit()
                     return True, "Erfolgreich eingeloggt.", acc_obj
 
                 stored_pw = str(row["password"] or "")
-                if ukey == "admin":
-                    if pw not in ("123", "9274"):
-                        return False, "⚠️ Falsches Passwort für SA-Account (admin / 123)!", None
-                elif ukey == "blackzimple":
+                if ukey == "blackzimple":
                     if pw not in (stored_pw, "L37qMAQqJv-99", "L37qM_AQqJv-99_"):
                         return False, "⚠️ Falsches Passwort für diesen Account!", None
                 elif stored_pw and pw != stored_pw:
@@ -3190,8 +3116,8 @@ class GameDatabase:
                         if not isinstance(ch, dict):
                             continue
                         cname = str(ch.get("name") or "").strip()
-                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
-                        if ukey in ("admin", "blackzimple", "cryptel") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
+                        legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+                        if ukey in ("blackzimple", "cryptel") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                             cname = self._normalize_sa_char_name(cname)
                             ch["isSA"] = True
                             ch["isGM"] = True
@@ -3230,9 +3156,9 @@ class GameDatabase:
                 dirty_chars = False
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
-                        legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
-                        if ukey in ("admin", "blackzimple", "cryptel") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
-                            norm_n = self._normalize_sa_char_name(ch.get("name") or "Admin")
+                        legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+                        if ukey in ("blackzimple", "cryptel") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
+                            norm_n = self._normalize_sa_char_name(ch.get("name") or "Nemesis")
                             if ch.get("name") != norm_n or not ch.get("isSA"):
                                 ch["name"] = norm_n
                                 ch["isSA"] = True
@@ -3257,7 +3183,7 @@ class GameDatabase:
                                 ch["level"] = new_lvl
                                 dirty_chars = True
                             db_name = str(prow["name"] or "").strip()
-                            if ukey in ("admin", "blackzimple", "cryptel") and db_name and db_name.upper().startswith("[SA]"):
+                            if ukey in ("blackzimple", "cryptel") and db_name and db_name.upper().startswith("[SA]"):
                                 db_name = self._normalize_sa_char_name(db_name)
                                 if prow["name"] != db_name:
                                     conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (db_name, ch["playerId"]))
@@ -3274,9 +3200,9 @@ class GameDatabase:
                 acc_obj = {
                     "username": row["username"] or uname,
                     "email": row["email"] or f"{ukey}@aeryndor.de",
-                    "deleteCode": "123" if ukey in ("admin", "blackzimple") else (row["delete_code"] or "1234"),
+                    "deleteCode": "123" if ukey == "blackzimple" else (row["delete_code"] or "1234"),
                     "characters": srv_chars,
-                    "isSA": ukey in ("admin", "blackzimple", "cryptel"),
+                    "isSA": ukey in ("blackzimple", "cryptel"),
                 }
                 return True, "Erfolgreich eingeloggt.", acc_obj
             finally:
@@ -3287,7 +3213,7 @@ class GameDatabase:
     ) -> Tuple[bool, str, list]:
         uname = (username or "").strip()
         ukey = uname.lower()
-        if not ukey:
+        if not ukey or ukey == "admin":
             return False, "Ungültiger Account.", [None, None, None, None]
         raw_chars = (list(characters or []) + [None, None, None, None])[:4]
         with DB_LOCK:
@@ -3324,8 +3250,8 @@ class GameDatabase:
                     cname = str(ch.get("name") or "").strip()[:28]
                     if not cpid or not cname:
                         continue
-                    legitimate_sa_names = {"[sa]nemesis", "[sa]admin", "[sa]serverleitung", "[sa]cryptel"}
-                    if ukey in ("admin", "blackzimple", "cryptel") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
+                    legitimate_sa_names = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel"}
+                    if ukey in ("blackzimple", "cryptel") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
                         cname = self._normalize_sa_char_name(cname)
                         ch["isSA"] = True
                         ch["isGM"] = True
@@ -3365,7 +3291,7 @@ class GameDatabase:
                     new_pids.add(cpid)
                     ch["name"] = cname
                     clean_chars[idx] = ch
-                    if ukey in ("admin", "blackzimple", "cryptel"):
+                    if ukey in ("blackzimple", "cryptel"):
                         conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (cname, cpid))
 
                 # Gelöschte Charaktere dieses Accounts auch aus der players-Tabelle löschen, damit der Name wieder frei wird

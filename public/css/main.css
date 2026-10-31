@@ -14470,32 +14470,68 @@ body.hud-edit-mode [data-hud-edit-key]::after {
   line-height: 1.25 !important;
 }
 
-/* Gespeicherte Account-Chips im Login ([SA]Admin etc.) */
+/* Gespeicherte Account-Chips im Login (👑 cryptel, 👑 blackzimple, Hinzufügen & Löschen) */
 .portal-label-row {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 6px !important;
-  margin-bottom: 4px !important;
+  margin-bottom: 5px !important;
+  flex-wrap: wrap !important;
 }
 
 .portal-saved-acc-pills {
   display: flex !important;
   align-items: center !important;
-  gap: 5px !important;
+  gap: 6px !important;
   flex-wrap: wrap !important;
 }
 
 .portal-acc-chip {
-  padding: 2px 9px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 3px 9px !important;
   border-radius: 999px !important;
   background: linear-gradient(180deg, rgba(46, 36, 22, 0.78), rgba(22, 16, 10, 0.88)) !important;
   border: 1px solid rgba(212, 168, 72, 0.55) !important;
   color: #fde68a !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
   cursor: pointer !important;
   transition: all 140ms ease !important;
+  user-select: none !important;
+}
+
+.portal-acc-chip .acc-chip-ico {
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
+.portal-acc-chip .acc-chip-del {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 15px !important;
+  height: 15px !important;
+  margin-left: 2px !important;
+  margin-right: -3px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  transition: all 120ms ease !important;
+}
+
+.portal-acc-chip .acc-chip-del:hover {
+  background: rgba(239, 68, 68, 0.88) !important;
+  color: #ffffff !important;
+  transform: scale(1.08) !important;
 }
 
 .portal-acc-chip:hover,
@@ -14504,6 +14540,45 @@ body.hud-edit-mode [data-hud-edit-key]::after {
   border-color: #fde047 !important;
   color: #fffbeb !important;
   box-shadow: 0 0 10px rgba(250, 204, 21, 0.35) !important;
+}
+
+/* SA-Accounts (blackzimple & cryptel): Krone + Goldschrift in jedem Status */
+.portal-acc-chip.is-sa-chip {
+  background: linear-gradient(180deg, rgba(96, 66, 12, 0.82), rgba(44, 28, 5, 0.92)) !important;
+  border: 1px solid rgba(250, 204, 21, 0.82) !important;
+  color: #ffd700 !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.6), 0 1px 2px rgba(0, 0, 0, 0.95) !important;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.25), inset 0 1px 0 rgba(255, 245, 190, 0.3) !important;
+}
+
+.portal-acc-chip.is-sa-chip .acc-chip-name {
+  color: #ffd700 !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.65), 0 1px 2px rgba(0, 0, 0, 0.95) !important;
+}
+
+.portal-acc-chip.is-sa-chip:hover,
+.portal-acc-chip.is-sa-chip.active {
+  background: linear-gradient(180deg, rgba(180, 125, 20, 0.94), rgba(102, 64, 10, 0.96)) !important;
+  border-color: #fef08a !important;
+  color: #fff59d !important;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.55), inset 0 1px 0 rgba(255, 251, 214, 0.45) !important;
+}
+
+.portal-acc-chip.portal-acc-add-btn {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border: 1px dashed rgba(125, 211, 252, 0.55) !important;
+  color: #bae6fd !important;
+  font-weight: 700 !important;
+}
+
+.portal-acc-chip.portal-acc-add-btn:hover,
+.portal-acc-chip.portal-acc-add-btn.is-adding {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.32), rgba(5, 150, 105, 0.45)) !important;
+  border: 1px solid #34d399 !important;
+  color: #ecfdf5 !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35) !important;
 }
 
 /* Charakterauswahl: Helden-Slots, Überkopf-Plakette & Rechte Helden-Chronik */

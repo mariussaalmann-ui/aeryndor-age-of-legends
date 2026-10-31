@@ -1586,6 +1586,9 @@
 }
 
 #portal-view .portal-acc-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
   border-radius: 999px !important;
   padding: 3px 10px !important;
   font-family: 'Inter', sans-serif !important;
@@ -1600,6 +1603,40 @@
   background: var(--ios-gold-soft) !important;
   border-color: rgba(250, 204, 21, 0.5) !important;
   color: #fde68a !important;
+}
+
+#portal-view .portal-acc-chip.is-sa-chip,
+#portal-view .portal-acc-chip.is-sa-chip .acc-chip-name {
+  color: #ffd700 !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.65), 0 1px 2px rgba(0, 0, 0, 0.92) !important;
+}
+
+#portal-view .portal-acc-chip.is-sa-chip {
+  background: linear-gradient(180deg, rgba(96, 66, 12, 0.72), rgba(44, 28, 5, 0.88)) !important;
+  border: 1px solid rgba(250, 204, 21, 0.82) !important;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.25), inset 0 1px 0 rgba(255, 245, 190, 0.3) !important;
+}
+
+#portal-view .portal-acc-chip.is-sa-chip.active,
+#portal-view .portal-acc-chip.is-sa-chip:hover {
+  background: linear-gradient(180deg, rgba(180, 125, 20, 0.92), rgba(102, 64, 10, 0.96)) !important;
+  border-color: #fef08a !important;
+  color: #fff59d !important;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.52), inset 0 1px 0 rgba(255, 251, 214, 0.45) !important;
+}
+
+#portal-view .portal-acc-chip.portal-acc-add-btn {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border: 1px dashed rgba(125, 211, 252, 0.55) !important;
+  color: #bae6fd !important;
+}
+
+#portal-view .portal-acc-chip.portal-acc-add-btn:hover,
+#portal-view .portal-acc-chip.portal-acc-add-btn.is-adding {
+  background: rgba(16, 185, 129, 0.28) !important;
+  border: 1px solid #34d399 !important;
+  color: #ecfdf5 !important;
 }
 
 #portal-view .portal-input-wrap {

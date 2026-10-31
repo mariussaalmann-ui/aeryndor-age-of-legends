@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v613';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v620';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -325,7 +325,18 @@ class AeryndorMMOApp {
     this.apiBase = this.customServerHost ? `http://${this.customServerHost}` : '';
 
     this.accounts = this.loadAccounts();
-    this.currentAccount = localStorage.getItem('aeryndor_active_account') || (this.accounts['admin'] ? 'admin' : (this.accounts['test'] ? 'test' : ''));
+    this.savedLogins = this.loadSavedLogins();
+    this.keepLoggedIn = localStorage.getItem('aeryndor_keep_login') !== '0';
+    this._addingNewSavedAccMode = false;
+    const rawSavedActiveAcc = (localStorage.getItem('aeryndor_active_account') || '').trim();
+    if (rawSavedActiveAcc.toLowerCase() === 'admin') {
+      localStorage.removeItem('aeryndor_active_account');
+    }
+    const validInitialAcc =
+      rawSavedActiveAcc && rawSavedActiveAcc.toLowerCase() !== 'admin'
+        ? rawSavedActiveAcc
+        : this.getSavedLoginAccountsList()[0] || (this.accounts['test'] ? 'test' : '');
+    this.currentAccount = validInitialAcc;
     this.selectedChannel = Number(localStorage.getItem('aeryndor_channel') || 1);
     this.selectedSlotIdx = 0;
 
@@ -1420,42 +1431,18 @@ class AeryndorMMOApp {
     const urlParams = new URLSearchParams(window.location.search);
     const clientParam = urlParams.get('client');
 
-    // Wenn als Admin-Client gestartet: Admin-Account mit SA-Rechten hinterlegen
-    if (clientParam === 'admin_client') {
-      const adminAcc = {
-        admin: {
-          username: 'admin',
-          email: 'admin@aeryndor.de',
-          deleteCode: '123',
-          characters: [
-            {
-              playerId: 'hero_admin_sa',
-              name: '[SA]Admin',
-              classId: 'warrior',
-              doctrineIdx: 0,
-              empire: 'kaeryu',
-              gender: 'male',
-              hairIndex: 0,
-              level: 99,
-              playTimeMin: 120,
-              mapName: 'Morgenwacht',
-              guild: 'Serverleitung',
-              role: 'SA',
-              isSA: true,
-              isGM: true,
-            },
-            null,
-            null,
-            null,
-          ],
-        },
-      };
-      localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(adminAcc));
-      localStorage.setItem('aeryndor_active_account', 'admin');
-      localStorage.setItem('aeryndor_mmo_player_id', 'hero_admin_sa');
-      localStorage.setItem('aeryndor_mmo_player_name', '[SA]Admin');
-      return adminAcc;
-    }
+    // Alten Client-Admin-Eintrag ('admin' / '[SA]Admin') restlos aus dem lokalen Speicher bereinigen
+    try {
+      if ((localStorage.getItem('aeryndor_active_account') || '').trim().toLowerCase() === 'admin') {
+        localStorage.removeItem('aeryndor_active_account');
+      }
+      if (localStorage.getItem('aeryndor_mmo_player_id') === 'hero_admin_sa') {
+        localStorage.removeItem('aeryndor_mmo_player_id');
+      }
+      if ((localStorage.getItem('aeryndor_mmo_player_name') || '').trim().toLowerCase() === '[sa]admin') {
+        localStorage.removeItem('aeryndor_mmo_player_name');
+      }
+    } catch (_) {}
 
     // Wenn als Test-Client gestartet: Test-Account für Spieler hinterlegen
     if (clientParam === 'test_client') {
@@ -1573,19 +1560,32 @@ class AeryndorMMOApp {
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
           const seenGlobalNames = new Set();
           const seenGlobalPids = new Set();
+          let dirtyPurge = false;
           for (const k of Object.keys(parsed)) {
+            if (k.trim().toLowerCase() === 'admin') {
+              delete parsed[k];
+              dirtyPurge = true;
+              continue;
+            }
             const acc = parsed[k];
             if (!acc || typeof acc !== 'object') continue;
+            if ( ['blackzimple', 'cryptel'].includes(k.trim().toLowerCase()) ) {
+              acc.isSA = true;
+            }
             if (Array.isArray(acc.characters)) {
               acc.characters = acc.characters.map((ch) => {
                 if (!ch || typeof ch !== 'object') return null;
                 let rawCleanName = String(ch.name || '').trim();
-                const legitimateSaNames = ['[sa]nemesis', '[sa]admin', '[sa]serverleitung'];
-                if (!legitimateSaNames.includes(rawCleanName.toLowerCase()) && ch.playerId !== 'hero_admin_sa') {
+                if (ch.playerId === 'hero_admin_sa' || rawCleanName.toLowerCase() === '[sa]admin') {
+                  dirtyPurge = true;
+                  return null;
+                }
+                const legitimateSaNames = ['[sa]nemesis', '[sa]serverleitung', '[sa]cryptel'];
+                if (!legitimateSaNames.includes(rawCleanName.toLowerCase())) {
                   rawCleanName = rawCleanName.replace(/\[.*?\]/g, '').replace(/[\[\]]/g, '').trim();
                   if (!rawCleanName) rawCleanName = `Held_${String(ch.playerId || '').slice(-4)}`;
                 }
-                const isCharSa = legitimateSaNames.includes(rawCleanName.toLowerCase()) || (rawCleanName.toUpperCase().startsWith('[SA]') && ch.playerId === 'hero_admin_sa');
+                const isCharSa = legitimateSaNames.includes(rawCleanName.toLowerCase());
                 const cleanName = rawCleanName;
                 const cleanPid = String(ch.playerId || '').trim();
                 if (!cleanName || !cleanPid) return null;
@@ -1607,6 +1607,9 @@ class AeryndorMMOApp {
               });
             }
           }
+          if (dirtyPurge) {
+            localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(parsed));
+          }
           return parsed;
         }
       }
@@ -1616,6 +1619,199 @@ class AeryndorMMOApp {
 
     // Keine alten Testaccounts mehr als Seed!
     return {};
+  }
+
+  isSaAccountName(accName) {
+    const k = String(accName || '').trim().toLowerCase();
+    if (!k || k === 'admin') return false;
+    if (k === 'blackzimple' || k === 'cryptel') return true;
+    const accObj = this.accounts?.[accName] || this.accounts?.[k];
+    if (accObj?.isSA) return true;
+    if (
+      Array.isArray(accObj?.characters) &&
+      accObj.characters.some((c) => c && (c.isSA || String(c.name || '').toUpperCase().startsWith('[SA]')))
+    ) {
+      return true;
+    }
+    return Boolean(this.savedLogins?.[k]?.isSA);
+  }
+
+  loadSavedLogins() {
+    const map = {};
+    try {
+      const raw = JSON.parse(localStorage.getItem('aeryndor_saved_logins_v1') || '{}');
+      if (raw && typeof raw === 'object') {
+        for (const [k, val] of Object.entries(raw)) {
+          const key = String(k || '').trim().toLowerCase();
+          if (!key || key === 'admin' || !val || typeof val !== 'object') continue;
+          const uname = String(val.username || k).trim();
+          if (!uname || uname.toLowerCase() === 'admin') continue;
+          map[key] = {
+            username: uname,
+            password: String(val.password || ''),
+            isSA: key === 'blackzimple' || key === 'cryptel' || Boolean(val.isSA),
+            updatedAt: Number(val.updatedAt || Date.now()),
+          };
+        }
+      }
+    } catch (_) {}
+    // Bestehende lokale Accounts (außer 'admin') in die Schnellauswahl übernehmen
+    for (const accName of Object.keys(this.accounts || {})) {
+      const clean = String(accName || '').trim();
+      const key = clean.toLowerCase();
+      if (!clean || key === 'admin') continue;
+      if (!map[key]) {
+        map[key] = {
+          username: clean,
+          password: ['test', 'test1', 'test2'].includes(key) ? '1234' : '',
+          isSA: this.isSaAccountName(clean),
+          updatedAt: Date.now(),
+        };
+      } else if (this.isSaAccountName(clean)) {
+        map[key].isSA = true;
+      }
+    }
+    try {
+      localStorage.setItem('aeryndor_saved_logins_v1', JSON.stringify(map));
+    } catch (_) {}
+    return map;
+  }
+
+  saveSavedLogins() {
+    try {
+      localStorage.setItem('aeryndor_saved_logins_v1', JSON.stringify(this.savedLogins || {}));
+    } catch (_) {}
+  }
+
+  getSavedLoginCred(accName) {
+    const key = String(accName || '').trim().toLowerCase();
+    if (!key || key === 'admin') return null;
+    return this.savedLogins?.[key] || null;
+  }
+
+  getSavedLoginAccountsList() {
+    const seen = new Set();
+    const list = [];
+    const entries = Object.values(this.savedLogins || {}).sort((a, b) => {
+      if (Boolean(b.isSA) !== Boolean(a.isSA)) return b.isSA ? 1 : -1;
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+    for (const item of entries) {
+      const uname = String(item?.username || '').trim();
+      const key = uname.toLowerCase();
+      if (!uname || key === 'admin' || seen.has(key)) continue;
+      seen.add(key);
+      list.push(uname);
+    }
+    for (const accName of Object.keys(this.accounts || {})) {
+      const uname = String(accName || '').trim();
+      const key = uname.toLowerCase();
+      if (!uname || key === 'admin' || seen.has(key)) continue;
+      seen.add(key);
+      list.push(uname);
+    }
+    return list.slice(0, 8);
+  }
+
+  upsertSavedLoginAccount(username, password = '', isSA = false) {
+    const uname = String(username || '').trim();
+    const key = uname.toLowerCase();
+    if (!uname || key === 'admin') return;
+    if (!this.savedLogins) this.savedLogins = {};
+    const prev = this.savedLogins[key];
+    this.savedLogins[key] = {
+      username: uname,
+      password: password !== undefined && password !== null && password !== '' ? String(password) : String(prev?.password || ''),
+      isSA: Boolean(isSA || this.isSaAccountName(uname) || prev?.isSA),
+      updatedAt: Date.now(),
+    };
+    this.saveSavedLogins();
+  }
+
+  deleteSavedLoginAccount(accName) {
+    const uname = String(accName || '').trim();
+    const key = uname.toLowerCase();
+    if (!key) return;
+    if (this.savedLogins) {
+      delete this.savedLogins[key];
+      this.saveSavedLogins();
+    }
+    if (this.accounts) {
+      for (const k of Object.keys(this.accounts)) {
+        if (k.trim().toLowerCase() === key) {
+          delete this.accounts[k];
+        }
+      }
+      localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
+    }
+    try {
+      const autoSess = JSON.parse(localStorage.getItem('aeryndor_auto_session_v1') || 'null');
+      if (autoSess && String(autoSess.username || '').trim().toLowerCase() === key) {
+        localStorage.removeItem('aeryndor_auto_session_v1');
+      }
+    } catch (_) {}
+    if (String(this.currentAccount || '').trim().toLowerCase() === key) {
+      const remaining = this.getSavedLoginAccountsList();
+      this.currentAccount = remaining[0] || '';
+      if (this.currentAccount) {
+        localStorage.setItem('aeryndor_active_account', this.currentAccount);
+      } else {
+        localStorage.removeItem('aeryndor_active_account');
+      }
+    }
+  }
+
+  deactivateAutoLoginSession() {
+    try {
+      const autoSess = JSON.parse(localStorage.getItem('aeryndor_auto_session_v1') || 'null');
+      if (autoSess && typeof autoSess === 'object') {
+        autoSess.active = false;
+        localStorage.setItem('aeryndor_auto_session_v1', JSON.stringify(autoSess));
+      }
+    } catch (_) {}
+  }
+
+  async tryRestoreSavedLoginSession() {
+    if (!this.keepLoggedIn) return false;
+    try {
+      const autoSess = JSON.parse(localStorage.getItem('aeryndor_auto_session_v1') || 'null');
+      if (!autoSess || !autoSess.active) return false;
+      const uname = String(autoSess.username || '').trim();
+      const pw = String(autoSess.password || '').trim();
+      if (uname.length < 2 || !pw || uname.toLowerCase() === 'admin') return false;
+      if (autoSess.channel) {
+        this.selectedChannel = Number(autoSess.channel) || 1;
+      }
+      const res = await fetch(`${this.apiBase}/api/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'account_login',
+          playerId: this.playerId,
+          username: uname,
+          accountName: uname,
+          password: pw,
+          sessionToken: this.getSessionToken(),
+          clientAccount: this.accounts[uname] || null,
+        }),
+      });
+      const data = await res.json();
+      const result = data?.result || data;
+      if (!result || result.ok === false) {
+        return false;
+      }
+      if (result.account) {
+        this.accounts[uname] = result.account;
+        localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
+      }
+      this.upsertSavedLoginAccount(uname, pw, Boolean(result?.account?.isSA));
+      this._isAccountLoggedIn = true;
+      this.currentAccount = uname;
+      localStorage.setItem('aeryndor_active_account', uname);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   saveAccounts() {
@@ -1688,6 +1884,7 @@ class AeryndorMMOApp {
       sessionToken: this.getSessionToken(),
     };
     this._isAccountLoggedIn = false;
+    this.deactivateAutoLoginSession();
     if (this.wsConnected && this.ws?.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(JSON.stringify(body));
@@ -1758,8 +1955,14 @@ class AeryndorMMOApp {
 
   async init() {
     const params = new URLSearchParams(window.location.search);
+    let autoLoggedIn = false;
     if (params.get('autostart') !== '1') {
-      this.showLoginPortal();
+      autoLoggedIn = await this.tryRestoreSavedLoginSession();
+      if (autoLoggedIn) {
+        this.showCharSelectPortal();
+      } else {
+        this.showLoginPortal();
+      }
     }
 
     await this.loadServerConfig();
@@ -1795,7 +1998,7 @@ class AeryndorMMOApp {
 
     if (params.get('autostart') === '1') {
       this.enterGameWorld();
-    } else if (!this.inWorld) {
+    } else if (!this.inWorld && !autoLoggedIn && this.portalMode !== 'charselect') {
       this.showLoginPortal();
     }
 
@@ -2213,8 +2416,12 @@ class AeryndorMMOApp {
       icon: './assets/icons/items/chest/mondlicht_truhe.png',
     };
 
-    const savedAccNames = Object.keys(this.accounts || {}).filter((a) => a && a.trim().length > 0);
-    const presetAccs = Array.from(new Set(['admin', ...savedAccNames])).slice(0, 4);
+    const presetAccs = this.getSavedLoginAccountsList();
+    const activeSavedCred = this.getSavedLoginCred(this.currentAccount);
+    const displayUsername = this._addingNewSavedAccMode ? '' : (this.currentAccount || '');
+    const displayPassword = this._addingNewSavedAccMode
+      ? ''
+      : (activeSavedCred?.password || (['test', 'test1', 'test2'].includes(String(this.currentAccount || '').toLowerCase()) ? '1234' : ''));
 
     portal.innerHTML = `
       <div class="portal-bg-layer" style="background-image: url('./assets/client_ui/login/login.png');"></div>
@@ -2302,18 +2509,27 @@ class AeryndorMMOApp {
                 <span class="portal-label">${t.userLabel}</span>
                 <div class="portal-saved-acc-pills">
                   ${presetAccs
-                    .map(
-                      (accName) => `
-                    <button type="button" class="portal-acc-chip ${this.currentAccount === accName ? 'active' : ''}" data-quick-acc="${this.escapeHtml(accName)}" title="Konto '${this.escapeHtml(accName)}' auswählen">
-                      ${accName === 'admin' ? '👑 [SA]Admin' : `👤 ${this.escapeHtml(accName)}`}
-                    </button>`
-                    )
+                    .map((accName) => {
+                      const isSaChip = this.isSaAccountName(accName);
+                      const isActiveChip =
+                        !this._addingNewSavedAccMode &&
+                        String(this.currentAccount || '').trim().toLowerCase() === accName.toLowerCase();
+                      return `
+                    <div class="portal-acc-chip ${isSaChip ? 'is-sa-chip' : ''} ${isActiveChip ? 'active' : ''}" data-quick-acc="${this.escapeHtml(accName)}" title="Konto '${this.escapeHtml(accName)}' auswählen">
+                      <span class="acc-chip-ico">${isSaChip ? '👑' : '👤'}</span>
+                      <span class="acc-chip-name">${this.escapeHtml(accName)}</span>
+                      <button type="button" class="acc-chip-del" data-del-acc="${this.escapeHtml(accName)}" title="Gespeicherten Account '${this.escapeHtml(accName)}' löschen">×</button>
+                    </div>`;
+                    })
                     .join('')}
+                  <button type="button" id="btn-add-saved-acc" class="portal-acc-chip portal-acc-add-btn ${this._addingNewSavedAccMode ? 'is-adding' : ''}" title="${this._addingNewSavedAccMode ? 'Eingegebenen Account &amp; Passwort jetzt in der Schnellauswahl speichern' : 'Neuen Account hinzufügen oder eingegebenen Account speichern'}">
+                    ${this._addingNewSavedAccMode ? '💾 Speichern' : '＋ Account'}
+                  </button>
                 </div>
               </div>
               <div class="portal-input-wrap has-ico">
                 <span class="portal-input-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-                <input id="login-username" class="portal-input" type="text" value="${this.escapeHtml(this.currentAccount || '')}" placeholder="${t.userPlaceholder}" autocomplete="username" />
+                <input id="login-username" class="portal-input" type="text" value="${this.escapeHtml(displayUsername)}" placeholder="${t.userPlaceholder}" autocomplete="username" />
               </div>
             </div>
 
@@ -2321,15 +2537,15 @@ class AeryndorMMOApp {
               <span class="portal-label">${t.pwLabel}</span>
               <div class="portal-input-wrap has-ico">
                 <span class="portal-input-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></span>
-                <input id="login-password" class="portal-input" type="password" value="${this.currentAccount === 'admin' ? '123' : (['test', 'test1', 'test2'].includes(this.currentAccount) ? '1234' : '')}" placeholder="${t.pwPlaceholder}" autocomplete="current-password" />
+                <input id="login-password" class="portal-input" type="password" value="${this.escapeHtml(displayPassword)}" placeholder="${t.pwPlaceholder}" autocomplete="current-password" />
                 <span id="login-caps-hint" class="portal-caps-hint hidden" title="Feststelltaste ist aktiv">⇪ Feststelltaste</span>
                 <button type="button" id="btn-toggle-pw" class="portal-pw-eye" title="Passwort anzeigen/verbergen">👁</button>
               </div>
             </div>
 
             <div class="portal-row-between">
-              <label class="portal-check-label">
-                <input type="checkbox" checked />
+              <label class="portal-check-label" for="login-keep-logged-in" title="Account &amp; Passwort merken und beim nächsten Spielstart automatisch anmelden">
+                <input id="login-keep-logged-in" type="checkbox" ${this.keepLoggedIn ? 'checked' : ''} />
                 <span>${t.keepLogin}</span>
               </label>
               <span id="login-status-msg" class="portal-status-msg">${t.statusReady(this.selectedChannel)}</span>
@@ -2417,13 +2633,105 @@ class AeryndorMMOApp {
     pwInput?.addEventListener('keydown', updateCaps);
     pwInput?.addEventListener('blur', () => capsHint?.classList.add('hidden'));
 
+    portal.querySelectorAll('[data-del-acc]').forEach((delBtn) => {
+      delBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const accName = delBtn.getAttribute('data-del-acc') || '';
+        if (!accName) return;
+        this._addingNewSavedAccMode = false;
+        this.deleteSavedLoginAccount(accName);
+        this.showToast(`🗑️ Gespeicherter Account „${accName}“ wurde entfernt.`);
+        this.showLoginPortal(false);
+      });
+    });
+
     portal.querySelectorAll('[data-quick-acc]').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const accName = chip.getAttribute('data-quick-acc') || 'admin';
+      chip.addEventListener('click', (ev) => {
+        if (ev.target && ev.target.closest('[data-del-acc]')) return;
+        const accName = chip.getAttribute('data-quick-acc') || '';
+        if (!accName) return;
+        this._addingNewSavedAccMode = false;
         this.currentAccount = accName;
         localStorage.setItem('aeryndor_active_account', accName);
         this.showLoginPortal(false);
       });
+    });
+
+    const addSavedBtn = portal.querySelector('#btn-add-saved-acc');
+    addSavedBtn?.addEventListener('click', () => {
+      const uname = (userInput?.value || '').trim();
+      const pw = (pwInput?.value || '').trim();
+      const existingCred = this.getSavedLoginCred(uname);
+      const isAlreadySavedUnchanged =
+        !this._addingNewSavedAccMode &&
+        existingCred &&
+        String(existingCred.username || '').toLowerCase() === uname.toLowerCase() &&
+        String(existingCred.password || '') === pw;
+
+      if (!uname || isAlreadySavedUnchanged) {
+        this._addingNewSavedAccMode = true;
+        this.showLoginPortal(false);
+        setTimeout(() => {
+          const freshUserInp = document.getElementById('login-username');
+          const msgEl = document.getElementById('login-status-msg');
+          if (freshUserInp) freshUserInp.focus();
+          if (msgEl) {
+            msgEl.textContent = '✏️ Account & Passwort eingeben und auf „💾 Speichern“ klicken.';
+            msgEl.classList.remove('error');
+          }
+        }, 20);
+        return;
+      }
+
+      if (uname.length < 2) {
+        showLoginError('⚠️ Bitte gültigen Accountnamen (mind. 2 Zeichen) eingeben.', userInput);
+        return;
+      }
+      if (uname.toLowerCase() === 'admin') {
+        showLoginError('⚠️ Dieser Account kann nicht gespeichert werden.', userInput);
+        return;
+      }
+      this._addingNewSavedAccMode = false;
+      this.upsertSavedLoginAccount(uname, pw, this.isSaAccountName(uname));
+      if (!this.accounts[uname]) {
+        this.accounts[uname] = {
+          username: uname,
+          email: `${uname.toLowerCase()}@aeryndor.de`,
+          deleteCode: uname.toLowerCase() === 'blackzimple' ? '123' : '1234',
+          characters: [null, null, null, null],
+          isSA: this.isSaAccountName(uname),
+        };
+        localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
+      }
+      this.currentAccount = uname;
+      localStorage.setItem('aeryndor_active_account', uname);
+      this.showToast(`💾 Account „${uname}“ gespeichert!`);
+      this.showLoginPortal(false);
+    });
+
+    const keepLoginChk = portal.querySelector('#login-keep-logged-in');
+    keepLoginChk?.addEventListener('change', () => {
+      this.keepLoggedIn = Boolean(keepLoginChk.checked);
+      localStorage.setItem('aeryndor_keep_login', this.keepLoggedIn ? '1' : '0');
+      const msg = portal.querySelector('#login-status-msg');
+      if (!this.keepLoggedIn) {
+        localStorage.removeItem('aeryndor_auto_session_v1');
+        if (msg) {
+          msg.textContent = '🔒 Eingeloggt bleiben deaktiviert.';
+          msg.classList.remove('error');
+        }
+      } else {
+        const uname = (userInput?.value || '').trim();
+        const pw = (pwInput?.value || '').trim();
+        if (uname.length >= 2 && uname.toLowerCase() !== 'admin') {
+          this.upsertSavedLoginAccount(uname, pw, this.isSaAccountName(uname));
+        }
+        if (msg) {
+          msg.textContent = '✓ Eingeloggt bleiben aktiv (Zugangsdaten werden gemerkt).';
+          msg.classList.remove('error');
+        }
+      }
     });
 
     portal.querySelectorAll('[data-sel-ch]').forEach((el) => {
@@ -2460,12 +2768,15 @@ class AeryndorMMOApp {
     const triggerDoLogin = async () => {
       const uname = (userInput?.value || '').trim();
       const pw = (pwInput?.value || '').trim();
+      const keepLogin = Boolean(portal.querySelector('#login-keep-logged-in')?.checked);
+      this.keepLoggedIn = keepLogin;
+      localStorage.setItem('aeryndor_keep_login', keepLogin ? '1' : '0');
       if (uname.length < 2) {
         showLoginError('⚠️ Bitte gültigen Namen eingeben.', userInput);
         return;
       }
-      if (uname.toLowerCase() === 'admin' && pw !== '123' && pw !== '9274') {
-        showLoginError('⚠️ Ungültiges Passwort für SA-Account (admin / 123).', pwInput);
+      if (uname.toLowerCase() === 'admin') {
+        showLoginError('⚠️ Dieser Account existiert nicht.', userInput);
         return;
       }
       if (['test', 'test1', 'test2'].includes(uname.toLowerCase()) && pw !== '1234') {
@@ -2474,6 +2785,7 @@ class AeryndorMMOApp {
       }
       const loginBtn = portal.querySelector('#btn-do-login');
       loginBtn?.classList.add('is-loading');
+      let serverAccIsSa = this.isSaAccountName(uname);
       try {
         const res = await fetch(`${this.apiBase}/api/action`, {
           method: 'POST',
@@ -2499,15 +2811,37 @@ class AeryndorMMOApp {
           return;
         }
         if (result?.account) {
+          serverAccIsSa = Boolean(result.account.isSA || serverAccIsSa);
+          result.account.isSA = serverAccIsSa;
           this.accounts[uname] = result.account;
           localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
         }
       } catch (_) {
         // Offline/Fallback
       }
+      this._addingNewSavedAccMode = false;
       this._isAccountLoggedIn = true;
       this.currentAccount = uname;
       localStorage.setItem('aeryndor_active_account', uname);
+      if (keepLogin) {
+        this.upsertSavedLoginAccount(uname, pw, serverAccIsSa);
+        localStorage.setItem(
+          'aeryndor_auto_session_v1',
+          JSON.stringify({
+            username: uname,
+            password: pw,
+            channel: this.selectedChannel,
+            active: true,
+            savedAt: Date.now(),
+          })
+        );
+      } else {
+        localStorage.removeItem('aeryndor_auto_session_v1');
+        if (this.savedLogins?.[uname.toLowerCase()]) {
+          this.savedLogins[uname.toLowerCase()].password = '';
+          this.saveSavedLogins();
+        }
+      }
       const accObj = this.getAccountObj();
       if (this.wsConnected && this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(
@@ -2682,6 +3016,19 @@ class AeryndorMMOApp {
       this._isAccountLoggedIn = true;
       this.currentAccount = uname;
       localStorage.setItem('aeryndor_active_account', uname);
+      this.upsertSavedLoginAccount(uname, this.keepLoggedIn ? pw : '', this.isSaAccountName(uname));
+      if (this.keepLoggedIn) {
+        localStorage.setItem(
+          'aeryndor_auto_session_v1',
+          JSON.stringify({
+            username: uname,
+            password: pw,
+            channel: this.selectedChannel,
+            active: true,
+            savedAt: Date.now(),
+          })
+        );
+      }
       this.saveAccounts();
       this.showToast(`🎉 Account „${uname}“ erfolgreich registriert!`);
       this.selectedSlotIdx = 0;
@@ -2762,17 +3109,18 @@ class AeryndorMMOApp {
         const docShort = (m.doctrines[ch.doctrineIdx || 0] || m.doctrines[0])?.name.split('(')[0].trim() || '';
         const rawMapName = String(ch.mapName || 'Morgenwacht');
         const shortMapName = rawMapName.includes('Morgenwacht') ? 'Morgenwacht' : rawMapName;
+        const isCharSa = Boolean(ch.isSA || String(ch.name || '').toUpperCase().startsWith('[SA]'));
         return `
-          <div class="char-slot-card ${isSel ? 'selected' : ''}" data-slot-idx="${idx}">
+          <div class="char-slot-card ${isSel ? 'selected' : ''} ${isCharSa ? 'is-sa-slot' : ''}" data-slot-idx="${idx}">
             <span class="slot-hotkey-tag">${idx + 1}</span>
             <div class="slot-portrait-ring">
               <img src="${m.portrait}" alt="${m.aeryndorName}" />
               <img src="${empCrest}" class="slot-mini-crest" alt="${empShort}" title="Stadt: ${empShort}" />
             </div>
             <div class="slot-info-col">
-              <div class="slot-char-name">${this.escapeHtml(ch.name)}</div>
+              <div class="slot-char-name ${isCharSa ? 'is-sa-gold' : ''}" ${isCharSa ? 'style="color:#ffd700 !important;font-weight:800;text-shadow:0 0 8px rgba(250,204,21,0.55);"' : ''}>${isCharSa ? '👑 ' : ''}${this.escapeHtml(ch.name)}</div>
               <div class="slot-char-meta">${m.aeryndorName} • ${this.escapeHtml(docShort)}</div>
-              <div class="slot-char-loc">📍 ${this.escapeHtml(shortMapName)} • ${this.escapeHtml(ch.guild || 'Keine Gilde')}</div>
+              <div class="slot-char-loc">📍 ${this.escapeHtml(shortMapName)} • ${isCharSa ? `<span style="color:#fde047;font-weight:700;">👑 ${this.escapeHtml(ch.guild || 'Serverleitung')}</span>` : this.escapeHtml(ch.guild || 'Keine Gilde')}</div>
             </div>
             <div class="slot-right-stack">
               <span class="slot-lvl-pill">Lv. ${ch.level || 1}</span>
@@ -2803,7 +3151,7 @@ class AeryndorMMOApp {
         <aside class="char-left-unified-box portal-ornate-box">
           <div class="portal-box-header">
             <span>◆ HELDEN-AUSWAHL (4 SLOTS) ◆</span>
-            <span class="portal-hdr-version">Konto: ${this.escapeHtml(this.currentAccount || 'Gast')}</span>
+            <span class="portal-hdr-version">${this.isSaAccountName(this.currentAccount) ? `<span style="color:#ffd700;font-weight:800;text-shadow:0 0 8px rgba(250,204,21,0.55);">Konto: 👑 ${this.escapeHtml(this.currentAccount)}</span>` : `Konto: ${this.escapeHtml(this.currentAccount || 'Gast')}`}</span>
           </div>
 
           <div class="char-slots-list">
@@ -2834,7 +3182,7 @@ class AeryndorMMOApp {
             <div class="plaque-sub">
               ${
                 activeChar
-                  ? `LV. ${charLvl} • ${this.escapeHtml(activeChar.name.toUpperCase())} • ${this.escapeHtml((String(activeChar.mapName || 'Morgenwacht').includes('Morgenwacht') ? 'Morgenwacht' : (activeChar.mapName || 'Morgenwacht')).toUpperCase())} (CH ${this.selectedChannel})`
+                  ? `LV. ${charLvl} • ${activeChar.isSA || String(activeChar.name || '').toUpperCase().startsWith('[SA]') ? `<span style="color:#ffd700;font-weight:800;text-shadow:0 0 8px rgba(250,204,21,0.6);">👑 ${this.escapeHtml(activeChar.name.toUpperCase())}</span>` : this.escapeHtml(activeChar.name.toUpperCase())} • ${this.escapeHtml((String(activeChar.mapName || 'Morgenwacht').includes('Morgenwacht') ? 'Morgenwacht' : (activeChar.mapName || 'Morgenwacht')).toUpperCase())} (CH ${this.selectedChannel})`
                   : 'KLICKE LINKS AUF [+ HELD ERSTELLEN], UM DEINE LEGENDE ZU BEGINNEN'
               }
             </div>
@@ -2877,7 +3225,7 @@ class AeryndorMMOApp {
 
             <div class="char-detail-row">
               <span class="lbl">Charaktername</span>
-              <span class="val gold">${activeChar ? this.escapeHtml(activeChar.name) : '— Kein Charakter —'}</span>
+              <span class="val gold" style="${activeChar && (activeChar.isSA || String(activeChar.name || '').toUpperCase().startsWith('[SA]')) ? 'color:#ffd700 !important;font-weight:800;text-shadow:0 0 8px rgba(250,204,21,0.55);' : ''}">${activeChar ? `${activeChar.isSA || String(activeChar.name || '').toUpperCase().startsWith('[SA]') ? '👑 ' : ''}${this.escapeHtml(activeChar.name)}` : '— Kein Charakter —'}</span>
             </div>
             <div class="char-detail-row">
               <span class="lbl">Stufe &amp; Rang</span>
@@ -3019,6 +3367,7 @@ class AeryndorMMOApp {
     });
 
     portal.querySelector('#btn-cs-back-login')?.addEventListener('click', () => {
+      this.deactivateAutoLoginSession();
       this.showLoginPortal();
     });
 
@@ -5736,7 +6085,7 @@ class AeryndorMMOApp {
   }
 
   triggerSaOnlineDynamicIslandAlert(info = {}) {
-    const saName = info.saName || '[SA]Admin';
+    const saName = info.saName || '[SA]Nemesis';
     const text = info.text || `👑 Server-Administrator ${saName} ist jetzt online!`;
     this.showToast(`📢 [SERVER-ANKÜNDIGUNG] ${text}`);
     let banner = document.getElementById('di-sa-online-banner');
@@ -8372,7 +8721,7 @@ class AeryndorMMOApp {
         const senderHtml =
           rawCh === 'system' || rawCh === 'event' || rawCh === 'drops'
             ? `<strong>${this.escapeHtml(m.sender)}:</strong>`
-            : `${gmCrown}<strong class="chat-sender-link" data-chat-whisper="${this.escapeHtml(m.sender)}" title="Klicken für Direkt-Konversation mit ${this.escapeHtml(m.sender)}">${this.escapeHtml(m.sender)}:</strong>`;
+            : `${gmCrown}<strong class="chat-sender-link" data-chat-whisper="${this.escapeHtml(m.sender)}" title="Klicken für Direkt-Konversation mit ${this.escapeHtml(m.sender)}" ${isSA ? 'style="color:#ffd700;font-weight:800;text-shadow:0 0 8px rgba(250,204,21,0.55);"' : ''}>${this.escapeHtml(m.sender)}:</strong>`;
         return `<div class="${lineCls}${mentionCls}"><span class="chat-ch-tag ${ch}">${tagLbl}</span>[${m.time || ''}] ${senderHtml} ${txt}</div>`;
       })
       .join('');
@@ -21922,11 +22271,10 @@ class AeryndorMMOApp {
 
   isSaAccount() {
     const pName = String(this.playerName || this.selfState?.name || '');
-    const pId = String(this.playerId || '').toLowerCase();
-    const isNameSa = pName.toUpperCase().startsWith('[SA]') || pId.startsWith('char_admin') || pId === 'admin';
+    const isNameSa = pName.toUpperCase().startsWith('[SA]');
     if (!isNameSa) return false;
     const acc = String(this.currentAccount || '').toLowerCase();
-    return acc === 'admin' || acc === 'blackzimple' || Boolean(this.selfState?.isSA);
+    return acc === 'blackzimple' || acc === 'cryptel' || Boolean(this.selfState?.isSA);
   }
 
   isDungeonCompletedForMap(mapId = this.selfState?.map_id || 'morgenwacht') {

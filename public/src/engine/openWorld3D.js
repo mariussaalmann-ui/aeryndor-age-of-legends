@@ -15,7 +15,7 @@ import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261026_v52
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
 import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
-import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v613';
+import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v619';
 
 // Modulweite Caches für 3D-GLB-Templates & Modell-Texturen:
 // Teilen geparste Geometrien, Skelette, Animations-Clips und Texturen nahtlos zwischen Login-Preloader,
@@ -8965,6 +8965,7 @@ export class OpenWorld3DEngine {
         this._townNightPointLights.push(pl);
       }
     }
+    this.ensureSkillEnvPointLightPool();
 
     const cands = this._nightLanternPointCandidates;
     if (!this.localPlayerPos) {
@@ -8972,6 +8973,13 @@ export class OpenWorld3DEngine {
         pl.intensity = 0;
         pl.position.set(0, -5000, 0);
         pl.visible = true;
+      }
+      if (this._skillEnvPointLights) {
+        for (const spl of this._skillEnvPointLights) {
+          spl.intensity = 0;
+          spl.position.set(0, -5000, 0);
+          spl.visible = true;
+        }
       }
       return;
     }
@@ -21556,11 +21564,17 @@ export class OpenWorld3DEngine {
       return this._skillMdeCache.get(fileName);
     }
     const scale = 0.0115;
-    const promise = fetch(`./assets/effects/skills/mde/${fileName}`)
-      .then((res) => {
+    const mdeUrl = `/assets/effects/skills/mde/${fileName}`;
+    const fetchBuffer = () =>
+      fetch(mdeUrl).then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status} for ${fileName}`);
         return res.arrayBuffer();
-      })
+      });
+    const promise = fetchBuffer()
+      .catch(
+        () =>
+          new Promise((resolve) => setTimeout(resolve, 120)).then(() => fetchBuffer())
+      )
       .then((buffer) => {
         const dv = new DataView(buffer);
         const submeshCount = dv.getUint32(11, true);
@@ -21604,6 +21618,10 @@ export class OpenWorld3DEngine {
           submeshes.push({ iCnt, frames });
         }
         return { submeshCount, frameCount, submeshes };
+      })
+      .catch((err) => {
+        this._skillMdeCache.delete(fileName);
+        throw err;
       });
     this._skillMdeCache.set(fileName, promise);
     return promise;
@@ -21696,6 +21714,898 @@ export class OpenWorld3DEngine {
     };
   }
 
+  ensureSkillEnvPointLightPool() {
+    if (this._skillEnvPointLights || !this.scene) return;
+    this._skillEnvPointLights = [];
+    this._activeSkillEnvGlows = [];
+    for (let i = 0; i < 3; i++) {
+      const pl = new THREE.PointLight(0xffffff, 0, 12.5, 1.75);
+      pl.castShadow = false;
+      pl.visible = true; // Niemals umschalten (verhindert NUM_POINT_LIGHTS Shader-Recompile!)
+      pl.position.set(0, -5000, 0);
+      this.scene.add(pl);
+      this._skillEnvPointLights.push(pl);
+    }
+  }
+
+  getSoftSkillEnvGroundWashTexture() {
+    if (this._softSkillEnvWashTex) return this._softSkillEnvWashTex;
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const half = size * 0.5;
+    const grad = ctx.createRadialGradient(half, half, 1, half, half, half - 2);
+    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.72)');
+    grad.addColorStop(0.24, 'rgba(255, 255, 255, 0.44)');
+    grad.addColorStop(0.52, 'rgba(255, 255, 255, 0.16)');
+    grad.addColorStop(0.78, 'rgba(255, 255, 255, 0.035)');
+    grad.addColorStop(0.95, 'rgba(255, 255, 255, 0.004)');
+    grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.userData = { isShared: true };
+    tex.needsUpdate = true;
+    this._softSkillEnvWashTex = tex;
+    return tex;
+  }
+
+  triggerSkillEnvironmentGlow(x, y, z, colorHex = 0xf97316, opts = {}) {
+    if (!this.scene) return;
+    this.ensureSkillEnvPointLightPool();
+    const distSq =
+      Math.pow((x || 0) - (this.localPlayerPos?.x || 0), 2) +
+      Math.pow((z || 0) - (this.localPlayerPos?.z || 0), 2);
+    if (distSq > 2500) return;
+
+    const delay = Math.max(0, Number(opts.delay || 0));
+    const duration = Math.max(0.38, Math.min(1.85, Number(opts.duration || 0.92)));
+    // Ganz leichtes, dezentes Leuchten auf die Umwelt (Bodenpflaster, Wände, Rüstung & nahe Objekte)
+    const peakIntensity = Math.max(0.55, Math.min(2.05, Number(opts.intensity || 1.32)));
+    const distance = Math.max(7.5, Math.min(16.0, Number(opts.distance || 11.5)));
+    const heightOffset = Number(opts.heightOffset ?? 1.08);
+    const followActor = opts.followActor || null;
+
+    if (!this._activeSkillEnvGlows) this._activeSkillEnvGlows = [];
+    if (this._activeSkillEnvGlows.length >= 6) {
+      this._activeSkillEnvGlows.shift();
+    }
+    this._activeSkillEnvGlows.push({
+      x,
+      y,
+      z,
+      heightOffset,
+      colorHex,
+      peakIntensity,
+      distance,
+      delay,
+      age: 0,
+      duration,
+      followActor,
+    });
+
+    // Sehr dezenter, weich auslaufender Boden-Lichtschimmer (sichtbar auch bei hellem Tageslicht, niemals grell)
+    if (!this._sharedUnitPlaneGeo) {
+      this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
+      this._sharedUnitPlaneGeo.userData = { isShared: true };
+    }
+    const washAlpha = Math.max(0.07, Math.min(0.18, Number(opts.groundWashAlpha ?? 0.13)));
+    const washRadius = Math.max(4.8, Math.min(11.5, distance * 0.78));
+    const washCol = new THREE.Color(colorHex);
+    const washMat = new THREE.MeshBasicMaterial({
+      map: this.getSoftSkillEnvGroundWashTexture(),
+      color: washCol,
+      transparent: true,
+      opacity: delay > 0.02 ? 0.0 : washAlpha,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const washGroup = new THREE.Group();
+    washGroup.position.set(x, y + 0.032, z);
+    const washMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, washMat);
+    washMesh.rotation.x = -Math.PI / 2;
+    washMesh.scale.setScalar(washRadius * 0.68);
+    washGroup.add(washMesh);
+    this.scene.add(washGroup);
+    this.vfxList.push({
+      type: 'metin_particles',
+      mesh: washGroup,
+      groundRings: [
+        {
+          mesh: washMesh,
+          mat: washMat,
+          s0: washRadius * 0.68,
+          s1: washRadius * 1.06,
+          c0: washCol,
+          c1: washCol,
+          peakAlpha: washAlpha,
+          delay,
+          life: duration,
+          spinSpeed: 0,
+        },
+      ],
+      verticalPlanes: [],
+      sprites: [],
+      age: 0,
+      maxAge: delay + duration + 0.05,
+      followActor,
+      followBone: '',
+      offsetX: 0,
+      offsetY: 0.032,
+      offsetZ: 0,
+    });
+  }
+
+  updateSkillEnvironmentLights(dt) {
+    if (!this._skillEnvPointLights) return;
+    const list = this._activeSkillEnvGlows || [];
+    const activeReady = [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const g = list[i];
+      g.age += dt;
+      const effAge = g.age - g.delay;
+      if (effAge >= g.duration) {
+        list.splice(i, 1);
+        continue;
+      }
+      if (effAge < 0) continue;
+      if (g.followActor?.root) {
+        g.x = g.followActor.root.position.x;
+        g.y = g.followActor.root.position.y;
+        g.z = g.followActor.root.position.z;
+      }
+      const u = Math.max(0, Math.min(1, effAge / g.duration));
+      const env = u < 0.14 ? u / 0.14 : Math.pow(Math.max(0, 1.0 - (u - 0.14) / 0.86), 1.55);
+      const curInt = g.peakIntensity * env;
+      if (curInt > 0.015) {
+        const d2 =
+          Math.pow(g.x - (this.localPlayerPos?.x || 0), 2) +
+          Math.pow(g.z - (this.localPlayerPos?.z || 0), 2);
+        activeReady.push({ g, curInt, d2 });
+      }
+    }
+    activeReady.sort((a, b) => a.d2 - b.d2 || b.curInt - a.curInt);
+    for (let i = 0; i < this._skillEnvPointLights.length; i++) {
+      const pl = this._skillEnvPointLights[i];
+      pl.visible = true;
+      if (i < activeReady.length) {
+        const { g, curInt } = activeReady[i];
+        pl.position.set(g.x, g.y + g.heightOffset, g.z);
+        pl.color.setHex(g.colorHex);
+        pl.distance = g.distance;
+        pl.intensity = curInt;
+      } else {
+        pl.intensity = 0;
+        pl.position.set(0, -5000, 0);
+      }
+    }
+  }
+
+  applyMetinLuminanceTintShader(mat) {
+    if (!mat) return mat;
+    mat.customProgramCacheKey = () => 'metin_lum_tint_v1';
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `#ifdef USE_MAP
+          vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+          float maxCh = max( sampledDiffuseColor.r, max( sampledDiffuseColor.g, sampledDiffuseColor.b ) );
+          float texWarmth = clamp( sampledDiffuseColor.r - sampledDiffuseColor.b, 0.0, 1.0 );
+          float tintCool = clamp( max( diffuse.b, diffuse.g ) - diffuse.r * 0.58, 0.0, 1.0 );
+          float lumMix = clamp( texWarmth * tintCool * 1.75, 0.0, 0.94 );
+          vec3 baseTexRgb = mix( sampledDiffuseColor.rgb, vec3( maxCh ), lumMix );
+          float hotCore = pow( maxCh, 2.15 ) * 0.32;
+          sampledDiffuseColor.rgb = baseTexRgb + vec3( hotCore );
+          diffuseColor *= sampledDiffuseColor;
+        #endif`
+      );
+    };
+    return mat;
+  }
+
+  boostMetinVfxColor(rgb, isLSkill = false, minLuma = 0.34) {
+    let r = Number(rgb?.[0] ?? 1.0);
+    let g = Number(rgb?.[1] ?? 1.0);
+    let b = Number(rgb?.[2] ?? 1.0);
+    if (isLSkill) {
+      r = Math.min(1.0, r * 1.16 + 0.14);
+      g = Math.min(1.0, g * 0.98 + 0.08);
+      b = Math.min(1.0, b * 1.22 + 0.18);
+    }
+    const peak = Math.max(r, g, b);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (peak < 0.45 && peak > 0.005) {
+      const mul = 0.72 / peak;
+      r = Math.min(1.0, r * mul);
+      g = Math.min(1.0, g * mul);
+      b = Math.min(1.0, b * mul);
+    }
+    if (luma < minLuma) {
+      const lift = (minLuma - luma) * 0.78;
+      r = Math.min(1.0, r + lift * 0.85);
+      g = Math.min(1.0, g + lift * 0.92);
+      b = Math.min(1.0, b + lift);
+    }
+    return new THREE.Color(r, g, b);
+  }
+
+  getMetinWhirlwindCrescentTexture() {
+    if (this._metinWhirlwindCrescentTex) return this._metinWhirlwindCrescentTex;
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const data = img.data;
+    const half = (size - 1) * 0.5;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x - half) / half;
+        const dy = (y - half) / half;
+        const r = Math.hypot(dx, dy);
+        const idx = (y * size + x) * 4;
+        if (r >= 0.96 || r <= 0.16) {
+          data[idx + 3] = 0;
+          continue;
+        }
+        const outerFade = r > 0.84 ? Math.pow(Math.max(0, (0.96 - r) / 0.12), 1.7) : 1.0;
+        const innerFade = r < 0.34 ? Math.pow(Math.max(0, (r - 0.16) / 0.18), 1.5) : 1.0;
+        const ang = Math.atan2(dy, dx);
+        // 4 breite logarithmische Metin2-Schwertwirbel-Klingensicheln + äußerer Schneidenring
+        let bladeSum = 0.0;
+        let coreSum = 0.0;
+        for (let b = 0; b < 4; b++) {
+          const bAng = (b * Math.PI) / 2;
+          const spiralPhase = ang - bAng - Math.log(Math.max(0.18, r)) * 2.55;
+          let wrapped = spiralPhase % (Math.PI * 2);
+          if (wrapped < 0) wrapped += Math.PI * 2;
+          // Scharfe Vorderkante bei wrapped ~ 0.15, breiter Energieschweif bis ~ 2.4
+          if (wrapped < 2.65) {
+            const lead = wrapped < 0.18 ? wrapped / 0.18 : 1.0;
+            const wake = Math.pow(Math.max(0, 1.0 - Math.max(0, wrapped - 0.18) / 2.47), 1.65);
+            const radialBand = Math.exp(-Math.pow((r - 0.66) / 0.24, 2.0));
+            const val = lead * wake * radialBand;
+            bladeSum += val;
+            if (wrapped < 0.42) {
+              coreSum += lead * Math.pow(1.0 - wrapped / 0.42, 1.8) * radialBand;
+            }
+          }
+        }
+        const rimSlash = Math.exp(-Math.pow((r - 0.80) / 0.045, 2.0)) * 0.72;
+        const innerRing = Math.exp(-Math.pow((r - 0.48) / 0.055, 2.0)) * 0.36;
+        const rawAlpha = Math.min(1.0, (bladeSum * 0.88 + rimSlash + innerRing) * outerFade * innerFade);
+        const whiteHot = Math.min(1.0, coreSum * 0.95 + rimSlash * 0.85);
+        const lum = Math.round(188 + whiteHot * 67);
+        data[idx] = lum;
+        data[idx + 1] = lum;
+        data[idx + 2] = Math.min(255, lum + 10);
+        data[idx + 3] = Math.round(rawAlpha * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.userData = { isShared: true };
+    tex.needsUpdate = true;
+    this._metinWhirlwindCrescentTex = tex;
+    return tex;
+  }
+
+  getMetinForwardSlashWaveTexture() {
+    if (this._metinForwardSlashWaveTex) return this._metinForwardSlashWaveTex;
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const data = img.data;
+    const half = (size - 1) * 0.5;
+    // WICHTIG: Bei rotation.x = -Math.PI/2 und rotation.z = 0 zeigt Canvas-OBERKANTE (y=0, dy < 0) nach +Z (VORWÄRTS)!
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x - half) / half;
+        const dy = (y - half) / half;
+        const r = Math.hypot(dx, dy);
+        const idx = (y * size + x) * 4;
+        if (r >= 0.96 || r <= 0.18) {
+          data[idx + 3] = 0;
+          continue;
+        }
+        // Winkel von Vorwärts-Achse (0, -1): 0 = exakt geradeaus, ±PI = hinten
+        const fwdAngle = Math.atan2(dx, -dy);
+        const absAng = Math.abs(fwdAngle);
+        const maxArc = 1.48; // ~170 Grad breite Metin2-Sichelwelle!
+        if (absAng >= maxArc) {
+          data[idx + 3] = 0;
+          continue;
+        }
+        const wingTaper = Math.pow(Math.cos((absAng / maxArc) * (Math.PI * 0.5)), 1.25);
+        const outerFade = r > 0.87 ? Math.pow(Math.max(0, (0.96 - r) / 0.09), 1.6) : 1.0;
+        const crescentRadius = 0.80 - 0.10 * Math.pow(absAng / maxArc, 2.0);
+        const distFromEdge = crescentRadius - r;
+        let slashAlpha = 0.0;
+        let hotEdge = 0.0;
+        if (distFromEdge >= -0.075 && distFromEdge <= 0.44) {
+          if (distFromEdge < 0) {
+            const front = 1.0 - Math.abs(distFromEdge) / 0.075;
+            slashAlpha = Math.pow(front, 1.7);
+            hotEdge = Math.pow(front, 2.0);
+          } else {
+            const trail = Math.pow(1.0 - distFromEdge / 0.44, 1.85);
+            const rays = 0.80 + 0.20 * Math.cos(fwdAngle * 18.0);
+            slashAlpha = trail * rays;
+            hotEdge = distFromEdge < 0.08 ? Math.pow(1.0 - distFromEdge / 0.08, 1.6) : 0.0;
+          }
+        }
+        const finalA = Math.min(1.0, slashAlpha * wingTaper * outerFade);
+        const lum = Math.round(186 + Math.min(1.0, hotEdge * wingTaper) * 69);
+        data[idx] = lum;
+        data[idx + 1] = lum;
+        data[idx + 2] = Math.min(255, lum + 12);
+        data[idx + 3] = Math.round(finalA * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.userData = { isShared: true };
+    tex.needsUpdate = true;
+    this._metinForwardSlashWaveTex = tex;
+    return tex;
+  }
+
+  getMetinRuneShockRingTexture() {
+    if (this._metinRuneShockRingTex) return this._metinRuneShockRingTex;
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const data = img.data;
+    const half = (size - 1) * 0.5;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x - half) / half;
+        const dy = (y - half) / half;
+        const r = Math.hypot(dx, dy);
+        const idx = (y * size + x) * 4;
+        if (r >= 0.96 || r <= 0.14) {
+          data[idx + 3] = 0;
+          continue;
+        }
+        const outerFade = r > 0.86 ? Math.pow(Math.max(0, (0.96 - r) / 0.10), 1.6) : 1.0;
+        const ang = Math.atan2(dy, dx);
+        const outerRim = Math.exp(-Math.pow((r - 0.80) / 0.042, 2.0));
+        const innerRim = Math.exp(-Math.pow((r - 0.58) / 0.032, 2.0)) * 0.68;
+        const softHalo = Math.exp(-Math.pow((r - 0.72) / 0.14, 2.0)) * 0.34;
+        let runeSeg = 0.0;
+        if (r > 0.60 && r < 0.78) {
+          const spoke = Math.pow(Math.max(0, Math.cos(ang * 12.0)), 6.0);
+          const glyph = Math.pow(Math.max(0, Math.sin(ang * 24.0 + r * 18.0)), 4.0) * 0.45;
+          const band = Math.sin(((r - 0.60) / 0.18) * Math.PI);
+          runeSeg = (spoke * 0.58 + glyph) * band;
+        }
+        const a = Math.min(1.0, (outerRim * 0.96 + innerRim + softHalo + runeSeg) * outerFade);
+        const hot = Math.min(1.0, outerRim + innerRim * 0.6 + runeSeg * 0.5);
+        const lum = Math.round(188 + hot * 67);
+        data[idx] = lum;
+        data[idx + 1] = lum;
+        data[idx + 2] = Math.min(255, lum + 10);
+        data[idx + 3] = Math.round(a * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.userData = { isShared: true };
+    tex.needsUpdate = true;
+    this._metinRuneShockRingTex = tex;
+    return tex;
+  }
+
+  getMetinSeismicFissureTexture() {
+    if (this._metinSeismicFissureTex) return this._metinSeismicFissureTex;
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, size, size);
+    const half = size * 0.5;
+    // Sanfter radialer Krater-Glühkern
+    const baseGrad = ctx.createRadialGradient(half, half, 4, half, half, half * 0.88);
+    baseGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.65)');
+    baseGrad.addColorStop(0.28, 'rgba(240, 240, 255, 0.28)');
+    baseGrad.addColorStop(0.72, 'rgba(220, 220, 255, 0.08)');
+    baseGrad.addColorStop(1.0, 'rgba(220, 220, 255, 0.0)');
+    ctx.fillStyle = baseGrad;
+    ctx.fillRect(0, 0, size, size);
+
+    // 10 gezackte, verzweigte seismische Bodenrisse (mit weichem Außen-Fade)
+    let seed = 1337;
+    const nextRand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let pass = 0; pass < 2; pass++) {
+      seed = 1337;
+      for (let b = 0; b < 10; b++) {
+        let ang = (b / 10) * Math.PI * 2 + (nextRand() - 0.5) * 0.24;
+        let px = half + Math.cos(ang) * 10;
+        let py = half + Math.sin(ang) * 10;
+        const segs = 7;
+        for (let s = 1; s <= segs; s++) {
+          const t = s / segs;
+          const rad = 12 + t * (half * 0.80);
+          ang += (nextRand() - 0.5) * 0.34;
+          const nx = half + Math.cos(ang) * rad;
+          const ny = half + Math.sin(ang) * rad;
+          const fade = Math.pow(1.0 - t * 0.78, 0.85) * (t > 0.82 ? (1.0 - t) / 0.18 : 1.0);
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(nx, ny);
+          if (pass === 0) {
+            ctx.strokeStyle = `rgba(215, 225, 255, ${(0.52 * fade).toFixed(3)})`;
+            ctx.lineWidth = (1.0 - t * 0.55) * 7.5;
+          } else {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * fade).toFixed(3)})`;
+            ctx.lineWidth = (1.0 - t * 0.62) * 2.6;
+          }
+          ctx.stroke();
+
+          if (s === 3 || s === 5) {
+            const fAng = ang + (b % 2 === 0 ? 0.52 : -0.52);
+            const fx = nx + Math.cos(fAng) * 20;
+            const fy = ny + Math.sin(fAng) * 20;
+            ctx.beginPath();
+            ctx.moveTo(nx, ny);
+            ctx.lineTo(fx, fy);
+            ctx.strokeStyle = pass === 0 ? `rgba(215, 225, 255, ${(0.34 * fade).toFixed(3)})` : `rgba(255, 255, 255, ${(0.76 * fade).toFixed(3)})`;
+            ctx.lineWidth = pass === 0 ? 3.8 : 1.4;
+            ctx.stroke();
+          }
+          px = nx;
+          py = ny;
+        }
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.userData = { isShared: true };
+    tex.needsUpdate = true;
+    this._metinSeismicFissureTex = tex;
+    return tex;
+  }
+
+  getMetinSkillPalette(code, tier = 1, isLSkill = false) {
+    // Authentische Metin2 Stufen-Farbpaletten (Normal -> Meister -> Großmeister -> Perfekt P -> Legendär L1)
+    if (isLSkill || tier >= 5) {
+      if (code === 'jeongwi') return { core: 0xffd1f7, main: 0xf43f5e, accent: 0xc026d3, env: 0xe11d48 };
+      if (code === 'geomgyeong') return { core: 0xfff7ed, main: 0xe879f9, accent: 0x38bdf8, env: 0xd946ef };
+      if (code === 'noegeom' || code === 'daejin') return { core: 0xe0f2fe, main: 0x38bdf8, accent: 0xd946ef, env: 0x60a5fa };
+      if (code === 'finish' || code === 'gyeoksan') return { core: 0xfef3c7, main: 0xf59e0b, accent: 0xe879f9, env: 0xf97316 };
+      return { core: 0xfef9ff, main: 0xd946ef, accent: 0x38bdf8, env: 0xc084fc };
+    }
+    if (tier >= 4) {
+      if (code === 'jeongwi') return { core: 0xfef2f2, main: 0xef4444, accent: 0xf97316, env: 0xef4444 };
+      if (code === 'geomgyeong') return { core: 0xfffbeb, main: 0xef4444, accent: 0xfbbf24, env: 0xf97316 };
+      if (code === 'noegeom') return { core: 0xe0f2fe, main: 0x60a5fa, accent: 0xa855f7, env: 0x38bdf8 };
+      return { core: 0xfff7ed, main: 0xf97316, accent: 0xef4444, env: 0xf97316 };
+    }
+    if (tier >= 3) {
+      return { core: 0xfaf5ff, main: 0xa855f7, accent: 0xf43f5e, env: 0xa855f7 };
+    }
+    if (tier >= 2) {
+      return { core: 0xfffbeb, main: 0xf59e0b, accent: 0xef4444, env: 0xf59e0b };
+    }
+    return { core: 0xf0f9ff, main: 0xfb923c, accent: 0x38bdf8, env: 0xfb923c };
+  }
+
+  spawnMetinSignatureSkillPolish(actor, x, y, z, rotY, resolved, opts = {}) {
+    if (!this.scene || !resolved) return;
+    const code = resolved.code;
+    const tier = Number(resolved.tier || 1);
+    const isLSkill = Boolean(resolved.isLSkill);
+    const pal = this.getMetinSkillPalette(code, tier, isLSkill);
+    const tierScale = isLSkill ? 1.30 : tier >= 4 ? 1.20 : tier >= 3 ? 1.10 : tier >= 2 ? 1.04 : 0.96;
+
+    if (!this._sharedUnitPlaneGeo) {
+      this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
+      this._sharedUnitPlaneGeo.userData = { isShared: true };
+    }
+    if (!this._sharedTornadoFunnelGeo) {
+      this._sharedTornadoFunnelGeo = new THREE.CylinderGeometry(0.68, 0.34, 1.0, 24, 1, true);
+      this._sharedTornadoFunnelGeo.userData = { isShared: true };
+    }
+
+    const pGroup = new THREE.Group();
+    pGroup.position.set(x, y + 0.03, z);
+    pGroup.rotation.y = rotY;
+    const groundRings = [];
+    const verticalPlanes = [];
+    const sprites = [];
+    let followCaster = false;
+    let maxAge = 1.25;
+
+    const addHorizLayer = (tex, s0, s1, col0Hex, col1Hex, alpha, delay, life, spinSpeed, lx = 0, ly = 0.08, lz = 0, tiltX = 0, tiltY = 0, rotZ0 = 0, vx = 0, vz = 0) => {
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        color: new THREE.Color(col0Hex),
+        transparent: true,
+        opacity: delay > 0.02 ? 0.0 : alpha,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(this._sharedUnitPlaneGeo, mat);
+      mesh.rotation.order = 'YXZ';
+      mesh.rotation.x = -Math.PI / 2 + tiltX;
+      mesh.rotation.y = tiltY;
+      mesh.rotation.z = rotZ0;
+      mesh.position.set(lx, ly, lz);
+      mesh.scale.setScalar(s0);
+      pGroup.add(mesh);
+      groundRings.push({
+        mesh,
+        mat,
+        s0,
+        s1,
+        c0: new THREE.Color(col0Hex),
+        c1: new THREE.Color(col1Hex),
+        peakAlpha: alpha,
+        delay,
+        life,
+        spinSpeed,
+        vx,
+        vz,
+      });
+      maxAge = Math.max(maxAge, delay + life + 0.06);
+    };
+
+    const addFunnelLayer = (tex, s0, s1, heightAspect, col0Hex, col1Hex, alpha, delay, life, spinY, ly = 0.92) => {
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        color: new THREE.Color(col0Hex),
+        transparent: true,
+        opacity: delay > 0.02 ? 0.0 : alpha,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(this._sharedTornadoFunnelGeo, mat);
+      mesh.position.set(0, ly, 0);
+      mesh.scale.set(s0, s0 * heightAspect, s0);
+      pGroup.add(mesh);
+      verticalPlanes.push({
+        mesh,
+        mat,
+        s0,
+        s1,
+        aspectY: heightAspect,
+        is3DFunnel: true,
+        c0: new THREE.Color(col0Hex),
+        c1: new THREE.Color(col1Hex),
+        peakAlpha: alpha,
+        delay,
+        life,
+        rotZ: 0,
+        spinY,
+      });
+      maxAge = Math.max(maxAge, delay + life + 0.06);
+    };
+
+    const addRadialSparks = (tex, count, radius, s0, s1, col0Hex, col1Hex, delay, life, speedOut, speedUp, swirl, gravity = 0) => {
+      for (let k = 0; k < count; k++) {
+        const sMat = new THREE.SpriteMaterial({
+          map: tex,
+          color: new THREE.Color(col0Hex),
+          transparent: true,
+          opacity: delay > 0.02 ? 0.0 : 0.92,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          rotation: Math.random() * Math.PI * 2,
+        });
+        this.applyMetinLuminanceTintShader(sMat);
+        const sp = new THREE.Sprite(sMat);
+        const ang = (k / count) * Math.PI * 2 + Math.random() * 0.45;
+        const r0 = radius * (0.25 + Math.random() * 0.75);
+        sp.position.set(Math.cos(ang) * r0, 0.22 + Math.random() * 0.65, Math.sin(ang) * r0);
+        const jit = 0.8 + Math.random() * 0.45;
+        sp.scale.set(s0 * jit, s0 * jit, 1);
+        const spd = speedOut * (0.65 + Math.random() * 0.7);
+        sp.userData = {
+          vx: Math.cos(ang) * spd,
+          vy: speedUp * (0.65 + Math.random() * 0.75),
+          vz: Math.sin(ang) * spd,
+          swirl: swirl * (k % 2 === 0 ? 1 : -0.8),
+          rotSpd: (k % 2 === 0 ? 1 : -1) * 3.2,
+          s0: s0 * jit,
+          s1: s1 * jit,
+          c0: new THREE.Color(col0Hex),
+          c1: new THREE.Color(col1Hex),
+          peakAlpha: 0.94,
+          delay: delay + (k / count) * 0.08,
+          life,
+          gravity,
+        };
+        pGroup.add(sp);
+        sprites.push(sp);
+      }
+      maxAge = Math.max(maxAge, delay + life + 0.14);
+    };
+
+    const whirlTex = this.getMetinWhirlwindCrescentTexture();
+    const slashTex = this.getMetinForwardSlashWaveTexture();
+    const ringTex = this.getMetinRuneShockRingTexture();
+    const fissureTex = this.getMetinSeismicFissureTexture();
+    const sparkTex = this.loadSkillTexture('warrior_gwi_geom_spark_copy.png') || this.getSoftShockwaveRingTexture();
+
+    if (code === 'palbang' || code === 'charyun' || code === 'yonggwon') {
+      // SCHWERTWIRBEL (Metin2 360°-Klingenzyklon – exakt synchron zum 360°-Spin bei 0.55s, massiv verbreitert & mehrlagig!)
+      followCaster = true;
+      const spinDelay = code === 'palbang' ? 0.54 : 0.34;
+      const dInner = 4.4 * tierScale;
+      const dOuter = 7.5 * tierScale; // ~9.75m Durchmesser auf L1!
+      if (code === 'palbang') {
+        addHorizLayer(ringTex, 1.3 * tierScale, 4.0 * tierScale, pal.core, pal.main, 0.72, 0.30, 0.40, -5.5, 0, 0.06, 0);
+      }
+      addHorizLayer(whirlTex, dInner, dOuter, pal.core, pal.main, 0.96, spinDelay, 0.92, -14.8, 0, 0.88, 0, 0, 0, 0);
+      addHorizLayer(whirlTex, dInner * 0.86, dOuter * 0.94, pal.main, pal.accent, 0.85, spinDelay + 0.04, 0.94, -12.6, 0, 0.56, 0, 0.19, 0.14, 1.1);
+      addHorizLayer(whirlTex, dInner * 0.82, dOuter * 0.90, pal.accent, pal.main, 0.80, spinDelay + 0.07, 0.92, -13.4, 0, 1.12, 0, -0.18, -0.15, 2.3);
+      addHorizLayer(ringTex, 2.2 * tierScale, 8.3 * tierScale, pal.core, pal.accent, 0.88, spinDelay + 0.02, 0.86, 4.2, 0, 0.06, 0);
+      addFunnelLayer(whirlTex, 3.2 * tierScale, 5.9 * tierScale, 0.32, pal.main, pal.accent, 0.64, spinDelay + 0.02, 0.88, -13.5, 0.86);
+      addRadialSparks(sparkTex, 18, 2.4 * tierScale, 0.34, 0.14, pal.core, pal.main, spinDelay + 0.02, 0.76, 3.6 * tierScale, 1.8, 7.5);
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: spinDelay,
+        duration: 1.00,
+        intensity: isLSkill ? 1.55 : 1.32,
+        distance: 12.8,
+        groundWashAlpha: 0.14,
+        followActor: actor,
+      });
+      if (opts.isLocal) {
+        setTimeout(() => {
+          if (!this.disposed) this.triggerCameraShake(0.14, 0.11);
+        }, Math.round(spinDelay * 1000));
+      }
+    } else if (code === 'samyeon' || code === 'amseup' || code === 'seomjeon') {
+      // DREIWEGE-SCHNITT (3 rasante, breite Metin2-Sichelwellen exakt auf 0.12s / 0.36s / 0.70s synchronisiert!)
+      const hitDelays = [0.12, 0.36, 0.70];
+      const hitAngles = [-0.34, 0.34, 0.0];
+      const hitTilts = [0.22, -0.22, 0.08];
+      const hitWidths = [4.6 * tierScale, 5.0 * tierScale, 6.2 * tierScale];
+      for (let h = 0; h < 3; h++) {
+        const hd = hitDelays[h];
+        const hw = hitWidths[h];
+        const hAng = hitAngles[h];
+        const fwdVx = -Math.sin(hAng) * 5.8;
+        const fwdVz = Math.cos(hAng) * 6.8;
+        addHorizLayer(slashTex, hw * 0.68, hw * 1.12, pal.core, pal.main, 0.96, hd, 0.44, 0, 0, 0.92 + h * 0.06, 0.55, 0.14, hitTilts[h], hAng, fwdVx, fwdVz);
+        addHorizLayer(slashTex, hw * 0.62, hw * 1.05, pal.main, pal.accent, 0.80, hd + 0.02, 0.48, 0, 0, 0.10, 0.65, 0, 0, hAng, fwdVx * 0.85, fwdVz * 0.85);
+        if (h === 2) {
+          // 3. Hieb: Extra breite X-Kreuzwelle & Schockbogen nach vorne!
+          addHorizLayer(slashTex, hw * 0.72, hw * 1.18, pal.accent, pal.core, 0.85, hd + 0.02, 0.48, 0, 0, 0.98, 0.70, -0.18, 0.24, 0, 0, 7.6);
+          addHorizLayer(ringTex, 1.8 * tierScale, 6.4 * tierScale, pal.core, pal.accent, 0.76, hd + 0.03, 0.54, 2.5, 0, 0.06, 1.35);
+          addRadialSparks(sparkTex, 14, 1.6 * tierScale, 0.32, 0.12, pal.core, pal.main, hd, 0.56, 4.2, 1.9, 2.2);
+          if (opts.isLocal) {
+            setTimeout(() => {
+              if (!this.disposed) this.triggerCameraShake(0.11, 0.09);
+            }, Math.round(hd * 1000));
+          }
+        }
+        const fwdWorldX = x + Math.sin(rotY) * 1.45;
+        const fwdWorldZ = z + Math.cos(rotY) * 1.45;
+        this.triggerSkillEnvironmentGlow(fwdWorldX, y, fwdWorldZ, h === 2 ? pal.main : pal.env, {
+          delay: hd,
+          duration: 0.52,
+          intensity: h === 2 ? 1.48 : 1.08,
+          distance: 10.8,
+          groundWashAlpha: h === 2 ? 0.14 : 0.10,
+        });
+      }
+    } else if (code === 'tanhwan' || code === 'gungsin') {
+      // SAUSEN (Überschall-Sturmstoß: breiter Mach-Schockkegel, Bodenschweif & Einschlag-Explosion!)
+      addHorizLayer(slashTex, 3.6 * tierScale, 6.4 * tierScale, pal.core, pal.main, 0.95, 0.03, 0.46, 0, 0, 0.90, 0.45, 0.12, 0, 0, 0, 11.5);
+      addHorizLayer(slashTex, 3.2 * tierScale, 5.8 * tierScale, pal.main, pal.accent, 0.82, 0.04, 0.48, 0, 0, 0.08, 0.35, 0, 0, 0, 0, 10.5);
+      addHorizLayer(ringTex, 1.5 * tierScale, 6.8 * tierScale, pal.core, pal.accent, 0.88, 0.14, 0.58, 3.4, 0, 0.06, 2.15);
+      addHorizLayer(fissureTex, 2.4 * tierScale, 5.6 * tierScale, pal.core, pal.main, 0.78, 0.14, 0.68, 0, 0, 0.04, 2.15);
+      addRadialSparks(sparkTex, 16, 1.5 * tierScale, 0.34, 0.12, pal.core, pal.accent, 0.08, 0.58, 4.6, 2.1, 2.8);
+      const hitX = x + Math.sin(rotY) * 2.1;
+      const hitZ = z + Math.cos(rotY) * 2.1;
+      this.triggerSkillEnvironmentGlow(hitX, y, hitZ, pal.env, {
+        delay: 0.04,
+        duration: 0.74,
+        intensity: isLSkill ? 1.52 : 1.28,
+        distance: 11.8,
+        groundWashAlpha: 0.13,
+      });
+      if (opts.isLocal) this.triggerCameraShake(0.13, 0.11);
+    } else if (code === 'geomgyeong' || code === 'gwigeom') {
+      // AURA DES SCHWERTES / VERZAUBERTE KLINGE (Schwert-Schmiedeblitz + breiter Metin2-Runenkreis exakt bei 0.53s!)
+      followCaster = true;
+      const snapDelay = code === 'geomgyeong' ? 0.53 : 0.48;
+      addHorizLayer(ringTex, 1.2 * tierScale, 3.8 * tierScale, pal.core, pal.main, 0.72, 0.04, 0.52, 2.8, 0, 0.05, 0);
+      addHorizLayer(ringTex, 1.6 * tierScale, 6.6 * tierScale, pal.core, pal.main, 0.92, snapDelay, 0.88, -3.2, 0, 0.05, 0);
+      addHorizLayer(whirlTex, 1.8 * tierScale, 5.4 * tierScale, pal.main, pal.accent, 0.76, snapDelay, 0.82, 6.4, 0, 0.12, 0);
+      addFunnelLayer(whirlTex, 1.5 * tierScale, 3.1 * tierScale, 0.62, pal.core, pal.main, 0.55, snapDelay - 0.02, 0.76, 8.2, 0.98);
+      addRadialSparks(sparkTex, 16, 1.4 * tierScale, 0.30, 0.12, pal.core, pal.main, snapDelay, 0.75, 2.9 * tierScale, 2.4, 4.2);
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: 0.04,
+        duration: 0.48,
+        intensity: 0.92,
+        distance: 9.5,
+        groundWashAlpha: 0.09,
+        followActor: actor,
+      });
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: snapDelay,
+        duration: 0.98,
+        intensity: isLSkill ? 1.52 : 1.28,
+        distance: 12.2,
+        groundWashAlpha: 0.14,
+        followActor: actor,
+      });
+    } else if (code === 'jeongwi' || code === 'cheongeun' || code === 'jumagap' || code === 'heuksin') {
+      // KAMPFRAUSCH / STARKER KÖRPER (Sofortige breite Zorn-Schockwellen + aufsteigender Sturmtrichter!)
+      followCaster = true;
+      addHorizLayer(ringTex, 1.5 * tierScale, 6.8 * tierScale, pal.core, pal.main, 0.90, 0.04, 0.76, 4.6, 0, 0.05, 0);
+      addHorizLayer(whirlTex, 2.0 * tierScale, 6.2 * tierScale, pal.main, pal.accent, 0.82, 0.06, 0.84, -9.8, 0, 0.14, 0);
+      addFunnelLayer(whirlTex, 1.8 * tierScale, 3.8 * tierScale, 0.58, pal.main, pal.accent, 0.62, 0.08, 0.86, -10.5, 0.96);
+      addHorizLayer(ringTex, 1.8 * tierScale, 7.6 * tierScale, pal.core, pal.accent, 0.92, 0.52, 0.82, -4.2, 0, 0.06, 0);
+      addRadialSparks(sparkTex, 18, 1.8 * tierScale, 0.32, 0.12, pal.core, pal.main, 0.08, 0.82, 3.2 * tierScale, 2.8, 5.6);
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: 0.04,
+        duration: 1.18,
+        intensity: isLSkill ? 1.48 : 1.25,
+        distance: 12.0,
+        groundWashAlpha: 0.13,
+        followActor: actor,
+      });
+    } else if (code === 'noegeom' || code === 'daejin' || code === 'gyeoksan') {
+      // MÄCHTIGES ERDBEBEN / STAMPFER / HEFTIGES SCHLAGEN (Exakt auf Aufprall 0.93s / 1.04s / 0.79s synchronisiert!)
+      const slamDelay = code === 'noegeom' ? 0.93 : code === 'daejin' ? 1.04 : 0.79;
+      if (code === 'noegeom') {
+        // Dezenter Auflade-Ring beim Hochreißen der Klinge (0.50s)
+        addHorizLayer(ringTex, 1.2 * tierScale, 3.6 * tierScale, pal.core, pal.main, 0.68, 0.50, 0.42, -5.0, 0, 0.06, 0);
+      }
+      const quakeDiam = (code === 'noegeom' ? 8.8 : 7.5) * tierScale; // ~11.4m auf L1!
+      addHorizLayer(fissureTex, quakeDiam * 0.42, quakeDiam, pal.core, pal.main, 0.96, slamDelay, 1.15, 0, 0, 0.04, 0);
+      addHorizLayer(ringTex, 1.8 * tierScale, quakeDiam * 1.06, pal.core, pal.accent, 0.94, slamDelay, 0.86, 3.0, 0, 0.06, 0);
+      addHorizLayer(whirlTex, 2.4 * tierScale, quakeDiam * 0.88, pal.main, pal.accent, 0.78, slamDelay + 0.03, 0.82, -7.2, 0, 0.22, 0);
+
+      // 6 hohe gezackte Himmel-zu-Boden-Blitzeinschläge im weiten Kreis um den Einschlag!
+      const boltTex = this.loadSkillTexture('warrior_toxic_effect_rework_130.png') || this.loadSkillTexture('warrior_toxic_effect_rework_133.png');
+      if (boltTex) {
+        const boltCnt = code === 'noegeom' ? 6 : 4;
+        const boltRad = (code === 'noegeom' ? 3.5 : 2.7) * tierScale;
+        for (let b = 0; b < boltCnt; b++) {
+          const bAng = (b / boltCnt) * Math.PI * 2 + 0.28;
+          const bx = Math.cos(bAng) * boltRad;
+          const bz = Math.sin(bAng) * boltRad;
+          const bDelay = slamDelay + (b % 3) * 0.045;
+          const bHeight = (3.4 + (b % 2) * 0.65) * tierScale;
+          for (let pk = 0; pk < 2; pk++) {
+            const bMat = new THREE.MeshBasicMaterial({
+              map: boltTex,
+              color: new THREE.Color(b % 2 === 0 ? pal.core : pal.main),
+              transparent: true,
+              opacity: 0.0,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            });
+            this.applyMetinLuminanceTintShader(bMat);
+            const bMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, bMat);
+            bMesh.position.set(bx, bHeight * 0.48, bz);
+            bMesh.rotation.y = bAng + pk * (Math.PI * 0.5);
+            bMesh.scale.set(1.55 * tierScale, bHeight, 1);
+            pGroup.add(bMesh);
+            verticalPlanes.push({
+              mesh: bMesh,
+              mat: bMat,
+              s0: 1.55 * tierScale,
+              s1: 1.85 * tierScale,
+              aspectY: bHeight / (1.55 * tierScale),
+              c0: new THREE.Color(pal.core),
+              c1: new THREE.Color(pal.accent),
+              peakAlpha: 0.96,
+              delay: bDelay,
+              life: 0.42,
+              rotZ: 0,
+            });
+          }
+          addHorizLayer(ringTex, 0.8, 2.6 * tierScale, pal.core, pal.main, 0.82, bDelay, 0.48, 0, bx, 0.05, bz);
+        }
+      }
+      const rockTex = this.loadSkillTexture('warrior_12zi_002_stone2.png') || sparkTex;
+      addRadialSparks(rockTex, 20, 2.2 * tierScale, 0.36, 0.16, pal.core, pal.main, slamDelay, 0.85, 4.5 * tierScale, 4.6, 1.4, 9.8);
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: slamDelay,
+        duration: 1.12,
+        intensity: isLSkill ? 1.72 : 1.45,
+        distance: 14.2,
+        groundWashAlpha: 0.16,
+      });
+      if (opts.isLocal) {
+        setTimeout(() => {
+          if (!this.disposed) this.triggerCameraShake(0.24, 0.18);
+        }, Math.round(slamDelay * 1000));
+      }
+    } else if (code === 'finish' || code === 'gigongcham' || code === 'geompung' || code === 'gihyeol') {
+      // HINRICHTUNGSSTOSS / DURCHSCHLAG / SCHWERTSCHLAG / SCHWERTORB (Exakt auf Aufprall 0.43s / 0.79s / 0.58s / 0.84s synchronisiert!)
+      const slamDelay = code === 'finish' ? 0.42 : code === 'geompung' ? 0.57 : code === 'gigongcham' ? 0.79 : 0.84;
+      for (let step = 0; step < 3; step++) {
+        const sd = slamDelay + step * 0.075;
+        const fz = 1.15 + step * 1.65;
+        const fw = (2.8 + step * 1.05) * tierScale;
+        addHorizLayer(fissureTex, fw * 0.55, fw, pal.core, pal.main, 0.94, sd, 0.88, 0, 0, 0.045, fz);
+        addHorizLayer(slashTex, fw * 0.75, fw * 1.25, pal.core, pal.accent, 0.90, sd, 0.46, 0, 0, 0.85, fz - 0.3, 0.16, 0, 0, 0, 8.2);
+      }
+      addHorizLayer(ringTex, 1.8 * tierScale, 7.2 * tierScale, pal.core, pal.accent, 0.92, slamDelay + 0.08, 0.78, 2.8, 0, 0.06, 2.4);
+      addRadialSparks(sparkTex, 18, 1.8 * tierScale, 0.36, 0.14, pal.core, pal.main, slamDelay + 0.04, 0.78, 4.4 * tierScale, 3.8, 2.0, 8.2);
+      const impactX = x + Math.sin(rotY) * 2.4;
+      const impactZ = z + Math.cos(rotY) * 2.4;
+      this.triggerSkillEnvironmentGlow(impactX, y, impactZ, pal.env, {
+        delay: slamDelay,
+        duration: 0.96,
+        intensity: isLSkill ? 1.62 : 1.38,
+        distance: 13.0,
+        groundWashAlpha: 0.15,
+      });
+      if (opts.isLocal) {
+        setTimeout(() => {
+          if (!this.disposed) this.triggerCameraShake(0.18, 0.14);
+        }, Math.round(slamDelay * 1000));
+      }
+    } else {
+      // Universelle breite Metin2-Schockwelle + dezentes Umgebungsleuchten für alle weiteren Klassen-Skills!
+      addHorizLayer(ringTex, 1.5 * tierScale, 5.8 * tierScale, pal.core, pal.main, 0.78, 0.08, 0.74, 3.0, 0, 0.05, 0);
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: 0.06,
+        duration: 0.86,
+        intensity: isLSkill ? 1.38 : 1.16,
+        distance: 11.2,
+        groundWashAlpha: 0.12,
+      });
+    }
+
+    if (groundRings.length > 0 || verticalPlanes.length > 0 || sprites.length > 0) {
+      this.scene.add(pGroup);
+      this.vfxList.push({
+        type: 'metin_particles',
+        mesh: pGroup,
+        groundRings,
+        verticalPlanes,
+        sprites,
+        age: 0,
+        maxAge,
+        followActor: followCaster ? actor : null,
+        followBone: '',
+        evPos: [0, 0, 0],
+        offsetX: 0,
+        offsetY: 0.03,
+        offsetZ: 0,
+      });
+    }
+  }
+
   spawnMetinMseEffect(effectDef, originX, originY, originZ, rotY = 0, actor = null, opts = {}) {
     if (!effectDef || !this.scene) return;
     const distSq =
@@ -21704,7 +22614,9 @@ export class OpenWorld3DEngine {
     if (distSq > 3600) return;
     const isLSkill = Boolean(opts.isLSkill);
     const tier = Number(opts.tier || 1);
-    const scaleMult = opts.scaleMult || (isLSkill ? 1.24 : tier >= 4 ? 1.12 : tier >= 3 ? 1.05 : 1.0);
+    const scaleMult =
+      opts.scaleMult ||
+      (isLSkill ? 1.62 : tier >= 4 ? 1.48 : tier >= 3 ? 1.34 : tier >= 2 ? 1.22 : 1.12);
     const followBone = opts.followBone || '';
     const evPos = opts.evPos || [0, 0, 0];
     const eventIndex = Number(opts.eventIndex || 0);
@@ -21712,7 +22624,7 @@ export class OpenWorld3DEngine {
     const cosR = Math.cos(rotY || 0);
     const sinR = Math.sin(rotY || 0);
 
-    // 1. 3D-.mde-Effektmeshes spawnen (exakt in Blickrichtung rotiert!)
+    // 1. 3D-.mde-Effektmeshes spawnen (exakt in Blickrichtung rotiert & deutlich breiter skaliert!)
     if (Array.isArray(effectDef.meshes)) {
       for (const mCfg of effectDef.meshes) {
         if (!mCfg.mde) continue;
@@ -21720,22 +22632,25 @@ export class OpenWorld3DEngine {
           .then((mdeData) => {
             if (this.disposed || !mdeData || !mdeData.submeshes?.length) return;
             const mdeGroup = new THREE.Group();
+            const mdeLower = mCfg.mde.toLowerCase();
+            const mdeWideXZ =
+              mdeLower.includes('gitu') ||
+              mdeLower.includes('finish') ||
+              mdeLower.includes('gyeoksan') ||
+              mdeLower.includes('geompung')
+                ? 1.54
+                : 1.34;
             const ox = (mCfg.pos?.[0] || 0) * 0.01 * scaleMult;
-            const oy = (mCfg.pos?.[2] || 0) * 0.01 * scaleMult;
+            const oy = (mCfg.pos?.[2] || 0) * 0.01 * (scaleMult * 0.85);
             const oz = -(mCfg.pos?.[1] || 0) * 0.01 * scaleMult;
             const wx = ox * cosR + oz * sinR;
             const wz = -ox * sinR + oz * cosR;
             const baseLift = attachedToLimb ? 0.0 : 0.06;
             mdeGroup.position.set(originX + wx, originY + baseLift + oy, originZ + wz);
             mdeGroup.rotation.y = rotY;
-            mdeGroup.scale.setScalar(scaleMult);
+            mdeGroup.scale.set(scaleMult * mdeWideXZ, scaleMult * 1.18, scaleMult * mdeWideXZ);
             const submeshNodes = [];
-            const [cr, cg, cb] = mCfg.color || [1, 1, 1];
-            const mColor = new THREE.Color(
-              isLSkill ? Math.min(1, cr * 1.12 + 0.14) : cr,
-              isLSkill ? Math.min(1, cg * 0.96 + 0.06) : cg,
-              isLSkill ? Math.min(1, cb * 1.20 + 0.20) : cb
-            );
+            const mColor = this.boostMetinVfxColor(mCfg.color || [1, 1, 1], isLSkill, 0.42);
             mdeData.submeshes.forEach((sub, sIdx) => {
               if (!sub.frames?.length || !sub.iCnt) return;
               const f0 = sub.frames[0];
@@ -21748,11 +22663,12 @@ export class OpenWorld3DEngine {
                 map: tex,
                 color: mColor,
                 transparent: true,
-                opacity: Math.max(0.18, Math.min(0.96, f0.vis || 0.92)),
+                opacity: Math.max(0.24, Math.min(0.98, f0.vis || 0.94)),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide,
               });
+              this.applyMetinLuminanceTintShader(mat);
               const mesh = new THREE.Mesh(geo, mat);
               mesh.frustumCulled = false;
               mdeGroup.add(mesh);
@@ -21760,7 +22676,7 @@ export class OpenWorld3DEngine {
             });
             this.scene.add(mdeGroup);
             const fDelay = mCfg.frameDelay || 0.025;
-            const totalDur = Math.max(0.52, Math.min(2.6, mdeData.frameCount * fDelay * (mCfg.loops || 1)));
+            const totalDur = Math.max(0.58, Math.min(2.6, mdeData.frameCount * fDelay * (mCfg.loops || 1)));
             this.vfxList.push({
               type: 'metin_mde',
               mesh: mdeGroup,
@@ -21784,7 +22700,7 @@ export class OpenWorld3DEngine {
       }
     }
 
-    // 2. Originalgetreue Metin2 EffectLib .mse-Partikelschichten (LIE=3, Y=2, 2_SIDE=4, 3_SIDE=5, NONE=0, ALL=1)
+    // 2. Originalgetreue Metin2 EffectLib .mse-Partikelschichten (breiter, Luminanz-korrigiert & richtungstreu!)
     if (Array.isArray(effectDef.particles) && effectDef.particles.length > 0) {
       const pGroup = new THREE.Group();
       const groupLift = attachedToLimb ? 0.0 : 0.03;
@@ -21794,175 +22710,246 @@ export class OpenWorld3DEngine {
       const verticalPlanes = [];
       const sprites = [];
       const fileLower = (effectDef.file || '').toLowerCase();
-      let maxLayerEnd = isLSkill ? 1.18 : 0.98;
+      let maxLayerEnd = isLSkill ? 1.28 : 1.06;
 
       if (!this._sharedUnitPlaneGeo) {
         this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
         this._sharedUnitPlaneGeo.userData = { isShared: true };
       }
 
-      const isPalbangSpin = fileLower.includes('palbang_spin') || (fileLower.includes('palbang') && !fileLower.includes('badak'));
+      const isPalbangSpin = fileLower.includes('palbang_spin') || (fileLower.includes('palbang') && !fileLower.includes('badak') && !fileLower.includes('sword'));
       const isSamyeonSlash = fileLower.includes('samyeon') && !fileLower.includes('badak');
+      const isJeongwiRage = fileLower.includes('jeongwi');
 
       for (const pCfg of effectDef.particles) {
         if (!pCfg.tex) continue;
         const tex = this.loadSkillTexture(pCfg.tex);
         if (!tex) continue;
-        const [r0, g0, b0] = pCfg.color || [1, 1, 1];
-        const [r1, g1, b1] = pCfg.c1 || pCfg.color || [r0, g0, b0];
-        const cStart = new THREE.Color(r0, g0, b0);
-        const cEnd = new THREE.Color(r1, g1, b1);
-        const peakAlpha = Math.max(0.24, Math.min(1.0, pCfg.a ?? 0.94));
-        const layerDelay = Math.max(0, Math.min(0.95, (pCfg.t || 0) * 0.85));
-        const minPersistence = isPalbangSpin ? 0.86 : isSamyeonSlash ? 0.54 : 0.44;
-        const layerLife = Math.max(minPersistence, Math.min(1.95, pCfg.life || 0.72));
+        const texLower = pCfg.tex.toLowerCase();
+        const isDarkCrackTex = texLower.includes('crack');
+        const cStart = isDarkCrackTex
+          ? new THREE.Color(pCfg.color?.[0] ?? 1, pCfg.color?.[1] ?? 1, pCfg.color?.[2] ?? 1)
+          : this.boostMetinVfxColor(pCfg.color || [1, 1, 1], isLSkill, 0.38);
+        const cEnd = isDarkCrackTex
+          ? new THREE.Color(pCfg.c1?.[0] ?? 1, pCfg.c1?.[1] ?? 1, pCfg.c1?.[2] ?? 1)
+          : this.boostMetinVfxColor(pCfg.c1 || pCfg.color || [1, 1, 1], isLSkill, 0.30);
+        const peakAlpha = Math.max(0.32, Math.min(1.0, (pCfg.a ?? 0.94) * (isPalbangSpin || isSamyeonSlash ? 1.18 : 1.08)));
+        const rawT = Number(pCfg.t || 0);
+        const layerDelay = Math.max(
+          0,
+          Math.min(0.88, isJeongwiRage && rawT > 0.75 ? rawT * 0.38 : rawT * 0.78)
+        );
+        const minPersistence = isPalbangSpin ? 0.92 : isSamyeonSlash ? 0.56 : 0.48;
+        const layerLife = Math.max(minPersistence, Math.min(2.05, pCfg.life || 0.76));
         const hasCycleCascade =
           !attachedToLimb &&
           !fileLower.includes('_loop') &&
           (Boolean(pCfg.loop) || Number(pCfg.cycle || 0) > Number(pCfg.life || 0) * 1.35);
         const effectiveCycle = hasCycleCascade
-          ? Math.min(1.35, Math.max(0.55, Number(pCfg.cycle || 0.82)))
+          ? Math.min(1.35, Math.max(0.52, Number(pCfg.cycle || 0.80)))
           : 0;
         maxLayerEnd = Math.max(maxLayerEnd, layerDelay + layerLife + (effectiveCycle > 0 ? effectiveCycle * 0.48 : 0));
 
-        const ox = (pCfg.pos?.[0] || 0) * 0.01;
+        // Bei Schwertwirbel (palbang_spin) Versatz zentrieren, damit der 360°-Wirbel breit rund um den Krieger kreist!
+        const posCenterScale = isPalbangSpin ? 0.18 : 1.0;
+        const ox = (pCfg.pos?.[0] || 0) * 0.01 * posCenterScale;
         const oy = (pCfg.pos?.[2] || 0) * 0.01;
-        const oz = -(pCfg.pos?.[1] || 0) * 0.01;
+        const oz = -(pCfg.pos?.[1] || 0) * 0.01 * posCenterScale;
 
-        const texLower = pCfg.tex.toLowerCase();
         const bill = pCfg.billboard ?? 1;
+        // Kreisförmige Schockwellen-Texturen (round, boom, 167, pasthitred) mit bill=4/5 NIEMALS senkrecht auf den Kopf stellen!
+        const isRingDomeTex =
+          (bill === 4 || bill === 5) &&
+          (texLower.includes('round') ||
+            texLower.includes('167') ||
+            texLower.includes('boom') ||
+            texLower.includes('pasthit'));
         const isHorizLieDisc =
           bill === 3 ||
+          isRingDomeTex ||
           fileLower.includes('badak') ||
           texLower.includes('badak') ||
           texLower.includes('circle');
 
-        if (isHorizLieDisc) {
-          // BILLBOARD_TYPE_LIE (3): Horizontale / 3D-geneigte Schwertwirbel- & Sichelscheiben
-          const samyeonBoost = isSamyeonSlash && eventIndex >= 2 ? 1.18 : 1.0;
-          const rawS0 = (pCfg.s0 || pCfg.size || 96) * 0.0118 * scaleMult * samyeonBoost;
-          const rawS1 = (pCfg.s1 || pCfg.size || 160) * 0.0118 * scaleMult * samyeonBoost;
-          const startDiam = Math.max(0.58, Math.min(6.0, Math.abs(rawS1 - rawS0) < 0.08 ? rawS0 * 0.74 : rawS0));
-          const endDiam = Math.max(0.80, Math.min(6.6, Math.abs(rawS1 - rawS0) < 0.08 ? rawS1 * 1.20 : rawS1));
+        const isDirectionalFwdTex =
+          texLower.includes('gihyeol_spash') ||
+          texLower.includes('nwegeomsplash') ||
+          texLower.includes('half_ring') ||
+          texLower.includes('crack') ||
+          texLower.includes('pasthit6') ||
+          texLower.includes('attackbeam');
 
-          const addDiscLayer = (tiltX, tiltY, yAdd, spinMult, alphaMult, delayAdd = 0) => {
+        if (isHorizLieDisc) {
+          const widthSkillBoost = isPalbangSpin ? 1.32 : isSamyeonSlash ? (eventIndex >= 2 ? 1.34 : 1.22) : isJeongwiRage ? 1.48 : 1.18;
+          const rawS0 = (pCfg.s0 || pCfg.size || 96) * 0.0126 * scaleMult * widthSkillBoost;
+          const rawS1 = (pCfg.s1 || pCfg.size || 160) * 0.0126 * scaleMult * widthSkillBoost;
+          const startDiam = Math.max(0.72, Math.min(9.8, Math.abs(rawS1 - rawS0) < 0.08 ? rawS0 * 0.78 : rawS0));
+          const endDiam = Math.max(1.05, Math.min(11.2, Math.abs(rawS1 - rawS0) < 0.08 ? rawS1 * 1.24 : rawS1));
+
+          const rawRadM = ((pCfg.rad || 0) * 0.0125) * scaleMult;
+          const rawCnt = Number(pCfg.count || 1);
+          const scatterCnt = !isDirectionalFwdTex && rawRadM >= 0.55 && rawCnt >= 3 && endDiam <= 2.4 ? Math.min(7, rawCnt) : 1;
+
+          const addDiscLayer = (tiltX, tiltY, yAdd, spinMult, alphaMult, delayAdd = 0, addX = 0, addZ = 0, fixedRotZ = null) => {
             const rMat = new THREE.MeshBasicMaterial({
               map: tex,
               color: cStart.clone(),
               transparent: true,
               opacity: layerDelay + delayAdd > 0.02 ? 0.0 : peakAlpha * alphaMult,
-              blending: THREE.AdditiveBlending,
+              blending: isDarkCrackTex ? THREE.NormalBlending : THREE.AdditiveBlending,
               depthWrite: false,
               side: THREE.DoubleSide,
             });
+            if (!isDarkCrackTex) this.applyMetinLuminanceTintShader(rMat);
             const rMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, rMat);
             rMesh.rotation.order = 'YXZ';
             rMesh.rotation.x = -Math.PI / 2 + tiltX;
             rMesh.rotation.y = tiltY;
-            rMesh.rotation.z = Math.random() * Math.PI * 2;
-            const baseDiscY = attachedToLimb
+            rMesh.rotation.z =
+              fixedRotZ !== null
+                ? fixedRotZ
+                : isDirectionalFwdTex
+                ? 0.0
+                : Math.random() * Math.PI * 2;
+            const isTiltedDisc = Math.abs(tiltX) + Math.abs(tiltY) > 0.05;
+            const rawDiscY = attachedToLimb
               ? oy
+              : isDarkCrackTex
+              ? 0.038
+              : isRingDomeTex
+              ? 0.18
               : isSamyeonSlash && oy < 0.35
-              ? 0.96 + (eventIndex % 3) * 0.10
-              : Math.max(0.02 + groundRings.length * 0.008, oy + groundRings.length * 0.006);
-            rMesh.position.set(ox, baseDiscY + yAdd, oz + (isSamyeonSlash ? 0.38 : 0.0));
-            rMesh.scale.setScalar(startDiam);
+              ? 0.92 + (eventIndex % 3) * 0.08
+              : isTiltedDisc
+              ? Math.max(0.84, Math.min(1.22, endDiam * 0.16), oy)
+              : Math.max(0.10 + groundRings.length * 0.008, Math.min(1.16, oy) + groundRings.length * 0.006);
+            const finalDiscY = attachedToLimb ? rawDiscY + yAdd : Math.max(0.035, rawDiscY + yAdd);
+            rMesh.position.set(ox + addX, finalDiscY, oz + addZ + (isSamyeonSlash ? 0.55 : 0.0));
+            rMesh.scale.setScalar(startDiam * (isDarkCrackTex ? 1.85 : 1.0));
             pGroup.add(rMesh);
 
             let spinRad = 0;
-            if (Math.abs(pCfg.rs || 0) > 1.0) {
-              spinRad = ((pCfg.rs * Math.PI) / 180.0) * spinMult;
-            } else if (
-              fileLower.includes('spin') ||
-              fileLower.includes('palbang') ||
-              fileLower.includes('charyun') ||
-              fileLower.includes('yonggwon')
-            ) {
-              spinRad = (groundRings.length % 2 === 0 ? -1 : 1) * 10.4 * spinMult;
-            } else if (isSamyeonSlash) {
-              spinRad = (eventIndex % 2 === 0 ? -1 : 1) * 7.2 * spinMult;
-            } else {
-              spinRad = (groundRings.length % 2 === 0 ? 1 : -1) * 0.95 * spinMult;
+            if (!isDirectionalFwdTex) {
+              if (Math.abs(pCfg.rs || 0) > 1.0) {
+                spinRad = ((pCfg.rs * Math.PI) / 180.0) * spinMult;
+              } else if (
+                fileLower.includes('spin') ||
+                fileLower.includes('palbang') ||
+                fileLower.includes('charyun') ||
+                fileLower.includes('yonggwon')
+              ) {
+                spinRad = (groundRings.length % 2 === 0 ? -1 : 1) * 11.4 * spinMult;
+              } else {
+                spinRad = (groundRings.length % 2 === 0 ? 1 : -1) * 1.15 * spinMult;
+              }
             }
             groundRings.push({
               mesh: rMesh,
               mat: rMat,
-              s0: startDiam,
-              s1: endDiam,
+              s0: startDiam * (isDarkCrackTex ? 1.85 : 1.0),
+              s1: endDiam * (isDarkCrackTex ? 2.05 : 1.0),
               c0: cStart,
               c1: cEnd,
               peakAlpha: peakAlpha * alphaMult,
               delay: layerDelay + delayAdd,
               life: layerLife,
               spinSpeed: spinRad,
+              vx: 0,
+              vz: isSamyeonSlash && isDirectionalFwdTex ? 3.2 : 0,
             });
           };
 
           if (isSamyeonSlash) {
-            // Dreiwege-Schnitt: 3 markante diagonale 3D-Schwert-Schnittebenen passend zu Hieb 1, 2 & 3!
-            const slashBankY = eventIndex % 3 === 0 ? 0.44 : eventIndex % 3 === 1 ? -0.46 : 0.0;
-            const slashPitchX = eventIndex % 3 === 2 ? 0.30 : 0.20;
-            addDiscLayer(slashPitchX, slashBankY, 0.0, 1.0, 1.0, 0.0);
+            const slashBankY = eventIndex % 3 === 0 ? 0.34 : eventIndex % 3 === 1 ? -0.34 : 0.0;
+            const slashPitchX = eventIndex % 3 === 2 ? 0.20 : 0.14;
+            const slashYawZ = isDirectionalFwdTex ? (eventIndex % 3 === 0 ? -0.28 : eventIndex % 3 === 1 ? 0.28 : 0.0) : null;
+            addDiscLayer(slashPitchX, slashBankY, 0.0, 1.0, 1.0, 0.0, 0, 0, slashYawZ);
+          } else if (isRingDomeTex) {
+            addDiscLayer(0.0, 0.0, 0.0, 1.0, 0.95, 0.0);
+            addDiscLayer(0.18, 0.14, 0.22, -0.85, 0.72, 0.03);
+          } else if (scatterCnt > 1) {
+            for (let scIdx = 0; scIdx < scatterCnt; scIdx++) {
+              const sAng = (scIdx / scatterCnt) * Math.PI * 2 + scIdx * 0.4;
+              const sDist = rawRadM * (0.45 + (scIdx % 3) * 0.26);
+              addDiscLayer(0.0, 0.0, 0.0, 1.0, 0.88, scIdx * 0.025, Math.cos(sAng) * sDist, Math.sin(sAng) * sDist);
+            }
           } else {
             addDiscLayer(0.0, 0.0, 0.0, 1.0, 1.0, 0.0);
-            if (isPalbangSpin && oy > 0.25 && groundRings.length <= 4) {
-              // Volumetrischer 3D-Schwertwirbel-Zyklon (kein papierdünner Strich bei flacher Kamera!)
-              addDiscLayer(0.24, 0.18, 0.16, 1.25, 0.82, 0.04);
-              addDiscLayer(-0.22, -0.20, -0.14, -1.18, 0.78, 0.08);
+            if (isPalbangSpin && oy > 0.25 && groundRings.length <= 6) {
+              addDiscLayer(0.20, 0.16, 0.18, 1.25, 0.86, 0.04);
+              addDiscLayer(-0.19, -0.18, -0.14, -1.18, 0.82, 0.08);
             }
           }
         } else if (bill === 2 || bill === 4 || bill === 5 || bill === 0) {
-          // BILLBOARD_TYPE_Y (2), 2_SIDE (4), 3_SIDE (5) = gekreuzte 3D-Energiesäulen (Kampfrausch / Starker Körper!); NONE (0) = 3D-Welle
-          const startSz = Math.max(0.58, Math.min(5.0, (pCfg.s0 || pCfg.size || 84) * 0.0122 * scaleMult));
-          const endSz = Math.max(0.75, Math.min(5.6, (pCfg.s1 || pCfg.size || 126) * 0.0122 * scaleMult));
+          // BILLBOARD_TYPE_Y (2), 2_SIDE (4), 3_SIDE (5) = gekreuzte 3D-Energiesäulen & Blitzeinschläge (mit rad/count-Kreisverteilung!)
+          const startSz = Math.max(0.75, Math.min(6.8, (pCfg.s0 || pCfg.size || 84) * 0.0132 * scaleMult));
+          const endSz = Math.max(0.95, Math.min(7.8, (pCfg.s1 || pCfg.size || 126) * 0.0132 * scaleMult));
           const isCrossedPillar = bill === 2 || bill === 4 || bill === 5;
           const planeCnt = bill === 5 ? 3 : isCrossedPillar ? 2 : 1;
-          for (let pk = 0; pk < planeCnt; pk++) {
-            const pMat = new THREE.MeshBasicMaterial({
-              map: tex,
-              color: cStart.clone(),
-              transparent: true,
-              opacity: layerDelay > 0.02 ? 0.0 : peakAlpha,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-              side: THREE.DoubleSide,
-            });
-            const pMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, pMat);
-            const py = attachedToLimb ? oy : Math.max(startSz * 0.44, oy);
-            pMesh.position.set(ox, py, oz);
-            if (isCrossedPillar) {
-              pMesh.rotation.y = pk * (Math.PI / planeCnt);
-            } else {
-              pMesh.rotation.set(-0.28, 0, (Math.random() - 0.5) * 0.45);
+          const isLightningTex = texLower.includes('130') || texLower.includes('133') || texLower.includes('152') || texLower.includes('lighting');
+          const aspectY = isLightningTex ? 1.65 : isCrossedPillar ? 1.32 : 1.0;
+
+          const rawRadM = ((pCfg.rad || 0) * 0.0132) * scaleMult;
+          const instCnt = !attachedToLimb && rawRadM >= 0.85 && Number(pCfg.count || 1) >= 2 ? Math.min(6, Number(pCfg.count || 2)) : 1;
+
+          for (let inst = 0; inst < instCnt; inst++) {
+            const iAng = (inst / instCnt) * Math.PI * 2 + 0.35;
+            const iDist = instCnt > 1 ? rawRadM * (0.72 + (inst % 2) * 0.28) : 0;
+            const px = ox + Math.cos(iAng) * iDist;
+            const pz = oz + Math.sin(iAng) * iDist;
+            const py = attachedToLimb
+              ? oy
+              : isLightningTex
+              ? startSz * aspectY * 0.48
+              : Math.max(startSz * aspectY * 0.44, Math.min(1.55, oy));
+            const iDelay = layerDelay + inst * 0.03;
+
+            for (let pk = 0; pk < planeCnt; pk++) {
+              const pMat = new THREE.MeshBasicMaterial({
+                map: tex,
+                color: cStart.clone(),
+                transparent: true,
+                opacity: iDelay > 0.02 ? 0.0 : peakAlpha,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+              });
+              this.applyMetinLuminanceTintShader(pMat);
+              const pMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, pMat);
+              pMesh.position.set(px, py, pz);
+              if (isCrossedPillar) {
+                pMesh.rotation.y = iAng + pk * (Math.PI / planeCnt);
+              } else {
+                pMesh.rotation.set(-0.26, 0, (Math.random() - 0.5) * 0.35);
+              }
+              pMesh.scale.set(startSz, startSz * aspectY, 1);
+              pGroup.add(pMesh);
+              verticalPlanes.push({
+                mesh: pMesh,
+                mat: pMat,
+                s0: startSz,
+                s1: endSz,
+                aspectY,
+                c0: cStart,
+                c1: cEnd,
+                peakAlpha,
+                delay: iDelay,
+                life: layerLife,
+                rotZ: isLightningTex ? 0 : (((pCfg.rs || 0) * Math.PI) / 180.0) * 0.35,
+              });
             }
-            const aspectY = isCrossedPillar ? 1.28 : 1.0;
-            pMesh.scale.set(startSz, startSz * aspectY, 1);
-            pGroup.add(pMesh);
-            verticalPlanes.push({
-              mesh: pMesh,
-              mat: pMat,
-              s0: startSz,
-              s1: endSz,
-              aspectY,
-              c0: cStart,
-              c1: cEnd,
-              peakAlpha,
-              delay: layerDelay,
-              life: layerLife,
-              rotZ: (((pCfg.rs || 0) * Math.PI) / 180.0) * 0.35,
-            });
           }
         } else {
-          // BILLBOARD_TYPE_ALL (1): Kamerazugewandte Energie-/Funken-/Flammen-Sprites (mit mehrstufigen Cycle-Wellen!)
+          // BILLBOARD_TYPE_ALL (1): Kamerazugewandte Energie-/Funken-/Flammen-Sprites (breiterer Radius & Luminanz-Korrektur!)
           const rawCnt = pCfg.count || 6;
           const baseEmitCount = attachedToLimb
-            ? Math.min(7, Math.max(2, Math.round(rawCnt * 0.35)))
-            : Math.min(12, Math.max(3, Math.round(rawCnt * 0.48)));
+            ? Math.min(8, Math.max(3, Math.round(rawCnt * 0.40)))
+            : Math.min(15, Math.max(4, Math.round(rawCnt * 0.55)));
           const waveCount = effectiveCycle > 0.35 ? 2 : 1;
-          const s0Base = Math.max(0.28, Math.min(3.5, (pCfg.s0 || pCfg.size || 36) * 0.0118)) * scaleMult;
-          const s1Base = Math.max(0.28, Math.min(3.9, (pCfg.s1 || pCfg.size || 44) * 0.0118)) * scaleMult;
-          const emitRad = Math.min(1.75, Math.max(attachedToLimb ? 0.06 : 0.16, (pCfg.rad || 0) * 0.01)) * scaleMult;
-          const velM = Math.min(3.4, Math.max(0.14, Math.abs(pCfg.vel || 26) * 0.01)) * scaleMult;
+          const s0Base = Math.max(0.32, Math.min(4.2, (pCfg.s0 || pCfg.size || 36) * 0.0124)) * scaleMult;
+          const s1Base = Math.max(0.32, Math.min(4.8, (pCfg.s1 || pCfg.size || 44) * 0.0124)) * scaleMult;
+          const emitRad = Math.min(3.4, Math.max(attachedToLimb ? 0.08 : 0.28, (pCfg.rad || 0) * 0.0128)) * scaleMult;
+          const velM = Math.min(4.4, Math.max(0.20, Math.abs(pCfg.vel || 26) * 0.0125)) * scaleMult;
 
           for (let wIdx = 0; wIdx < waveCount; wIdx++) {
             const waveDelay = wIdx * (effectiveCycle * 0.46);
@@ -21977,24 +22964,25 @@ export class OpenWorld3DEngine {
                 depthWrite: false,
                 rotation: Math.random() * Math.PI * 2,
               });
+              this.applyMetinLuminanceTintShader(sMat);
               const sp = new THREE.Sprite(sMat);
               const ang = (k / emitCount) * Math.PI * 2 + Math.random() * 0.55 + wIdx * 0.8;
-              const rDist = emitRad * (0.25 + Math.random() * 0.75);
+              const rDist = emitRad * (0.28 + Math.random() * 0.72);
               const localY = attachedToLimb
                 ? oy + (Math.random() - 0.35) * 0.26
                 : oy > 0.08
-                ? oy + (Math.random() - 0.5) * 0.30
-                : 0.28 + Math.random() * 0.88;
+                ? Math.min(2.2, oy) + (Math.random() - 0.5) * 0.34
+                : 0.26 + Math.random() * 0.92;
               sp.position.set(ox + Math.cos(ang) * rDist, localY, oz + Math.sin(ang) * rDist);
-              const jitter = 0.82 + Math.random() * 0.36;
+              const jitter = 0.84 + Math.random() * 0.36;
               const sNow = s0Base * jitter;
               sp.scale.set(sNow, sNow, 1);
               sp.userData = {
-                vx: Math.cos(ang) * velM * (0.45 + Math.random() * 0.65),
-                vy: attachedToLimb ? 0.25 + Math.random() * 0.55 : 0.38 + velM * 0.45 + Math.random() * 0.85,
-                vz: Math.sin(ang) * velM * (0.45 + Math.random() * 0.65),
-                swirl: (k % 2 === 0 ? 1 : -1) * (attachedToLimb ? 1.1 : isPalbangSpin ? 3.8 : 1.8),
-                rotSpd: Math.abs(pCfg.rs || 0) > 1 ? ((pCfg.rs * Math.PI) / 180.0) * 0.5 : k % 2 === 0 ? 1.4 : -1.4,
+                vx: Math.cos(ang) * velM * (0.50 + Math.random() * 0.70),
+                vy: attachedToLimb ? 0.26 + Math.random() * 0.55 : 0.42 + velM * 0.42 + Math.random() * 0.88,
+                vz: Math.sin(ang) * velM * (0.50 + Math.random() * 0.70),
+                swirl: (k % 2 === 0 ? 1 : -1) * (attachedToLimb ? 1.1 : isPalbangSpin ? 4.6 : 2.1),
+                rotSpd: Math.abs(pCfg.rs || 0) > 1 ? ((pCfg.rs * Math.PI) / 180.0) * 0.5 : k % 2 === 0 ? 1.5 : -1.5,
                 s0: s0Base * jitter,
                 s1: s1Base * jitter,
                 c0: cStart,
@@ -22011,9 +22999,9 @@ export class OpenWorld3DEngine {
       }
 
       if (isLSkill && !attachedToLimb && groundRings.length === 0 && !fileLower.includes('_loop')) {
-        const lTex = this.loadSkillTexture('warrior_ls1_1.png') || this.getSoftShockwaveRingTexture();
+        const lTex = this.getMetinRuneShockRingTexture();
         const lStart = new THREE.Color(0xe879f9);
-        const lEnd = new THREE.Color(0xfbbf24);
+        const lEnd = new THREE.Color(0x38bdf8);
         const lMat = new THREE.MeshBasicMaterial({
           map: lTex,
           color: lStart.clone(),
@@ -22025,14 +23013,14 @@ export class OpenWorld3DEngine {
         });
         const lMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, lMat);
         lMesh.rotation.x = -Math.PI / 2;
-        lMesh.position.y = 0.04;
-        lMesh.scale.setScalar(1.35);
+        lMesh.position.y = 0.045;
+        lMesh.scale.setScalar(1.8);
         pGroup.add(lMesh);
         groundRings.push({
           mesh: lMesh,
           mat: lMat,
-          s0: 1.35,
-          s1: 3.85,
+          s0: 1.8,
+          s1: 6.4,
           c0: lStart,
           c1: lEnd,
           peakAlpha: 0.88,
@@ -22051,7 +23039,7 @@ export class OpenWorld3DEngine {
           verticalPlanes,
           sprites,
           age: 0,
-          maxAge: Math.max(0.60, Math.min(2.45, maxLayerEnd)),
+          maxAge: Math.max(0.65, Math.min(2.65, maxLayerEnd)),
           followActor: opts.follow ? actor : null,
           followBone,
           evPos,
@@ -22116,19 +23104,22 @@ export class OpenWorld3DEngine {
       actor._activeSkillForceRestart = true;
       actor._activeSkillIsLSkill = Boolean(isLSkill);
       if (meleeRibbonCodes.has(code)) {
-        actor._ribbonSwingTimer = Math.max(actor._ribbonSwingTimer || 0, animDur * 0.88);
+        actor._ribbonSwingTimer = Math.max(actor._ribbonSwingTimer || 0, animDur * 0.90);
       }
     }
 
     // Sausen (tanhwan) & Blitzangriff (gungsin): spürbarer Vorwärts-Sturmimpuls in Blickrichtung!
     if (opts.isLocal && !this.localPlayerActor?.mountGroup?.visible && (code === 'tanhwan' || code === 'gungsin')) {
-      this.combatLungeTimer = 0.24;
-      this.combatLungeSpeed = 9.8;
+      this.combatLungeTimer = 0.25;
+      this.combatLungeSpeed = 10.6;
     }
 
     if (resolved.soundUrl) {
       this.playMetinSkillSound(resolved.soundUrl, x, z);
     }
+
+    // Maßgeschneiderte breite Metin2-Signatur-Schichten + ganz leichtes dezentes Umgebungsleuchten spawnen!
+    this.spawnMetinSignatureSkillPolish(actor, x, y, z, rotY, resolved, opts);
 
     if (!this._scheduledMetinEvents) this._scheduledMetinEvents = [];
     const events = resolved.msa?.events || [];
@@ -22277,8 +23268,8 @@ export class OpenWorld3DEngine {
         if (bladeAura.userData.innerAuraMat && bladeAura.userData.defaultCoreHex) {
           bladeAura.userData.innerAuraMat.color.setHex(bladeAura.userData.defaultCoreHex);
         }
-        if (bladeAura.userData.outerAuraMat && bladeAura.userData.defaultOuterHex) {
-          bladeAura.userData.outerAuraMat.color.setHex(bladeAura.userData.defaultOuterHex);
+        if (bladeAura.userData.outerAuraMat && bladeAura.userData.defaultCoreHex) {
+          bladeAura.userData.outerAuraMat.color.setHex(bladeAura.userData.defaultCoreHex);
         }
         if (bladeAura.userData.flameMat && bladeAura.userData.defaultOuterHex) {
           bladeAura.userData.flameMat.color.setHex(bladeAura.userData.defaultOuterHex);
@@ -22286,8 +23277,18 @@ export class OpenWorld3DEngine {
       }
       return;
     }
-    const p0 = chosen.loop.effect.particles[0];
-    const [r, g, b] = p0.color || [1.0, 0.45, 0.12];
+    let bestRgb = null;
+    let bestSat = -1;
+    for (const pt of chosen.loop.effect.particles) {
+      if (!Array.isArray(pt.color) || pt.color.length < 3) continue;
+      const [pr, pg, pb] = pt.color;
+      const sat = Math.max(pr, pg, pb) - Math.min(pr, pg, pb);
+      if (sat > bestSat) {
+        bestSat = sat;
+        bestRgb = pt.color;
+      }
+    }
+    const [r, g, b] = bestRgb || chosen.loop.effect.particles[0].color || [1.0, 0.45, 0.12];
     const loopColor = new THREE.Color(
       chosen.isLSkill ? Math.min(1, r * 1.15 + 0.22) : r,
       chosen.isLSkill ? Math.min(1, g * 0.92 + 0.10) : g,
@@ -22304,7 +23305,7 @@ export class OpenWorld3DEngine {
         bladeAura.userData.innerAuraMat.color.copy(coreHotColor);
       }
       if (bladeAura.userData.outerAuraMat) {
-        bladeAura.userData.outerAuraMat.color.copy(loopColor);
+        bladeAura.userData.outerAuraMat.color.copy(coreHotColor);
       }
       if (bladeAura.userData.flameMat) {
         bladeAura.userData.flameMat.color.copy(loopColor);
@@ -22395,20 +23396,24 @@ export class OpenWorld3DEngine {
     const img = ctx.createImageData(w, h);
     const data = img.data;
     for (let y = 0; y < h; y++) {
-      // v=0 (Heft/Parierstange) bis v=1 (Klingenspitze)
+      // v=0 (Heft/Parierstange) bis v=1 (Klingenspitze) – beide Ränder laufen exakt auf Alpha 0 aus!
       const v = 1.0 - y / (h - 1);
-      const radialEnv =
-        v < 0.08
-          ? 0.0
-          : Math.min(1.0, Math.pow((v - 0.08) / 0.92, 0.72)) * (1.0 - Math.pow(Math.max(0, (v - 0.96) / 0.04), 2.0));
-      const tipRim = Math.exp(-Math.pow((v - 0.90) / 0.075, 2.0)) * 0.45;
+      const vBorderFade = Math.sin(Math.min(1.0, Math.max(0.0, v)) * Math.PI);
+      const baseCut = v < 0.06 ? 0.0 : Math.min(1.0, (v - 0.06) / 0.14);
+      const tipCut = v > 0.92 ? Math.max(0.0, (1.0 - v) / 0.08) : 1.0;
+      const radialEnv = Math.pow(Math.max(0.0, v), 0.72) * baseCut * tipCut * Math.pow(vBorderFade, 0.35);
+      const tipRim = Math.exp(-Math.pow((v - 0.84) / 0.085, 2.0)) * 0.48 * tipCut * baseCut;
       for (let x = 0; x < w; x++) {
-        // u=0 (direkt an der Schneide) bis u=1 (auslaufendes Schweif-Ende)
+        // u=0 (direkt an der Schneide) bis u=1 (auslaufendes Schweif-Ende, bei u=1 exakt Alpha 0!)
         const u = x / (w - 1);
-        const leadFlash = Math.exp(-u * 18.0) * 0.65;
-        const wakeFade = Math.pow(Math.max(0, 1.0 - u), 1.85);
-        const alpha = Math.min(1.0, (wakeFade * 0.82 + leadFlash * 0.55) * (radialEnv + tipRim));
-        const whiteCore = Math.min(1.0, leadFlash + tipRim * wakeFade);
+        const leadSoft = u < 0.035 ? u / 0.035 : 1.0;
+        const tailZero = u >= 0.985 ? 0.0 : Math.pow(Math.max(0.0, (0.985 - u) / 0.985), 2.15);
+        const leadFlash = Math.exp(-u * 16.0) * 0.58 * tailZero;
+        const alpha =
+          y === 0 || y === h - 1 || x === w - 1
+            ? 0.0
+            : Math.min(1.0, (tailZero * 0.78 + leadFlash * 0.48) * (radialEnv + tipRim) * leadSoft);
+        const whiteCore = Math.min(1.0, leadFlash + tipRim * tailZero);
         const idx = (y * w + x) * 4;
         data[idx] = Math.round(215 + whiteCore * 40);
         data[idx + 1] = Math.round(220 + whiteCore * 35);
@@ -22418,6 +23423,8 @@ export class OpenWorld3DEngine {
     }
     ctx.putImageData(img, 0, 0);
     const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     tex.userData = { isShared: true };
@@ -22511,7 +23518,11 @@ export class OpenWorld3DEngine {
           (trail.vTip.x - k0.tx) * (trail.vTip.x - k0.tx) +
           (trail.vTip.y - k0.ty) * (trail.vTip.y - k0.ty) +
           (trail.vTip.z - k0.tz) * (trail.vTip.z - k0.tz);
-        if (tipDistSq > 0.0006) {
+        if (tipDistSq > 2.25) {
+          // Bei großem Pose-/Frame-Sprung alte Knoten verwerfen, damit kein flaches Trapez gespannt wird
+          knots.length = 0;
+          shouldInsert = true;
+        } else if (tipDistSq > 0.0006) {
           shouldInsert = true;
         } else {
           // Aktuelle Klingenposition am neuesten Knoten nachführen
@@ -22560,6 +23571,7 @@ export class OpenWorld3DEngine {
     };
 
     const n = knots.length;
+    const totalExpectedSlices = Math.min(MAX_SLICES, (n - 1) * SUB_DIV + 1);
     const posArr = trail.posArr;
     const uvArr = trail.uvArr;
     let sliceCnt = 0;
@@ -22580,7 +23592,8 @@ export class OpenWorld3DEngine {
         const ty = cr(k0.ty, k1.ty, k2.ty, k3.ty, t);
         const tz = cr(k0.tz, k1.tz, k2.tz, k3.tz, t);
         const interpAge = k1.age + (k2.age - k1.age) * t;
-        const u = Math.min(1.0, Math.max(0.0, interpAge / MAX_AGE));
+        const sliceFrac = totalExpectedSlices > 1 ? sliceCnt / (totalExpectedSlices - 1) : 1.0;
+        const u = Math.min(1.0, Math.max(sliceFrac, interpAge / MAX_AGE));
 
         const pOff = sliceCnt * 6;
         posArr[pOff] = bx;
@@ -25263,7 +26276,76 @@ export class OpenWorld3DEngine {
     blockDome.visible = false;
     root.add(blockDome);
 
-    // --- 1. ECHTES 3D-GLB-HELDENMODELL PRO KLASSE (Krieger, Ninja, Sura, Schamane) ---
+    // --- 1. METIN2 +7 / +8 / +9 RÜSTUNGS- & WAFFEN-FUNKELN (SHINING PARTIKEL) ---
+    // Muss vor der synchronen GLB-Cache-Waffenbindung (bindHeroWeaponAndIk) initialisiert werden!
+    const armorPlusLvl = Number(cfg.armorPlus ?? plus ?? 0);
+    const buildShiningEmitter = (plusLvl, rad = 0.44, hSpan = 0.82, axisOff = 1.12, alongZ = false) => {
+      if (plusLvl < 7) return null;
+      const g = new THREE.Group();
+      if (alongZ) {
+        g.position.set(0, 0, axisOff);
+      } else {
+        g.position.y = axisOff;
+      }
+      const colMain = plusLvl >= 9 ? 0xfbbf24 : plusLvl === 8 ? 0xc084fc : 0x38bdf8;
+      const colSub = plusLvl >= 9 ? 0xfef08a : plusLvl === 8 ? 0x60a5fa : 0xe0f2fe;
+      const count = alongZ
+        ? plusLvl >= 9
+          ? 10
+          : plusLvl === 8
+          ? 7
+          : 5
+        : plusLvl >= 9
+        ? 18
+        : plusLvl === 8
+        ? 12
+        : 8;
+      const spTex = this.getShiningSparkleTexture ? this.getShiningSparkleTexture() : null;
+      const sparks = [];
+      for (let i = 0; i < count; i++) {
+        const sm = new THREE.SpriteMaterial({
+          map: spTex,
+          color: i % 3 === 0 ? colSub : colMain,
+          transparent: true,
+          opacity: alongZ ? 0.78 : 0.88,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const sp = new THREE.Sprite(sm);
+        const s = alongZ
+          ? plusLvl >= 9
+            ? 0.088
+            : plusLvl === 8
+            ? 0.074
+            : 0.06
+          : plusLvl >= 9
+          ? 0.22
+          : plusLvl === 8
+          ? 0.18
+          : 0.15;
+        sp.scale.set(s, s, 1);
+        const ang = (i / count) * Math.PI * 2;
+        const r = rad * (0.78 + (i % 3) * 0.14);
+        const yb = (i / count - 0.5) * hSpan;
+        if (alongZ) {
+          sp.position.set(Math.cos(ang) * r, Math.sin(ang) * r, yb);
+        } else {
+          sp.position.set(Math.cos(ang) * r, yb, Math.sin(ang) * r);
+        }
+        sp.userData = { angle: ang, speed: 1.9 + (i % 4) * 0.42, radius: r, yBase: yb, phase: i * 0.65, baseScale: s };
+        g.add(sp);
+        sparks.push(sp);
+      }
+      g.userData = { sparks, plusLvl, alongZ, axisOff };
+      return g;
+    };
+
+    const armorShining = buildShiningEmitter(armorPlusLvl, 0.46, 0.84, 1.15, false);
+    if (armorShining) root.add(armorShining);
+    const weaponShining = buildShiningEmitter(plus, 0.042, 1.02, 0.76, true);
+    if (weaponShining) weaponGroup.add(weaponShining);
+
+    // --- 2. ECHTES 3D-GLB-HELDENMODELL PRO KLASSE (Krieger, Ninja, Sura, Schamane) ---
     const classKey = cfg.classId || 'warrior';
     const heroGlbCfg = HERO_GLB_BY_CLASS[classKey] || HERO_GLB_BY_CLASS.warrior;
     const heroGlbHolder = new THREE.Group();
@@ -25279,7 +26361,7 @@ export class OpenWorld3DEngine {
         // behalten aber +7/+8/+9 Funkeln (weaponShining) und Klingen-Auren (bladeAuraGroup) bei.
         weaponGroup.userData.hideProceduralBlade = true;
         for (const ch of weaponGroup.children) {
-          if (ch !== weaponGroup.userData?.bladeAuraGroup) {
+          if (ch !== weaponShining && ch !== weaponGroup.userData?.bladeAuraGroup) {
             ch.visible = false;
           }
         }
@@ -25425,74 +26507,6 @@ export class OpenWorld3DEngine {
           .catch(() => {});
       }
     }
-
-    // --- 2. METIN2 +7 / +8 / +9 RÜSTUNGS- & WAFFEN-FUNKELN (SHINING PARTIKEL) ---
-    const armorPlusLvl = Number(cfg.armorPlus ?? plus ?? 0);
-    const buildShiningEmitter = (plusLvl, rad = 0.44, hSpan = 0.82, axisOff = 1.12, alongZ = false) => {
-      if (plusLvl < 7) return null;
-      const g = new THREE.Group();
-      if (alongZ) {
-        g.position.set(0, 0, axisOff);
-      } else {
-        g.position.y = axisOff;
-      }
-      const colMain = plusLvl >= 9 ? 0xfbbf24 : plusLvl === 8 ? 0xc084fc : 0x38bdf8;
-      const colSub = plusLvl >= 9 ? 0xfef08a : plusLvl === 8 ? 0x60a5fa : 0xe0f2fe;
-      const count = alongZ
-        ? plusLvl >= 9
-          ? 10
-          : plusLvl === 8
-          ? 7
-          : 5
-        : plusLvl >= 9
-        ? 18
-        : plusLvl === 8
-        ? 12
-        : 8;
-      const spTex = this.getShiningSparkleTexture ? this.getShiningSparkleTexture() : null;
-      const sparks = [];
-      for (let i = 0; i < count; i++) {
-        const sm = new THREE.SpriteMaterial({
-          map: spTex,
-          color: i % 3 === 0 ? colSub : colMain,
-          transparent: true,
-          opacity: alongZ ? 0.78 : 0.88,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const sp = new THREE.Sprite(sm);
-        const s = alongZ
-          ? plusLvl >= 9
-            ? 0.088
-            : plusLvl === 8
-            ? 0.074
-            : 0.06
-          : plusLvl >= 9
-          ? 0.22
-          : plusLvl === 8
-          ? 0.18
-          : 0.15;
-        sp.scale.set(s, s, 1);
-        const ang = (i / count) * Math.PI * 2;
-        const r = rad * (0.78 + (i % 3) * 0.14);
-        const yb = (i / count - 0.5) * hSpan;
-        if (alongZ) {
-          sp.position.set(Math.cos(ang) * r, Math.sin(ang) * r, yb);
-        } else {
-          sp.position.set(Math.cos(ang) * r, yb, Math.sin(ang) * r);
-        }
-        sp.userData = { angle: ang, speed: 1.9 + (i % 4) * 0.42, radius: r, yBase: yb, phase: i * 0.65, baseScale: s };
-        g.add(sp);
-        sparks.push(sp);
-      }
-      g.userData = { sparks, plusLvl, alongZ, axisOff };
-      return g;
-    };
-
-    const armorShining = buildShiningEmitter(armorPlusLvl, 0.46, 0.84, 1.15, false);
-    if (armorShining) root.add(armorShining);
-    const weaponShining = buildShiningEmitter(plus, 0.042, 1.02, 0.76, true);
-    if (weaponShining) weaponGroup.add(weaponShining);
 
     // --- 3. LEBENDIGE 3D-ANGELRUTE & SCHWIMMER (POSE) + 3D-BERGBAU-ERZADER & SPITZHACKE ---
     const fishingGroup = new THREE.Group();
@@ -26023,144 +27037,157 @@ export class OpenWorld3DEngine {
       return g;
     }
 
-    let bladeCol = 0xe2e8f0;
-    let emCol = 0x38bdf8;
-    let len = 1.22;
+    let bladeCol = 0xf1f5f9;
+    let bladeEmissive = 0x334155;
+    let gemCol = 0xf59e0b;
+    let len = 1.34;
     if (weaponVisual === 'msk') {
-      bladeCol = 0xbae6fd;
-      emCol = 0x38bdf8;
-      len = 1.34;
+      bladeCol = 0xe0f2fe;
+      bladeEmissive = 0x1d4ed8;
+      gemCol = 0x38bdf8;
+      len = 1.38;
     } else if (weaponVisual === 'rsb') {
-      bladeCol = 0xef4444;
-      emCol = 0xdc2626;
-      len = 1.48;
+      bladeCol = 0xf87171;
+      bladeEmissive = 0xb91c1c;
+      gemCol = 0xef4444;
+      len = 1.50;
     } else if (weaponVisual === 'sternenreisser') {
-      bladeCol = 0xfef08a;
-      emCol = 0x38bdf8;
-      len = 1.45;
+      bladeCol = 0xfef9c3;
+      bladeEmissive = 0xb45309;
+      gemCol = 0xfbbf24;
+      len = 1.46;
     }
 
     // 1. Zweihand-Ledergriff mit Knauf (Ursprung z=0 sitzt exakt in der geschlossenen rechten Hand!)
     const hilt = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.032, 0.036, 0.34, 10),
-      new THREE.MeshStandardMaterial({ color: 0x5c2d16, roughness: 0.62, metalness: 0.15 })
+      new THREE.CylinderGeometry(0.028, 0.032, 0.34, 10),
+      new THREE.MeshStandardMaterial({ color: 0x5c2d16, roughness: 0.58, metalness: 0.16 })
     );
     hilt.rotation.x = Math.PI / 2;
     hilt.position.z = -0.02;
 
-    const pommel = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.062, 1),
-      new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.90, roughness: 0.20 })
-    );
+    const bronzeGoldMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      metalness: 0.44,
+      roughness: 0.28,
+      emissive: 0x78350f,
+      emissiveIntensity: 0.24,
+    });
+    const pommel = new THREE.Mesh(new THREE.OctahedronGeometry(0.056, 1), bronzeGoldMat);
     pommel.position.z = -0.21;
 
-    // 2. Geschwungene Parierstange (Crossguard) mit Mitteljuwel
-    const guardMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.88, roughness: 0.22 });
-    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.072, 0.085), guardMat);
+    // 2. Schlanke, goldbronzen schimmernde Parierstange (Crossguard) mit Mitteljuwel (wird ohne IBL niemals schwarz!)
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.052, 0.068), bronzeGoldMat);
     guard.position.z = 0.15;
     const guardGem = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.048, 0),
+      new THREE.OctahedronGeometry(0.044, 0),
       new THREE.MeshStandardMaterial({
-        color: emCol,
-        emissive: emCol,
-        emissiveIntensity: 0.85,
-        metalness: 0.5,
-        roughness: 0.15,
+        color: gemCol,
+        emissive: gemCol,
+        emissiveIntensity: 0.72,
+        metalness: 0.38,
+        roughness: 0.20,
       })
     );
     guardGem.position.z = 0.15;
 
-    // 3. Geschliffene, spitz zulaufende Zweihand-Klinge mit Hohlkehle (Fuller) statt klobigem Kasten
+    // 3. Hell polierte Silberstahl-Klinge mit dunkler Hohlkehle (Fuller) statt türkisem Kasten
     const bodyLen = len * 0.78;
     const tipLen = len * 0.22;
     const bladeMat = new THREE.MeshStandardMaterial({
       color: bladeCol,
-      metalness: 0.92,
-      roughness: 0.14,
-      emissive: weaponVisual === 'rsb' ? 0xdc2626 : 0x14b8a6,
-      emissiveIntensity: plus >= 9 ? 0.42 : plus >= 6 ? 0.28 : 0.18,
+      metalness: 0.42,
+      roughness: 0.24,
+      emissive: bladeEmissive,
+      emissiveIntensity: weaponVisual === 'rsb' ? 0.36 : plus >= 9 ? 0.24 : 0.14,
     });
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.026, bodyLen), bladeMat);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.096, 0.022, bodyLen), bladeMat);
     blade.position.z = 0.18 + bodyLen * 0.5;
 
-    const tipGeo = new THREE.ConeGeometry(0.115 * Math.SQRT1_2, tipLen, 4);
+    const tipGeo = new THREE.ConeGeometry(0.096 * Math.SQRT1_2, tipLen, 4);
     tipGeo.rotateY(Math.PI / 4);
-    tipGeo.scale(1.0, 1.0, 0.026 / 0.115);
+    tipGeo.scale(1.0, 1.0, 0.022 / 0.096);
     tipGeo.rotateX(Math.PI / 2);
     tipGeo.computeVertexNormals();
     const bladeTip = new THREE.Mesh(tipGeo, bladeMat);
     bladeTip.position.z = 0.18 + bodyLen + tipLen * 0.5;
 
     const fuller = new THREE.Mesh(
-      new THREE.BoxGeometry(0.036, 0.032, bodyLen * 0.88),
+      new THREE.BoxGeometry(0.026, 0.026, bodyLen * 0.86),
       new THREE.MeshStandardMaterial({
-        color: 0x0f172a,
-        metalness: 0.85,
-        roughness: 0.25,
-        emissive: emCol,
-        emissiveIntensity: 0.45,
+        color: 0x334155,
+        metalness: 0.48,
+        roughness: 0.32,
+        emissive: weaponVisual === 'rsb' ? 0x991b1b : 0x1e293b,
+        emissiveIntensity: 0.22,
       })
     );
     fuller.position.z = 0.18 + bodyLen * 0.46;
 
-    // 4. Formschlüssige, spitz zulaufende Metin2-Energiescheide ("Aura des Schwertes" – 0 Kreis-Blobs!)
+    // 4. Weich auslaufende 4-Ebenen-Flammenhülle ("Aura des Schwertes" – 0 harte Kasten-/Zylinderkanten!)
     const bladeAuraGroup = new THREE.Group();
-    const defaultCoreHex = weaponVisual === 'rsb' ? 0xfca5a5 : 0xfef08a;
-    const defaultOuterHex = weaponVisual === 'rsb' ? 0xef4444 : 0xf97316;
+    const defaultCoreHex = weaponVisual === 'rsb' ? 0xfecaca : 0xfef08a;
+    const defaultOuterHex = weaponVisual === 'rsb' ? 0xef4444 : 0xff7a1a;
+    const flameTex = this.getBladeAuraFlameTexture ? this.getBladeAuraFlameTexture() : null;
 
     const innerAuraMat = new THREE.MeshBasicMaterial({
+      map: flameTex,
       color: defaultCoreHex,
       transparent: true,
-      opacity: weaponVisual === 'rsb' ? 0.22 : 0.0,
+      opacity: weaponVisual === 'rsb' ? 0.24 : 0.0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
-    const innerAura = new THREE.Mesh(
-      new THREE.BoxGeometry(0.118, 0.028, len * 0.92),
-      innerAuraMat
-    );
-    innerAura.position.z = 0.18 + len * 0.46;
+    const coreGeo = new THREE.PlaneGeometry(0.13, len * 1.04);
+    coreGeo.rotateX(Math.PI / 2);
+    const innerAura = new THREE.Mesh(coreGeo, innerAuraMat);
+    innerAura.position.z = 0.18 + len * 0.50;
 
     const outerAuraMat = new THREE.MeshBasicMaterial({
-      color: defaultOuterHex,
+      map: flameTex,
+      color: defaultCoreHex,
       transparent: true,
-      opacity: weaponVisual === 'rsb' ? 0.14 : 0.0,
+      opacity: weaponVisual === 'rsb' ? 0.20 : 0.0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
-    const outerAura = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.008, 0.066, len * 1.02, 10, 1, true),
-      outerAuraMat
-    );
-    outerAura.rotation.x = Math.PI / 2;
+    const outerAura = new THREE.Mesh(coreGeo, outerAuraMat);
     outerAura.position.z = 0.18 + len * 0.50;
+    outerAura.rotation.z = Math.PI * 0.5;
 
-    const flameTex = this.getBladeAuraFlameTexture ? this.getBladeAuraFlameTexture() : null;
     const flameMat = new THREE.MeshBasicMaterial({
       map: flameTex,
       color: defaultOuterHex,
       transparent: true,
-      opacity: weaponVisual === 'rsb' ? 0.28 : 0.0,
+      opacity: weaponVisual === 'rsb' ? 0.30 : 0.0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
-    const flameGeo = new THREE.PlaneGeometry(0.24, len * 1.06);
+    const flameGeo = new THREE.PlaneGeometry(0.28, len * 1.10);
     flameGeo.rotateX(Math.PI / 2);
     const flamePlaneA = new THREE.Mesh(flameGeo, flameMat);
-    flamePlaneA.position.z = 0.18 + len * 0.51;
+    flamePlaneA.position.z = 0.18 + len * 0.52;
     const flamePlaneB = new THREE.Mesh(flameGeo, flameMat);
-    flamePlaneB.position.z = 0.18 + len * 0.51;
+    flamePlaneB.position.z = 0.18 + len * 0.52;
     flamePlaneB.rotation.z = Math.PI * 0.5;
+    const flamePlaneC = new THREE.Mesh(flameGeo, flameMat);
+    flamePlaneC.position.z = 0.18 + len * 0.52;
+    flamePlaneC.rotation.z = Math.PI * 0.25;
+    const flamePlaneD = new THREE.Mesh(flameGeo, flameMat);
+    flamePlaneD.position.z = 0.18 + len * 0.52;
+    flamePlaneD.rotation.z = -Math.PI * 0.25;
 
-    bladeAuraGroup.add(innerAura, outerAura, flamePlaneA, flamePlaneB);
+    bladeAuraGroup.add(innerAura, outerAura, flamePlaneA, flamePlaneB, flamePlaneC, flamePlaneD);
     bladeAuraGroup.userData = {
       innerAura,
       outerAura,
       flamePlaneA,
       flamePlaneB,
+      flamePlaneC,
+      flamePlaneD,
       innerAuraMat,
       outerAuraMat,
       flameMat,
@@ -27616,7 +28643,7 @@ export class OpenWorld3DEngine {
       ctx.fillText(guild, canvas.width / 2, guildY);
     }
 
-    // 2. Untere Hauptzeile: Lvl (Gold), Rang (Passend farblich), optional 🤖 [Bot] Symbol (Cyan), Name (Weiß)
+    // 2. Untere Hauptzeile: Lvl (Gold), Rang (Passend farblich), optional 🤖 [Bot] Symbol (Cyan), Name (Weiß bzw. Gold + 👑 bei SA)
     const mainY = showGuild ? 92 : 76;
     ctx.font = 'bold 30px Inter, "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
@@ -27626,11 +28653,12 @@ export class OpenWorld3DEngine {
     const rankText = showGuild && rankName ? String(rankName) : '';
     const rawName = String(name);
     const isBotFlag = Boolean(opts.isBot) || rawName.startsWith('[Bot]') || rawName.endsWith('Bot');
+    const isSaFlag = !isBotFlag && (Boolean(opts.isSA) || opts.teamRank === 'SA' || rawName.toUpperCase().startsWith('[SA]'));
     const cleanCharName = rawName.startsWith('[Bot]')
       ? rawName.slice(5).trim()
       : (isBotFlag && rawName.endsWith('Bot') ? rawName.slice(0, -3).trim() : rawName);
     const botPrefixText = isBotFlag ? '🤖 [Bot]' : '';
-    const nameText = cleanCharName;
+    const nameText = isSaFlag ? `👑 ${cleanCharName}` : cleanCharName;
     const gap = 14;
 
     const wLvl = ctx.measureText(lvlText).width;
@@ -27682,7 +28710,15 @@ export class OpenWorld3DEngine {
       ctx.fillStyle = '#38bdf8';
       ctx.fillText(botPrefixText, xBotPrefix, mainY);
     }
-    ctx.fillStyle = '#ffffff';
+    if (isSaFlag) {
+      const saGrad = ctx.createLinearGradient(xName, mainY - 14, xName, mainY + 14);
+      saGrad.addColorStop(0, '#fff7ad');
+      saGrad.addColorStop(0.5, '#ffd700');
+      saGrad.addColorStop(1, '#f59e0b');
+      ctx.fillStyle = saGrad;
+    } else {
+      ctx.fillStyle = '#ffffff';
+    }
     ctx.fillText(nameText, xName, mainY);
 
     const tex = new THREE.CanvasTexture(canvas);
@@ -32804,18 +33840,20 @@ export class OpenWorld3DEngine {
       const swingBoost = (lp._ribbonSwingTimer || 0) > 0 ? 1.18 : 1.0;
       if (hasBladeBuff) {
         if (bladeAura.userData.innerAuraMat) {
-          bladeAura.userData.innerAuraMat.opacity = Math.min(0.92, 0.56 * pulse * swingBoost);
+          bladeAura.userData.innerAuraMat.opacity = Math.min(0.95, 0.72 * pulse * swingBoost);
         }
         if (bladeAura.userData.outerAuraMat) {
-          bladeAura.userData.outerAuraMat.opacity = Math.min(0.62, 0.32 * pulse * swingBoost);
+          bladeAura.userData.outerAuraMat.opacity = Math.min(0.92, 0.68 * pulse * swingBoost);
           const s = 0.94 + Math.sin(elapsed * 15.0) * 0.14;
-          bladeAura.userData.outerAura.scale.set(s, 1.0, s);
+          bladeAura.userData.outerAura.scale.set(s, 1.0, 1.0);
         }
         if (bladeAura.userData.flameMat) {
-          bladeAura.userData.flameMat.opacity = Math.min(0.95, 0.78 * flicker * swingBoost);
+          bladeAura.userData.flameMat.opacity = Math.min(0.92, 0.64 * flicker * swingBoost);
           const fw = 0.92 + Math.sin(elapsed * 19.0) * 0.16;
           if (bladeAura.userData.flamePlaneA) bladeAura.userData.flamePlaneA.scale.set(fw, 1.0, 1.0);
           if (bladeAura.userData.flamePlaneB) bladeAura.userData.flamePlaneB.scale.set(fw, 1.0, 1.0);
+          if (bladeAura.userData.flamePlaneC) bladeAura.userData.flamePlaneC.scale.set(fw * 0.94, 1.0, 1.0);
+          if (bladeAura.userData.flamePlaneD) bladeAura.userData.flamePlaneD.scale.set(fw * 0.94, 1.0, 1.0);
         }
       } else if (isRsb) {
         if (bladeAura.userData.innerAuraMat) bladeAura.userData.innerAuraMat.opacity = 0.20 * pulse;
@@ -34362,8 +35400,9 @@ export class OpenWorld3DEngine {
       this.clickIndicator.material.opacity = this.clickIndicatorTimer;
     }
 
-    // 6. Temporäre VFX (inkl. Metin2 .mde 3D-Effektmeshes & .mse Partikel/Boden-Runen) aktualisieren
+    // 6. Temporäre VFX (inkl. Metin2 .mde 3D-Effektmeshes, .mse Partikel/Boden-Runen & dezentes Skill-Umgebungslicht) aktualisieren
     this.updateMetinScheduledEvents(dt);
+    this.updateSkillEnvironmentLights(dt);
     for (let i = this.vfxList.length - 1; i >= 0; i--) {
       const v = this.vfxList[i];
       v.age += dt;
@@ -34611,6 +35650,8 @@ export class OpenWorld3DEngine {
             const sc = gr.s0 + (gr.s1 - gr.s0) * ease;
             gr.mesh.scale.setScalar(sc);
             gr.mesh.rotation.z += dt * (gr.spinSpeed || 0);
+            if (gr.vx) gr.mesh.position.x += gr.vx * dt * (1.0 - u * 0.45);
+            if (gr.vz) gr.mesh.position.z += gr.vz * dt * (1.0 - u * 0.45);
             if (gr.c0 && gr.c1) {
               gr.mat.color.copy(gr.c0).lerp(gr.c1, u);
             }
@@ -34628,7 +35669,12 @@ export class OpenWorld3DEngine {
             const u = Math.min(1.0, lAge / Math.max(0.18, vp.life || 0.65));
             const ease = 1.0 - Math.pow(1.0 - u, 1.7);
             const sc = vp.s0 + (vp.s1 - vp.s0) * ease;
-            vp.mesh.scale.set(sc, sc * (vp.aspectY || 1.0), 1);
+            if (vp.is3DFunnel) {
+              vp.mesh.scale.set(sc, sc * (vp.aspectY || 1.0), sc);
+            } else {
+              vp.mesh.scale.set(sc, sc * (vp.aspectY || 1.0), 1);
+            }
+            if (vp.spinY) vp.mesh.rotation.y += dt * vp.spinY;
             if (vp.rotZ) vp.mesh.rotation.z += dt * vp.rotZ;
             if (vp.c0 && vp.c1) {
               vp.mat.color.copy(vp.c0).lerp(vp.c1, u);
@@ -34653,7 +35699,15 @@ export class OpenWorld3DEngine {
             sp.position.x = nx + ud.vx * dt;
             sp.position.y += ud.vy * dt;
             sp.position.z = nz + ud.vz * dt;
-            ud.vy *= 1.0 - dt * 1.15;
+            if (ud.gravity) {
+              ud.vy -= ud.gravity * dt;
+              if (sp.position.y < 0.05) {
+                sp.position.y = 0.05;
+                ud.vy = Math.abs(ud.vy) * 0.25;
+              }
+            } else {
+              ud.vy *= 1.0 - dt * 1.15;
+            }
             if (ud.rotSpd) sp.material.rotation += ud.rotSpd * dt;
             const sz = ud.s0 + (ud.s1 - ud.s0) * u;
             sp.scale.set(sz, sz, 1);

@@ -11086,8 +11086,8 @@ class WorldAuthority:
         name = str(p.get("name", "")).strip()
         pid = str(player_id or p.get("player_id") or p.get("id") or "").lower()
         
-        # Ein Charakter ist NUR ein SA-Spieler, wenn sein Name mit [SA] beginnt (oder interne Admin-ID)
-        is_name_sa = name.upper().startswith("[SA]") or pid.startswith("char_admin") or pid.startswith("hero_admin") or pid == "admin"
+        # Ein Charakter ist NUR ein SA-Spieler, wenn sein Name mit [SA] beginnt
+        is_name_sa = name.upper().startswith("[SA]")
         if not is_name_sa:
             return False
 
@@ -11098,10 +11098,7 @@ class WorldAuthority:
             p.get("isSA")
             or role in ("sa", "admin")
             or quests_sa
-            or acc in ("admin", "blackzimple", "cryptel")
-            or pid.startswith("char_admin")
-            or pid.startswith("hero_admin")
-            or pid == "admin"
+            or acc in ("blackzimple", "cryptel")
         )
 
     def _get_player_team_rank(self, p: dict, player_id: str = "") -> Optional[str]:

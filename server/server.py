@@ -43,7 +43,7 @@ TEAM_RANKS = {
     "DEV": "Developer",
     "SUP": "Supporter",
 }
-TEAM_ACCOUNTS = {"admin", "blackzimple", "cryptel"}
+TEAM_ACCOUNTS = {"blackzimple", "cryptel"}
 
 def get_team_rank_tag(raw_name: str) -> Optional[str]:
     """Prüft, ob der Name ein geschütztes Team-Kürzel enthält oder damit beginnt."""
@@ -726,16 +726,16 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
             # [SA]-Prefix nur normalisieren wenn der Name bereits [SA] hat und Account berechtigt ist
-            if req_name.upper().startswith("[SA]") and (account_key in ("admin", "blackzimple", "cryptel") or player_id == "hero_admin_sa"):
+            if req_name.upper().startswith("[SA]") and account_key in ("blackzimple", "cryptel"):
                 req_name = DB._normalize_sa_char_name(req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
         # SA-Status beim Betreten der Welt:
-        # NUR wenn der Charaktername explizit mit [SA] beginnt (oder Admin-Hero-ID)
+        # NUR wenn der Charaktername explizit mit [SA] beginnt
         # UND der Account autorisiert ist!
         char_name = str(p.get("name") or "").strip()
-        is_name_sa = char_name.upper().startswith("[SA]") or player_id == "hero_admin_sa"
-        is_account_authorized = account_key in ("admin", "blackzimple", "cryptel") or player_id == "hero_admin_sa"
+        is_name_sa = char_name.upper().startswith("[SA]")
+        is_account_authorized = account_key in ("blackzimple", "cryptel")
         is_sa_join = is_name_sa and is_account_authorized
         if is_sa_join:
             p["name"] = DB._normalize_sa_char_name(p.get("name") or "Admin")
