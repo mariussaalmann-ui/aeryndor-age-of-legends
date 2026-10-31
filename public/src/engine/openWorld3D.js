@@ -25641,6 +25641,7 @@ export class OpenWorld3DEngine {
           useMapAsEmissive: true,
           roughness: resolvedCfg.roughness ?? 0.46,
           metalness: resolvedCfg.metalness ?? 0.08,
+          alphaTest: resolvedCfg.alphaTest || 0,
         }
       );
     }
@@ -25659,9 +25660,10 @@ export class OpenWorld3DEngine {
         groundOffset: 0.18,
         flyBob: 0.05,
         labelY: 1.54,
-        color: new THREE.Color(2.25, 2.65, 1.95),
+        alphaTest: 0.42,
+        color: new THREE.Color(1.48, 1.72, 1.38),
         emissive: new THREE.Color(0x22c55e),
-        emissiveIntensity: 0.46,
+        emissiveIntensity: 0.36,
         sparkColor: 0x4ade80,
       },
       plechi_smaragd_dragon: {
@@ -25678,6 +25680,7 @@ export class OpenWorld3DEngine {
         groundOffset: 0.16,
         flyBob: 0.05,
         labelY: 1.52,
+        alphaTest: 0.42,
         color: new THREE.Color(1.45, 1.55, 1.38),
         emissive: new THREE.Color(0x10b981),
         emissiveIntensity: 0.34,
@@ -25743,10 +25746,29 @@ export class OpenWorld3DEngine {
         flyBob: 0.05,
         previewYOffset: 0.32,
         labelY: 1.48,
+        alphaTest: 0.42,
         color: new THREE.Color(1.42, 1.48, 1.65),
         emissive: new THREE.Color(0x60a5fa),
         emissiveIntensity: 0.36,
         sparkColor: 0x93c5fd,
+      },
+      astral_phoenix: {
+        key: 'astral_phoenix',
+        label: 'Astralphönix',
+        emoji: '🔥',
+        labelColor: '#fb923c',
+        glb: '/assets/models/pets/plechi_fantasy_flypet2.glb?v=20261025_v1',
+        tex: ['/assets/models/pets/plechi_fantasy_flypet.png?v=20261028_v2'],
+        height: 1.46,
+        groundOffset: 0.38,
+        flyBob: 0.06,
+        previewYOffset: 0.32,
+        labelY: 1.56,
+        alphaTest: 0.42,
+        color: new THREE.Color(1.92, 1.34, 0.88),
+        emissive: new THREE.Color(0xf97316),
+        emissiveIntensity: 0.56,
+        sparkColor: 0xfbbf24,
       },
       plechi_emd_pet: {
         key: 'plechi_emd_pet',
@@ -25812,6 +25834,7 @@ export class OpenWorld3DEngine {
         useMapAsEmissive: true,
         wetStrength: 0.18,
         snowStrength: 0.22,
+        alphaTest: petCfg.alphaTest || 0,
       });
       if (Array.isArray(pg.userData.petAuraSparks)) {
         for (const sp of pg.userData.petAuraSparks) {
@@ -25859,7 +25882,9 @@ export class OpenWorld3DEngine {
     const hasArmor = cfg.hasArmor !== false;
     const hasShield = cfg.hasShield !== undefined ? Boolean(cfg.hasShield) : true;
     const hasHelmet = cfg.hasHelmet !== false;
-    const key = `${cfg.classId || 'warrior'}_${cfg.gender || 'male'}_${cfg.hairIndex || 0}_${cfg.weaponPlus ?? 3}_${cfg.weaponVisual || ''}`;
+    const weaponPlus = Number(cfg.weaponPlus ?? 0);
+    const armorPlus = Number(cfg.armorPlus ?? weaponPlus);
+    const key = `${cfg.classId || 'warrior'}_${cfg.gender || 'male'}_${cfg.hairIndex || 0}_${weaponPlus}_${armorPlus}_${cfg.weaponVisual || ''}`;
     if (key !== this.localAppearanceKey) {
       this.localAppearanceKey = key;
       const oldPos = this.localPlayerActor.root.position.clone();
@@ -25870,7 +25895,8 @@ export class OpenWorld3DEngine {
         classId: cfg.classId || 'warrior',
         gender: cfg.gender || 'male',
         hairIndex: cfg.hairIndex || 0,
-        weaponPlus: cfg.weaponPlus ?? 3,
+        weaponPlus,
+        armorPlus,
         weaponVisual: cfg.weaponVisual || null,
         hasWeapon,
         hasArmor,
@@ -25886,6 +25912,9 @@ export class OpenWorld3DEngine {
       this.localPlayerActor.root.rotation.y = oldRot;
       if (this.localPlayerLabel) {
         this.localPlayerActor.root.add(this.localPlayerLabel);
+      }
+      if (this.localTeamEmblemGroup) {
+        this.localPlayerActor.root.add(this.localTeamEmblemGroup);
       }
       this.scene.add(this.localPlayerActor.root);
     }
@@ -26145,10 +26174,11 @@ export class OpenWorld3DEngine {
     });
 
     // Dezenter +7/+8/+9 Runen-Bodenring zu Füßen des Helden
+    const maxPlusForRing = Math.max(Number(plus || 0), Number(cfg.armorPlus ?? 0));
     const auraRing = new THREE.Mesh(
       new THREE.RingGeometry(0.58, 0.66, 32),
       new THREE.MeshBasicMaterial({
-        color: plus >= 9 ? 0xfde047 : 0x38bdf8,
+        color: maxPlusForRing >= 9 ? 0xfde047 : 0x38bdf8,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.65,
@@ -26156,7 +26186,7 @@ export class OpenWorld3DEngine {
     );
     auraRing.rotation.x = -Math.PI / 2;
     auraRing.position.y = 0.03;
-    auraRing.visible = plus >= 7;
+    auraRing.visible = maxPlusForRing >= 7;
     root.add(auraRing);
 
     // Mount-Gruppe: Echtes 3D-Pferd vom Stallburschen (pewi_mount_horse.glb) mit 5 Textur-/Fellvarianten (col1..col5)!
@@ -26219,6 +26249,7 @@ export class OpenWorld3DEngine {
           useMapAsEmissive: true,
           wetStrength: 0.18,
           snowStrength: 0.22,
+          alphaTest: petCfg.alphaTest || 0,
         }
       );
       const petEffectTex = this.loadModelTexture('/assets/models/pets/ridack_effect.png?v=20261018_v85');
@@ -29393,11 +29424,18 @@ export class OpenWorld3DEngine {
     const eq = p.equipment || {};
     const repRank = comp.reputationRank || {};
     this.localTeamRank = p.teamRank || (p.isSA ? 'SA' : (p.isGM ? 'GM' : null));
+    this.localPlayerEmpire = p.empire || 'solaria';
+    const rawLocalGuild = typeof p.guild === 'object' ? p.guild?.name : (p.guild ?? p.guildName);
+    const resolvedLocalGuild = this.customGuildName || rawLocalGuild || (this.localTeamRank ? 'Serverleitung' : '');
+    if (comp.hasCostumeMountSkin && comp.mountVisualSkin && this.customMountSkin !== comp.mountVisualSkin) {
+      this.customMountSkin = comp.mountVisualSkin;
+    }
     this.setLocalPlayerAppearance({
       classId: p.class_id || 'warrior',
-      gender: this.customGender || 'male',
+      gender: this.customGender || p.gender || 'male',
       hairIndex: this.customHairIndex || 0,
       weaponPlus: comp.weaponPlus ?? 0,
+      armorPlus: comp.armorPlus ?? 0,
       weaponVisual: comp.weaponVisual || null,
       hasWeapon: Boolean(eq.weapon ?? comp.hasWeapon),
       hasArmor: Boolean(eq.armor ?? comp.hasArmor),
@@ -29408,7 +29446,7 @@ export class OpenWorld3DEngine {
       teamRank: this.localTeamRank,
       rankName: repRank.name || 'Freundlich',
       rankColor: repRank.color || null,
-      guild: this.customGuildName || p.guild || 'Drachenorden',
+      guild: resolvedLocalGuild,
     });
     const isNowMounted = Boolean(p.active_mount);
     this.localPlayerActor.mountGroup.visible = isNowMounted;
@@ -29427,15 +29465,15 @@ export class OpenWorld3DEngine {
       const petLv = Math.max(1, Number(p.petData?.level || 1));
       this._lastPetLevel = petLv;
       let chosenSkin = this.customPetSkin || 'ridack_dragonpet';
-      if (p.petData?.skinKey) {
+      if (comp.hasCostumePetSkin && comp.petSkin) {
+        chosenSkin = comp.petSkin;
+      } else {
         let localSaved = '';
         try {
           localSaved = localStorage.getItem('aeryndor_pet_skin_v1') || '';
         } catch (_) {}
-        if (!localSaved) {
-          chosenSkin = p.petData.skinKey;
-          this.customPetSkin = chosenSkin;
-        }
+        chosenSkin = localSaved || comp.petSkin || p.petData?.skinKey || chosenSkin;
+        this.customPetSkin = chosenSkin;
       }
       const rawCustom = p.petData?.customName || '';
       this.applyPetSkinToGroup(this.localPlayerActor.petGroup, chosenSkin, petLv, rawCustom);
@@ -29447,7 +29485,8 @@ export class OpenWorld3DEngine {
       this.spawnRingWave(this.localPlayerPos.x, lpy + 0.35, this.localPlayerPos.z, 0x4ade80, 1.9);
     }
     this.hasActiveWeaponBuff = Array.isArray(comp.activeBuffs) && comp.activeBuffs.length > 0;
-    this.localPlayerActor.auraRing.visible = (comp.weaponPlus || 0) >= 7 || this.hasActiveWeaponBuff;
+    const localMaxPlus = Math.max(Number(comp.weaponPlus || 0), Number(comp.armorPlus || 0));
+    this.localPlayerActor.auraRing.visible = localMaxPlus >= 7 || this.hasActiveWeaponBuff;
     this.localPlayerClassId = p.classId || 'warrior';
     this.localPlayerGender = p.gender || 'm';
     this.localPlayerDoctrine = p.doctrine || '';
@@ -29475,16 +29514,52 @@ export class OpenWorld3DEngine {
     for (const op of snapshot.otherPlayers || []) {
       activeOtherIds.add(op.id);
       let mesh = this.otherPlayerMeshes.get(op.id);
+      const opTeamRank = op.teamRank || (op.isSA ? 'SA' : (op.isGM ? 'GM' : null));
       const opRankName = op.reputationRank || 'Freundlich';
-      const opGuild = op.guild || 'Drachenorden';
+      const opRankColor = op.reputationRankColor || op.reputationColor || null;
+      const rawOpGuild = op.guild !== undefined ? op.guild : op.guildName;
+      const opGuild = rawOpGuild || (opTeamRank ? 'Serverleitung' : '');
       const opShowGuild = this.showGuildNames !== false;
-      const opLabelKey = `${op.level}|${opRankName}|${op.name}|${opGuild}|${opShowGuild}`;
-      if (!mesh) {
+      const opLabelKey = `${op.level}|${opRankName}|${opRankColor || ''}|${op.name}|${opGuild}|${opShowGuild}`;
+      const opWeaponPlus = Number(op.weaponPlus ?? 0);
+      const opArmorPlus = Number(op.armorPlus ?? opWeaponPlus);
+      const opGender = op.gender === 'f' || op.gender === 'female' ? 'female' : 'male';
+      const opAppearanceKey = `${op.classId || 'warrior'}_${opGender}_${opWeaponPlus}_${opArmorPlus}_${op.weaponVisual || ''}_${op.mountSkin || ''}`;
+      if (!mesh || mesh.appearanceKey !== opAppearanceKey) {
+        const prevPos = mesh?.root ? mesh.root.position.clone() : null;
+        const prevRotY = mesh?.root ? mesh.root.rotation.y : (op.rotY || 0);
+        const prevPetState = mesh?.petGroup?.userData?.petWorldState || null;
+        const prevPlayerData = mesh?.playerData || null;
+        const prevTargetX = mesh?.targetX ?? op.x;
+        const prevTargetZ = mesh?.targetZ ?? op.z;
+        const prevTargetRotY = mesh?.targetRotY ?? (op.rotY || 0);
+        const prevSnapX = mesh?.snapX;
+        const prevSnapZ = mesh?.snapZ;
+        const prevLastSnapAt = mesh?.lastSnapAt;
+        if (mesh) {
+          if (mesh.teamEmblemGroup && this.teamEmblemSystem) {
+            this.teamEmblemSystem.destroyEmblemGroup(mesh.teamEmblemGroup);
+            mesh.teamEmblemGroup = null;
+          }
+          if (mesh.root) this.entityGroup.remove(mesh.root);
+        }
         const rig = this.createCharacterRig({
-          classId: op.classId,
-          weaponPlus: op.weaponPlus ?? 0,
+          classId: op.classId || 'warrior',
+          gender: opGender,
+          weaponPlus: opWeaponPlus,
+          armorPlus: opArmorPlus,
+          weaponVisual: op.weaponVisual || null,
+          hasWeapon: op.hasWeapon !== false,
+          hasArmor: op.hasArmor !== false,
+          hasShield: Boolean(op.hasShield),
+          hasHelmet: op.hasHelmet !== false,
           petSkin: op.petSkin || 'ridack_dragonpet',
+          mountSkin: op.mountSkin || 'horse_lvl1',
         });
+        rig.appearanceKey = opAppearanceKey;
+        if (prevPetState && rig.petGroup) {
+          rig.petGroup.userData.petWorldState = prevPetState;
+        }
         const hitCyl = new THREE.Mesh(
           new THREE.CylinderGeometry(1.05, 1.05, 2.75, 10),
           new THREE.MeshBasicMaterial({ visible: false })
@@ -29497,7 +29572,7 @@ export class OpenWorld3DEngine {
           {
             level: op.level,
             rankName: opRankName,
-            rankColor: op.reputationRankColor || null,
+            rankColor: opRankColor,
             name: op.name,
             guild: opGuild,
             showGuild: opShowGuild,
@@ -29509,11 +29584,22 @@ export class OpenWorld3DEngine {
         rig.root.add(lbl);
         rig.labelSprite = lbl;
         rig.lastLabelKey = opLabelKey;
-        rig.targetX = op.x;
-        rig.targetZ = op.z;
-        rig.targetRotY = op.rotY || 0;
-        rig.root.position.set(op.x, this.getTerrainHeight(op.x, op.z, this.currentMapId), op.z);
-        rig._justSpawned = true;
+        rig.targetX = prevTargetX;
+        rig.targetZ = prevTargetZ;
+        rig.targetRotY = prevTargetRotY;
+        if (prevSnapX !== undefined) rig.snapX = prevSnapX;
+        if (prevSnapZ !== undefined) rig.snapZ = prevSnapZ;
+        if (prevLastSnapAt !== undefined) rig.lastSnapAt = prevLastSnapAt;
+        if (prevPlayerData) rig.playerData = prevPlayerData;
+        if (prevPos) {
+          rig.root.position.copy(prevPos);
+          rig.root.rotation.y = prevRotY;
+          rig._justSpawned = false;
+        } else {
+          rig.root.position.set(op.x, this.getTerrainHeight(op.x, op.z, this.currentMapId), op.z);
+          rig.root.rotation.y = op.rotY || 0;
+          rig._justSpawned = true;
+        }
         this.entityGroup.add(rig.root);
         mesh = rig;
         mesh.playerName = op.name;
@@ -29526,7 +29612,7 @@ export class OpenWorld3DEngine {
           {
             level: op.level,
             rankName: opRankName,
-            rankColor: op.reputationRankColor || null,
+            rankColor: opRankColor,
             name: op.name,
             guild: opGuild,
             showGuild: opShowGuild,
@@ -29544,7 +29630,6 @@ export class OpenWorld3DEngine {
         mesh.labelSprite.position.y = op.activeMount ? 3.48 : 2.84;
       }
       // 3D-Team-Wappen für andere autorisierte Team-Mitglieder
-      const opTeamRank = op.teamRank || (op.isSA ? 'SA' : (op.isGM ? 'GM' : null));
       if (opTeamRank && this.teamEmblemSystem) {
         if (!mesh.teamEmblemGroup || mesh.teamRank !== opTeamRank) {
           if (mesh.teamEmblemGroup) this.teamEmblemSystem.destroyEmblemGroup(mesh.teamEmblemGroup);
@@ -29594,6 +29679,21 @@ export class OpenWorld3DEngine {
       if (mesh.rShoulder) mesh.rShoulder.visible = op.hasArmor !== false;
       if (mesh.cape) mesh.cape.visible = op.hasArmor !== false;
       if (mesh.chestCrest) mesh.chestCrest.visible = op.hasArmor !== false;
+      const opHasBuffs = Array.isArray(op.activeBuffs) && op.activeBuffs.length > 0;
+      const opMaxPlus = Math.max(opWeaponPlus, opArmorPlus);
+      if (mesh.auraRing) {
+        mesh.auraRing.visible = opMaxPlus >= 7 || opHasBuffs;
+        if (mesh.auraRing.material?.color) {
+          mesh.auraRing.material.color.setHex(opMaxPlus >= 9 ? 0xfde047 : 0x38bdf8);
+        }
+      }
+      this.syncActorMetinBuffState(
+        mesh,
+        op.activeBuffs,
+        op.classId || 'warrior',
+        op.doctrine || '',
+        opGender === 'female' ? 'f' : 'm'
+      );
       // Zielposition & Geschwindigkeitsvektor (Dead-Reckoning) + Live-Bot-Laufwege für das Navigations-System speichern
       const nowSnapMs = performance.now();
       const prevSnapX = mesh.snapX ?? op.x;
@@ -29790,6 +29890,11 @@ export class OpenWorld3DEngine {
       if (isSelected) {
         hasSelectedMob = true;
         this.targetSelectionRing.position.set(mob.x, my + 0.12, mob.z);
+        const mobRingScale = mob.kind === 'metin' || mob.isBoss ? 1.32 : 1.0;
+        this.targetSelectionRing.scale.setScalar(mobRingScale);
+        if (this.targetSelectionRing.material?.color) {
+          this.targetSelectionRing.material.color.setHex(0xef4444);
+        }
       }
     }
     for (const [id, mRoot] of this.monsterMeshes.entries()) {
@@ -29830,10 +29935,15 @@ export class OpenWorld3DEngine {
       if (selPMesh && selPMesh.root) {
         this.targetSelectionRing.position.set(
           selPMesh.root.position.x,
-          selPMesh.root.position.y + 0.14,
+          selPMesh.root.position.y + 0.08,
           selPMesh.root.position.z
         );
-        this.targetSelectionRing.scale.setScalar(1.0);
+        this.targetSelectionRing.scale.setScalar(0.54);
+        if (this.targetSelectionRing.material?.color) {
+          const selEmp = selPMesh.playerData?.empire || 'solaria';
+          const isEnemyEmp = Boolean(this.localPlayerEmpire && selEmp && selEmp !== this.localPlayerEmpire);
+          this.targetSelectionRing.material.color.setHex(isEnemyEmp ? 0xf59e0b : 0x38bdf8);
+        }
         hasSelectedMob = true;
       }
     }
@@ -32052,8 +32162,13 @@ export class OpenWorld3DEngine {
             this.autoAttackTargetId = null;
             this.clientClickTarget = null;
             if (pMesh && pMesh.root) {
-              this.targetSelectionRing.position.set(pMesh.root.position.x, pMesh.root.position.y + 0.14, pMesh.root.position.z);
-              this.targetSelectionRing.scale.setScalar(1.0);
+              this.targetSelectionRing.position.set(pMesh.root.position.x, pMesh.root.position.y + 0.08, pMesh.root.position.z);
+              this.targetSelectionRing.scale.setScalar(0.54);
+              if (this.targetSelectionRing.material?.color) {
+                const selEmp = pMesh.playerData?.empire || 'solaria';
+                const isEnemyEmp = Boolean(this.localPlayerEmpire && selEmp && selEmp !== this.localPlayerEmpire);
+                this.targetSelectionRing.material.color.setHex(isEnemyEmp ? 0xf59e0b : 0x38bdf8);
+              }
               this.targetSelectionRing.visible = true;
             }
             if (this.callbacks.onSelectPlayer) {
@@ -32099,8 +32214,13 @@ export class OpenWorld3DEngine {
           this.pendingInteract = null;
           this.isLeftMouseDownOnGround = false;
           if (pMesh && pMesh.root) {
-            this.targetSelectionRing.position.set(pMesh.root.position.x, pMesh.root.position.y + 0.14, pMesh.root.position.z);
-            this.targetSelectionRing.scale.setScalar(1.0);
+            this.targetSelectionRing.position.set(pMesh.root.position.x, pMesh.root.position.y + 0.08, pMesh.root.position.z);
+            this.targetSelectionRing.scale.setScalar(0.54);
+            if (this.targetSelectionRing.material?.color) {
+              const selEmp = pMesh.playerData?.empire || 'solaria';
+              const isEnemyEmp = Boolean(this.localPlayerEmpire && selEmp && selEmp !== this.localPlayerEmpire);
+              this.targetSelectionRing.material.color.setHex(isEnemyEmp ? 0xf59e0b : 0x38bdf8);
+            }
             this.targetSelectionRing.visible = true;
           }
           if (this.callbacks.onSelectPlayer) {
@@ -32317,39 +32437,35 @@ export class OpenWorld3DEngine {
     }
 
     const distToOwner = Math.hypot(ownerX - st.wx, ownerZ - st.wz);
+    const restAng = ownerRot - Math.PI * 0.68;
+    const restDist = 1.72;
     if (!st.initialized || distToOwner > 28.0) {
-      const startAng = ownerRot - Math.PI * 0.65;
-      st.wx = ownerX + Math.sin(startAng) * 2.4;
-      st.wz = ownerZ + Math.cos(startAng) * 2.4;
+      st.wx = ownerX + Math.sin(restAng) * restDist;
+      st.wz = ownerZ + Math.cos(restAng) * restDist;
       st.wRot = ownerRot;
       st.tx = st.wx;
       st.tz = st.wz;
-      st.wanderTimer = 1.4;
+      st.isMoving = false;
       st.initialized = true;
     }
 
-    if (isOwnerMoving || distToOwner > 5.6) {
-      // Spieler bewegt sich oder ist weiter weg: Pet fliegt/läuft frei hinterher (leicht seitlich versetzt mit sanfter Kurve)
-      const flankWeave = Math.sin(elapsed * 1.35 + st.phase) * 0.48;
-      const followAng = ownerRot + Math.PI * 0.72 + flankWeave;
-      const followDist = 2.55;
+    if (isOwnerMoving) {
+      // Spieler läuft: Begleiter folgt flüssig leicht seitlich versetzt hinter dem Charakter
+      const flankWeave = Math.sin(elapsed * 1.15 + st.phase) * 0.16;
+      const followAng = ownerRot - Math.PI * 0.70 + flankWeave;
+      const followDist = 1.92;
       st.tx = ownerX + Math.sin(followAng) * followDist;
       st.tz = ownerZ + Math.cos(followAng) * followDist;
-      st.wanderTimer = 1.4 + Math.random() * 1.6;
+      st.repositioning = true;
     } else {
-      // Spieler steht oder kämpft: Pet fliegt/läuft frei in der Nähe (1.9m – 4.3m Radius) um den Charakter herum!
-      const curTargetOwnerDist = Math.hypot(st.tx - ownerX, st.tz - ownerZ);
-      const curDistToTarget = Math.hypot(st.tx - st.wx, st.tz - st.wz);
-      if (curDistToTarget < 0.28) {
-        st.wanderTimer -= dt;
-      }
-      if (st.wanderTimer <= 0 || curTargetOwnerDist > 5.0 || curTargetOwnerDist < 1.3) {
-        const stepDir = Math.random() < 0.5 ? 1 : -1;
-        st.wanderAngle += stepDir * (1.15 + Math.random() * 2.1);
-        const rad = 1.95 + Math.random() * 2.35;
-        st.tx = ownerX + Math.sin(st.wanderAngle) * rad;
-        st.tz = ownerZ + Math.cos(st.wanderAngle) * rad;
-        st.wanderTimer = 1.6 + Math.random() * 2.6;
+      // Spieler steht still: Kein nervöses Umherkreisen! Begleiter steht ruhig in 'wait'-Pose an der Flanke.
+      if (distToOwner > 2.45 || distToOwner < 1.02) {
+        st.tx = ownerX + Math.sin(restAng) * restDist;
+        st.tz = ownerZ + Math.cos(restAng) * restDist;
+        st.repositioning = true;
+      } else if (!st.repositioning) {
+        st.tx = st.wx;
+        st.tz = st.wz;
       }
     }
 
@@ -32357,12 +32473,12 @@ export class OpenWorld3DEngine {
     const dz = st.tz - st.wz;
     const distToTarget = Math.hypot(dx, dz);
 
-    if (distToTarget > 0.20) {
+    if (distToTarget > 0.16) {
       st.isMoving = true;
-      const catchingUp = isOwnerMoving || distToOwner > 4.6;
+      const catchingUp = isOwnerMoving || distToOwner > 3.2;
       const moveSpeed = catchingUp
-        ? Math.min(13.0, 7.8 + distToTarget * 0.9)
-        : 3.15;
+        ? Math.min(13.0, 7.6 + distToTarget * 0.95)
+        : 4.2;
       const step = Math.min(distToTarget, moveSpeed * dt);
       st.wx += (dx / distToTarget) * step;
       st.wz += (dz / distToTarget) * step;
@@ -32371,9 +32487,18 @@ export class OpenWorld3DEngine {
       let diffRot = desiredRot - st.wRot;
       while (diffRot > Math.PI) diffRot -= Math.PI * 2;
       while (diffRot < -Math.PI) diffRot += Math.PI * 2;
-      st.wRot += diffRot * Math.min(1.0, dt * 7.5);
+      st.wRot += diffRot * Math.min(1.0, dt * 8.0);
     } else {
       st.isMoving = false;
+      st.repositioning = false;
+      st.tx = st.wx;
+      st.tz = st.wz;
+      let idleRotDiff = ownerRot - st.wRot;
+      while (idleRotDiff > Math.PI) idleRotDiff -= Math.PI * 2;
+      while (idleRotDiff < -Math.PI) idleRotDiff += Math.PI * 2;
+      if (Math.abs(idleRotDiff) > 0.02) {
+        st.wRot += idleRotDiff * Math.min(1.0, dt * 3.8);
+      }
     }
 
     const groundY = this.getTerrainHeight(st.wx, st.wz, this.currentMapId);

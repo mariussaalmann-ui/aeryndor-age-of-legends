@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v620';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v624';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -4345,11 +4345,12 @@ class AeryndorMMOApp {
     try {
       this.ws = new WebSocket(wsUrl);
       this.ws.onopen = () => {
-        if (this._hadWsConnectionOnce && !this.customServerHost) {
+        if (this._hadWsConnectionOnce && !this.customServerHost && !this.inWorld && !this._isAccountLoggedIn) {
+          const curBuildTag = (import.meta.url.match(/[?&]v=([^&]+)/) || [])[1] || '';
           fetch(`./index.html?_cb=${Date.now()}`, { cache: 'no-store' })
             .then((r) => r.text())
             .then((html) => {
-              if (html && !html.includes('v=v20261031_v607')) {
+              if (html && curBuildTag && !html.includes(curBuildTag)) {
                 window.location.reload();
               }
             })
@@ -4585,10 +4586,11 @@ class AeryndorMMOApp {
       this.runeweaverStage?.triggerActionAnimation('switch');
     }
     const silentSuccessActions = ['allocate_stat', 'upgrade_skill', 'allocate_pet_stat', 'upgrade_pet_skill'];
-    if (res.message && !(res.ok && silentSuccessActions.includes(action))) {
-      this.showToast(res.message);
+    const msgText = res.message || (!res.ok ? res.error : '');
+    if (msgText && !(res.ok && silentSuccessActions.includes(action))) {
+      this.showToast(msgText, res.ok === false ? 'warn' : undefined);
     } else if (!res.ok && res.reason && !['cooldown', 'no_target', 'dead', 'no_player', 'out_of_range'].includes(res.reason)) {
-      this.showToast(`⚠️ ${res.reason}`);
+      this.showToast(`⚠️ ${res.reason}`, 'warn');
     }
     this.refreshOpenWindows();
   }
@@ -4689,8 +4691,30 @@ class AeryndorMMOApp {
     }
     if (snap?.serverBootId) {
       if (this._lastServerBootId && this._lastServerBootId !== snap.serverBootId) {
-        window.location.reload();
-        return;
+        this._lastServerBootId = snap.serverBootId;
+        if (this.inWorld && this.ws && this.ws.readyState === WebSocket.OPEN) {
+          const rejoinPayload = {
+            action: 'join',
+            playerId: this.playerId,
+            accountName: this.currentAccount || '',
+            sessionToken: this.getSessionToken(),
+            inWorld: true,
+            name: this.playerName,
+            classId: this.playerClassId || 'warrior',
+            empire: this.playerEmpire || this.getActiveCharacter()?.empire || 'seiryu',
+          };
+          if (this.engine?.hasInitialServerPos) {
+            rejoinPayload.x = this.engine.localPlayerPos.x;
+            rejoinPayload.z = this.engine.localPlayerPos.z;
+            rejoinPayload.rotY = this.engine.localPlayerRotY;
+          }
+          this.ws.send(JSON.stringify(rejoinPayload));
+          return;
+        }
+        if (!this.inWorld && !this._isAccountLoggedIn) {
+          window.location.reload();
+          return;
+        }
       }
       this._lastServerBootId = snap.serverBootId;
     }
@@ -4813,7 +4837,11 @@ class AeryndorMMOApp {
         snap.player.doctrine = docObjForEngine?.id || snap.player.doctrine || '';
         snap.player.gender = activeChar?.gender || snap.player.gender || 'm';
       }
-      this.engine.syncSnapshot(snap);
+      try {
+        this.engine.syncSnapshot(snap);
+      } catch (err) {
+        console.error('[Engine syncSnapshot]', err);
+      }
     }
 
     const nowPerf = performance.now();
@@ -5318,7 +5346,9 @@ class AeryndorMMOApp {
       if (s.active_pet) {
         const pd = s.petData || {};
         const pLvl = Math.max(1, Math.min(120, Number(pd.level || 1)));
-        activePetSkinKey = this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet';
+        activePetSkinKey = (s.computed?.hasCostumePetSkin && s.computed?.petSkin)
+          ? s.computed.petSkin
+          : (this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet');
         const petSkinMeta = this.engine?.getPetSkinConfig?.(activePetSkinKey) || { label: 'Grüner Smaragddrache', emoji: '🐉' };
         const petName = (pd.customName && pd.customName !== 'Grüner Smaragddrache') ? pd.customName : (petSkinMeta.label || 'Grüner Smaragddrache');
         const petEmoji = petSkinMeta.emoji || '🐾';
@@ -8033,7 +8063,8 @@ class AeryndorMMOApp {
   getHotbarConfig() {
     const s = this.selfState;
     const clsId = s?.class_id || 'warrior';
-    const storageKey = `aeryndor_hotbar_v420_${clsId}`;
+    const storageKey = `aeryndor_hotbar_v622_${clsId}`;
+    const legacyKey = `aeryndor_hotbar_v420_${clsId}`;
     if (!this._hotbarByClass) this._hotbarByClass = {};
     if (!this._hotbarByClass[clsId]) {
       try {
@@ -8042,6 +8073,31 @@ class AeryndorMMOApp {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length === 9) {
             this._hotbarByClass[clsId] = parsed;
+          }
+        } else {
+          const legacyRaw = localStorage.getItem(legacyKey);
+          if (legacyRaw) {
+            const parsedLegacy = JSON.parse(legacyRaw);
+            if (Array.isArray(parsedLegacy) && parsedLegacy.length === 9) {
+              // Auto-Repair: Falls Slots 1–6 zuvor durch Rechtsklick versehentlich geleert wurden, fehlende Standard-Skills wiederherstellen
+              const presentSkillIdxs = new Set(
+                parsedLegacy
+                  .filter((e) => e && e.type === 'skill' && Number.isFinite(Number(e.skillIndex)))
+                  .map((e) => Number(e.skillIndex))
+              );
+              for (let skIdx = 0; skIdx < 6; skIdx++) {
+                if (!presentSkillIdxs.has(skIdx)) {
+                  const freeIdx = !parsedLegacy[skIdx] ? skIdx : parsedLegacy.findIndex((e) => !e);
+                  if (freeIdx >= 0) {
+                    parsedLegacy[freeIdx] = { type: 'skill', skillIndex: skIdx };
+                  }
+                }
+              }
+              this._hotbarByClass[clsId] = parsedLegacy;
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(parsedLegacy));
+              } catch (_e2) {}
+            }
           }
         }
       } catch (_e) {}
@@ -8067,7 +8123,7 @@ class AeryndorMMOApp {
     const clsId = s?.class_id || 'warrior';
     if (!this._hotbarByClass?.[clsId]) return;
     try {
-      localStorage.setItem(`aeryndor_hotbar_v420_${clsId}`, JSON.stringify(this._hotbarByClass[clsId]));
+      localStorage.setItem(`aeryndor_hotbar_v622_${clsId}`, JSON.stringify(this._hotbarByClass[clsId]));
     } catch (_e) {}
   }
 
@@ -8182,13 +8238,13 @@ class AeryndorMMOApp {
                 const skLv = Number(s.skills?.[sk.id] || 0);
                 const customIco = this.resolveActiveSkillIcon(rawCustomIco, sk.id, skLv);
                 iconHtml = `<img src="${customIco}" class="iw-slot-icon" draggable="false" alt="${this.escapeHtml(sk.name)}" />`;
-                titleTxt = `${sk.name} [${slotNum}] – ${sk.description || ''} (Rausziehen oder Rechtsklick zum Leeren)`;
+                titleTxt = `${sk.name} [${slotNum}] – ${sk.description || ''} (Links-/Rechtsklick: Aktivieren • Rausziehen oder Shift+Rechtsklick: Leeren)`;
               }
             } else if (entry?.type === 'horse_skill') {
               const hs = horseSkillsList.find((x) => x.id === entry.horseSkillId || Number(x.slot) === Number(entry.slot)) || horseSkillsList[0];
               if (hs) {
                 iconHtml = `<img src="${hs.icon}" class="iw-slot-icon" draggable="false" alt="${this.escapeHtml(hs.shortName || hs.name)}" />`;
-                titleTxt = `🐎 ${hs.name || hs.shortName} [${slotNum}] – ${hs.description || ''} (Rausziehen oder Rechtsklick zum Leeren)`;
+                titleTxt = `🐎 ${hs.name || hs.shortName} [${slotNum}] – ${hs.description || ''} (Links-/Rechtsklick: Aktivieren • Rausziehen oder Shift+Rechtsklick: Leeren)`;
                 countBadge =
                   horseLvNow < 50
                     ? `<span class="iw-slot-count" style="color:#f87171;">🔒50</span>`
@@ -8235,18 +8291,23 @@ class AeryndorMMOApp {
             this.triggerHotbarSlot(slotNum);
           });
 
-          // Rechtsklick leert den Slot sofort
+          // Metin2-Steuerung: Rechtsklick aktiviert ebenfalls die Fertigkeit / das Item!
+          // (Shift+Rechtsklick, Alt+Rechtsklick oder Herausziehen leert den Slot)
           btn.addEventListener('contextmenu', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
             this.hideItemTooltip();
-            if (hbCfg[toIdx]) {
-              hbCfg[toIdx] = null;
-              this.saveHotbarConfig();
-              wrap.dataset.sig = '';
-              this.updateBottomHotbarHUD();
-              this.showToast(`🗑️ Aktionsleisten-Slot ${slotNum} geleert`);
+            if (ev.shiftKey || ev.altKey) {
+              if (hbCfg[toIdx]) {
+                hbCfg[toIdx] = null;
+                this.saveHotbarConfig();
+                wrap.dataset.sig = '';
+                this.updateBottomHotbarHUD();
+                this.showToast(`🗑️ Aktionsleisten-Slot ${slotNum} geleert`);
+              }
+              return;
             }
+            this.triggerHotbarSlot(slotNum);
           });
 
           // Hover-Tooltip für belegte Hotbar-Slots
@@ -8264,7 +8325,7 @@ class AeryndorMMOApp {
                 sub: `Aktive Fertigkeit (Stufe ${rawLv}) • Abklingzeit: ${sk.cooldown || 8}s`,
                 bonuses: [
                   `⚔️ Typ: ${sk.type === 'buff' ? 'Kampf-Aura / Selbst-Buff' : 'Flächen- & Nahkampfangriff'}`,
-                  '💡 Aus der Leiste ziehen oder Rechtsklick zum Entfernen',
+                  '💡 Links-/Rechtsklick: Aktivieren • Rausziehen oder Shift+Rechtsklick: Entfernen',
                 ],
                 desc: sk.description || 'Entfesselt eine mächtige Klassenfertigkeit im Kampf.',
                 color: '#fde047',
@@ -14584,7 +14645,7 @@ class AeryndorMMOApp {
     });
 
     body.querySelectorAll('[data-drag-skill-idx]').forEach((row) => {
-      row.style.cursor = 'grab';
+      row.style.cursor = 'pointer';
       row.querySelectorAll('img').forEach((im) => {
         im.setAttribute('draggable', 'false');
       });
@@ -14610,11 +14671,31 @@ class AeryndorMMOApp {
               { label: 'Aufstieg', value: 'Stufe 1–19 → M1–M10 → G1–G10 → P1–P10 → L1', color: '#fde047' },
             ],
             desc: dSk?.desc || srvSk?.description || 'Mächtige Klassenfertigkeit von Aeryndor.',
-            hint: 'In einen Slot [1–9] der unteren Aktionsleiste ziehen',
+            hint: 'Rechtsklick / Icon-Klick: Direkt einsetzen • In Slot [1–9] ziehen',
           });
         });
         row.addEventListener('mouseleave', () => this.hideItemTooltip());
       }
+      // Metin2-Direktaktivierung im Fertigkeiten-Fenster [K / F]: Rechtsklick, Doppelklick oder Klick auf das Skill-Icon
+      row.addEventListener('contextmenu', (ev) => {
+        if (ev.target?.closest?.('button')) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.hideItemTooltip();
+        this.tryUseSkill(skIdxNum + 1);
+      });
+      row.addEventListener('dblclick', (ev) => {
+        if (ev.target?.closest?.('button')) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.hideItemTooltip();
+        this.tryUseSkill(skIdxNum + 1);
+      });
+      row.querySelector('.cw-skill-ico')?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this.hideItemTooltip();
+        this.tryUseSkill(skIdxNum + 1);
+      });
       row.addEventListener('dragstart', (ev) => {
         this.hideItemTooltip();
         const skIdx = row.getAttribute('data-drag-skill-idx');
@@ -15183,7 +15264,9 @@ class AeryndorMMOApp {
     };
 
     const isSummoned = Boolean(s.active_pet);
-    const activePetSkinKey = this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet';
+    const activePetSkinKey = (s.computed?.hasCostumePetSkin && s.computed?.petSkin)
+      ? s.computed.petSkin
+      : (this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet');
     const petSkinMeta = this.engine?.getPetSkinConfig?.(activePetSkinKey) || { label: 'Grüner Smaragddrache', emoji: '🐉' };
     const petName = (pd.customName && pd.customName !== 'Grüner Smaragddrache') ? pd.customName : (petSkinMeta.label || 'Grüner Smaragddrache');
     const petEmoji = petSkinMeta.emoji || '🐉';

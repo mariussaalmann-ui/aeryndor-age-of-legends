@@ -1467,6 +1467,7 @@ class WorldAuthority:
         "plechi_fantasy_flypet2": "Äther-Schwinge",
         "plechi_emd_pet": "Runen-Wächter",
         "plechi_elephant_pet2": "Kaiser-Elefant",
+        "astral_phoenix": "Astralphönix",
     }
 
     def _ensure_player_pet_data(self, p: dict) -> dict:
@@ -1880,7 +1881,11 @@ class WorldAuthority:
         has_shoes = bool(eq_map.get("shoes"))
         has_gloves = bool(eq_map.get("gloves"))
         weapon_plus = 0
+        armor_plus = 0
         weapon_visual = None
+        costume_weapon_visual = None
+        costume_pet_skin = None
+        costume_mount_skin = None
         weapon_sub_type = "one_hand"
         weapon_atk_speed_pct = 0.0
         for slot_key, item in list(eq_map.items()):
@@ -1972,14 +1977,29 @@ class WorldAuthority:
                 spd_add = float(eff.get("speedPct", 0)) + float(eff.get("moveSpeedPct", 0))
                 speed *= 1.0 + (spd_add * 0.5) / 100.0
             if slot_key == "weapon":
-                weapon_plus = item.get("plusLevel", 0)
-                weapon_sub_type = str(item.get("weaponSubType") or ITEM_TEMPLATES.get(item.get("templateId", ""), {}).get("weaponSubType") or "one_hand")
+                weapon_plus = int(item.get("plusLevel", 0) or 0)
+                tpl_w = ITEM_TEMPLATES.get(tpl_id_eq, {})
+                weapon_sub_type = str(item.get("weaponSubType") or tpl_w.get("weaponSubType") or "one_hand")
                 if weapon_sub_type == "bell":
                     weapon_sub_type = "staff"
-                weapon_visual = item.get("weaponVisual") or cdef["visual"]["defaultWeapon"] or "sword"
+                weapon_visual = item.get("weaponVisual") or tpl_w.get("weaponVisual") or cdef["visual"]["defaultWeapon"] or "sword"
                 if weapon_visual == "bell":
                     weapon_visual = "staff"
                 pierce_chance += weapon_plus * 0.45
+            elif slot_key == "armor":
+                armor_plus = int(item.get("plusLevel", 0) or 0)
+            elif slot_key == "costume_weapon":
+                tpl_cw = ITEM_TEMPLATES.get(tpl_id_eq, {})
+                costume_weapon_visual = item.get("weaponVisual") or tpl_cw.get("weaponVisual") or "sternenreisser"
+            elif slot_key == "costume_pet_skin":
+                tpl_cp = ITEM_TEMPLATES.get(tpl_id_eq, {})
+                costume_pet_skin = item.get("petSkin") or tpl_cp.get("petSkin") or "astral_phoenix"
+            elif slot_key == "costume_mount_skin":
+                tpl_cm = ITEM_TEMPLATES.get(tpl_id_eq, {})
+                costume_mount_skin = item.get("mountSkin") or tpl_cm.get("mountSkin") or "horse_lvl50"
+
+        if costume_weapon_visual and has_weapon:
+            weapon_visual = costume_weapon_visual
 
         # Mount & Pferde-System (Lv. 1 Pferd | Lv. 35 Kampfpferd | Lv. 50 Militärgaul + Sattel-Statuspunkte & Mount-Skins!)
         mount_data = self._ensure_player_mount_data(p)
@@ -2345,16 +2365,19 @@ class WorldAuthority:
             "horseLevel": horse_level,
             "horseSkills": HORSE_SKILLS,
             "horseSkillsUnlocked": horse_level >= 50,
-            "mountVisualSkin": mount_data.get("visualSkin", "horse_lvl1"),
+            "mountVisualSkin": costume_mount_skin or mount_data.get("visualSkin", "horse_lvl1"),
+            "hasCostumeMountSkin": bool(costume_mount_skin),
             "mountData": mount_data,
             "petActive": bool(pet_id and pet_id in PETS),
-            "petSkin": pet_data.get("skinKey", "ridack_dragonpet"),
+            "petSkin": costume_pet_skin or pet_data.get("skinKey", "ridack_dragonpet"),
+            "hasCostumePetSkin": bool(costume_pet_skin),
             "petLevel": int(pet_data.get("level", 1)),
             "petName": pet_data.get("customName", "Grüner Smaragddrache"),
             "petBonusAtk": pet_bonus_atk,
             "petBonusMagicAtk": pet_bonus_magic_atk,
             "petDmgPct": pet_dmg_pct,
             "weaponPlus": weapon_plus,
+            "armorPlus": armor_plus,
             "weaponVisual": weapon_visual,
             "weaponSubType": weapon_sub_type if has_weapon else None,
             "isDoubleStrike": is_double_strike,
@@ -14146,7 +14169,10 @@ class WorldAuthority:
                 continue
             seen_other_names.add(op_name_key)
             op_cdef = CHARACTER_CLASSES.get(op["class_id"], CHARACTER_CLASSES["warrior"])
-            op_rep_rank = op.get("computed", {}).get("reputationRank", {}) or {}
+            op_comp = op.get("computed")
+            if not isinstance(op_comp, dict) or "armorPlus" not in op_comp:
+                op_comp = self.compute_player_combat_stats(op)
+            op_rep_rank = op_comp.get("reputationRank", {}) or {}
             op_vx = float(op.get("vx", 0.0) or 0.0)
             op_vz = float(op.get("vz", 0.0) or 0.0)
             op_is_moving = (
@@ -14172,6 +14198,19 @@ class WorldAuthority:
             team_rank = self._get_player_team_rank(op, pid)
             is_sa = (team_rank == "SA") or self._is_sa_player(op, pid)
             is_gm = bool(team_rank)
+            raw_op_guild = op.get("guild")
+            if isinstance(raw_op_guild, dict):
+                op_guild_str = str(raw_op_guild.get("name") or "")
+            else:
+                op_guild_str = str(raw_op_guild or op.get("guildName") or "")
+            if not op_guild_str and team_rank:
+                op_guild_str = "Serverleitung"
+            op_rep_color = op_rep_rank.get("color", "#93c5fd")
+            op_pet_skin = (
+                op_comp.get("petSkin")
+                if op_comp.get("hasCostumePetSkin")
+                else ((op.get("petData") or {}).get("skinKey") or op_comp.get("petSkin") or "ridack_dragonpet")
+            )
             op_entry = {
                 "id": pid,
                 "name": op["name"],
@@ -14181,10 +14220,12 @@ class WorldAuthority:
                 "role": team_rank if team_rank else op.get("role", "player"),
                 "classId": op["class_id"],
                 "className": op_cdef["name"],
+                "doctrine": op.get("doctrine", ""),
                 "gender": op.get("gender", "male"),
                 "empire": op.get("empire", "solaria"),
                 "partyId": op.get("partyId"),
-                "guildName": (op.get("guild") or {}).get("name") if isinstance(op.get("guild"), dict) else (op.get("guildName") or ""),
+                "guild": op_guild_str,
+                "guildName": op_guild_str,
                 "level": op["level"],
                 "hp": int(op["hp"]),
                 "maxHp": int(op["max_hp"]),
@@ -14193,30 +14234,33 @@ class WorldAuthority:
                 "rotY": round(op.get("rot_y", 0.0), 3),
                 "vx": round(float(op.get("vx", 0.0)), 3) if op_is_moving else 0.0,
                 "vz": round(float(op.get("vz", 0.0)), 3) if op_is_moving else 0.0,
-                "speed": round(float(op.get("moveSpeed", op.get("computed", {}).get("speed", 8.5))), 2),
+                "speed": round(float(op.get("moveSpeed", op_comp.get("speed", 8.5))), 2),
                 "destX": round(float(op.get("dest_x", op["pos_x"])), 2),
                 "destZ": round(float(op.get("dest_z", op["pos_z"])), 2),
                 "activeMount": op.get("active_mount"),
-                "mountSkin": op.get("computed", {}).get("mountVisualSkin", "horse_lvl1"),
+                "mountSkin": op_comp.get("mountVisualSkin", "horse_lvl1"),
                 "activePet": op.get("active_pet"),
-                "petSkin": (op.get("petData") or {}).get("skinKey") or op.get("computed", {}).get("petSkin", "ridack_dragonpet"),
-                "petLevel": int((op.get("petData") or {}).get("level") or op.get("computed", {}).get("petLevel", 1)),
-                "petName": (op.get("petData") or {}).get("customName") or op.get("computed", {}).get("petName", "Grüner Smaragddrache"),
+                "petSkin": op_pet_skin,
+                "petLevel": int((op.get("petData") or {}).get("level") or op_comp.get("petLevel", 1)),
+                "petName": (op.get("petData") or {}).get("customName") or op_comp.get("petName", "Grüner Smaragddrache"),
                 "isMoving": op_is_moving,
                 "isAttacking": op_is_attacking,
                 "comboStep": int(op.get("comboStep", 0)),
                 "isDead": bool(op.get("isDead", False)),
                 "isBlocking": bool(op.get("isBlocking", False)),
                 "isDodging": now < op.get("dodgeUntil", 0.0),
-                "weaponPlus": op.get("computed", {}).get("weaponPlus", 0),
-                "weaponVisual": op.get("computed", {}).get("weaponVisual", None),
-                "hasWeapon": op.get("computed", {}).get("hasWeapon", False),
-                "hasArmor": op.get("computed", {}).get("hasArmor", False),
-                "hasShield": op.get("computed", {}).get("hasShield", False),
-                "hasHelmet": op.get("computed", {}).get("hasHelmet", False),
+                "weaponPlus": op_comp.get("weaponPlus", 0),
+                "armorPlus": op_comp.get("armorPlus", 0),
+                "weaponVisual": op_comp.get("weaponVisual", None),
+                "hasWeapon": op_comp.get("hasWeapon", False),
+                "hasArmor": op_comp.get("hasArmor", False),
+                "hasShield": op_comp.get("hasShield", False),
+                "hasHelmet": op_comp.get("hasHelmet", False),
+                "activeBuffs": op_comp.get("activeBuffs", []),
                 "reputation": int(op.get("reputation", 1500)),
                 "reputationRank": op_rep_rank.get("name", "Freundlich"),
-                "reputationColor": op_rep_rank.get("color", "#93c5fd"),
+                "reputationColor": op_rep_color,
+                "reputationRankColor": op_rep_color,
             }
             if not fast_tick:
                 op_eq_list = []
