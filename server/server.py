@@ -732,39 +732,46 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         existing_is_legit_sa = existing_db_name_key in DB.LEGITIMATE_SA_NAMES and account_key in ("blackzimple", "cryptel")
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
-            # [SA]-Prefix nur normalisieren wenn der Name bereits [SA] hat und Account berechtigt ist
-            if req_name.upper().startswith("[SA]") and account_key in ("blackzimple", "cryptel"):
+            # Team-Prefix ([SA] / [GM]) nur normalisieren wenn der Name autorisiert ist
+            if (req_name.upper().startswith("[SA]") or req_name.lower() in DB.LEGITIMATE_SA_NAMES) and account_key in ("blackzimple", "cryptel"):
                 req_name = DB._normalize_sa_char_name(req_name)
             elif existing_is_legit_sa:
                 req_name = DB._normalize_sa_char_name(p.get("name") or req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
-        # SA-Status beim Betreten der Welt:
-        # NUR wenn der Charaktername explizit mit [SA] beginnt
-        # UND der Account autorisiert ist!
+        # SA/GM-Status beim Betreten der Welt:
+        # NUR wenn der Charaktername autorisiert ist UND der Account berechtigt ist!
         char_name = str(p.get("name") or "").strip()
-        is_name_sa = char_name.upper().startswith("[SA]")
+        is_name_sa = char_name.upper().startswith("[SA]") or char_name.lower() in DB.LEGITIMATE_SA_NAMES
         is_account_authorized = account_key in ("blackzimple", "cryptel")
         is_sa_join = is_name_sa and is_account_authorized
         if is_sa_join:
-            p["name"] = DB._normalize_sa_char_name(p.get("name") or "Admin")
+            norm_join_n = DB._normalize_sa_char_name(p.get("name") or "Admin")
+            join_t_role = DB._team_role_for_name(norm_join_n)
+            p["name"] = norm_join_n
             p["isSA"] = True
             p["isGM"] = True
-            p["role"] = "sa"
+            p["role"] = join_t_role.lower()
+            p["teamRank"] = join_t_role
             p["guildName"] = "Serverleitung"
             p.setdefault("quests", {})["__is_sa__"] = True
         else:
             # Normaler Charakter: Bereinige jegliche SA/GM-Flags
             p["isSA"] = False
             p["isGM"] = False
-            if p.get("role") in ("sa", "SA"):
+            if p.get("role") in ("sa", "SA", "gm", "GM"):
                 p["role"] = "player"
+            p.pop("teamRank", None)
             if p.get("guildName") == "Serverleitung":
                 p["guildName"] = ""
             if isinstance(p.get("quests"), dict) and "__is_sa__" in p["quests"]:
                 p["quests"].pop("__is_sa__", None)
         if payload.get("classId") in CHARACTER_CLASSES:
             p["class_id"] = payload["classId"]
+        if payload.get("gender") in ("male", "female"):
+            p["gender"] = payload["gender"]
+        if str(p.get("name") or "").strip().lower() == "[gm]critical":
+            p["gender"] = "female"
         if payload.get("empire"):
             p["empire"] = "kaeryu" if str(payload["empire"]).lower() == "kaeryu" else "seiryu"
         raw_join_doc = payload.get("doctrine") if payload.get("doctrine") not in (None, "") else payload.get("doctrineIdx")
@@ -1374,10 +1381,14 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
         existing_cc_legit_sa = existing_cc_name_key in DB.LEGITIMATE_SA_NAMES
         if payload.get("name"):
             req_name = str(payload["name"]).strip()[:28]
-            if existing_cc_legit_sa and not req_name.upper().startswith("[SA]"):
+            if existing_cc_legit_sa and req_name.lower() not in DB.LEGITIMATE_SA_NAMES:
                 req_name = DB._normalize_sa_char_name(p.get("name") or req_name)
             if req_name and not DB.is_character_name_taken(req_name, exclude_player_id=player_id):
                 p["name"] = req_name
+        if payload.get("gender") in ("male", "female"):
+            p["gender"] = payload["gender"]
+        if str(p.get("name") or "").strip().lower() == "[gm]critical":
+            p["gender"] = "female"
         if payload.get("empire"):
             p["empire"] = "kaeryu" if str(payload["empire"]).lower() == "kaeryu" else "seiryu"
         if payload.get("isNewSpawn"):

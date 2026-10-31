@@ -11161,8 +11161,8 @@ class WorldAuthority:
         name = str(p.get("name", "")).strip()
         pid = str(player_id or p.get("player_id") or p.get("id") or "").lower()
         
-        # Ein Charakter ist NUR ein SA-Spieler, wenn sein Name mit [SA] beginnt
-        is_name_sa = name.upper().startswith("[SA]")
+        # Ein Charakter hat SA-Berechtigung, wenn sein Name mit [SA] beginnt oder explizit in LEGITIMATE_SA_NAMES steht (z. B. [GM]Critical)
+        is_name_sa = name.upper().startswith("[SA]") or name.lower() in self.db.LEGITIMATE_SA_NAMES
         if not is_name_sa:
             return False
 
@@ -11841,8 +11841,8 @@ class WorldAuthority:
             "sender": sender_str,
             "channel": ch,
             "isBot": detected_bot,
-            "isSA": sender_str.upper().startswith("[SA]"),
-            "isGM": sender_str.upper().startswith("[SA]") or sender_str.startswith("[GM]") or sender_str.startswith("[GA]"),
+            "isSA": sender_str.upper().startswith("[SA]") or sender_str.strip().lower() in self.db.LEGITIMATE_SA_NAMES,
+            "isGM": sender_str.upper().startswith("[SA]") or sender_str.upper().startswith("[GM]") or sender_str.upper().startswith("[GA]"),
             "text": clean,
             "time": time.strftime("%H:%M"),
         }
@@ -14528,7 +14528,7 @@ class WorldAuthority:
             if self_team_rank:
                 p["teamRank"] = self_team_rank
                 p["isGM"] = True
-                if self_team_rank == "SA":
+                if self_team_rank == "SA" or self._is_sa_player(p, for_player_id):
                     p["isSA"] = True
 
         if fast_tick:

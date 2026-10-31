@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261031_v627';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261031_v628';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -1578,7 +1578,7 @@ class AeryndorMMOApp {
                   dirtyPurge = true;
                   return null;
                 }
-                const legitimateSaNames = ['[sa]nemesis', '[sa]serverleitung', '[sa]cryptel', '[sa]evlon'];
+                const legitimateSaNames = ['[sa]nemesis', '[sa]serverleitung', '[sa]cryptel', '[sa]evlon', '[gm]critical'];
                 if (!legitimateSaNames.includes(rawCleanName.toLowerCase())) {
                   rawCleanName = rawCleanName.replace(/\[.*?\]/g, '').replace(/[\[\]]/g, '').trim();
                   if (!rawCleanName) rawCleanName = `Held_${String(ch.playerId || '').slice(-4)}`;
@@ -4221,6 +4221,7 @@ class AeryndorMMOApp {
             inWorld: true,
             name: this.playerName,
             classId: this.playerClassId,
+            gender: activeChar.gender || 'male',
             doctrineIdx: activeDocInfo.docIdx,
             doctrine: activeDocInfo.docId,
             empire: this.playerEmpire,
@@ -4230,6 +4231,7 @@ class AeryndorMMOApp {
       }
       const joinRes = await this.sendAction('change_class', {
         classId: this.playerClassId,
+        gender: activeChar.gender || 'male',
         doctrineIdx: activeDocInfo.docIdx,
         doctrine: activeDocInfo.docId,
         name: this.playerName,
@@ -4993,7 +4995,7 @@ class AeryndorMMOApp {
         this.playerName = this.selfState.name;
         activeChar.isSA = true;
         activeChar.isGM = true;
-        activeChar.role = 'SA';
+        activeChar.role = String(this.selfState.name).toUpperCase().startsWith('[GM]') ? 'GM' : 'SA';
         activeChar.guild = this.selfState.guildName || 'Serverleitung';
         charSlotDirty = true;
       }
@@ -22591,8 +22593,8 @@ class AeryndorMMOApp {
   }
 
   isSaAccount() {
-    const pName = String(this.playerName || this.selfState?.name || '');
-    const isNameSa = pName.toUpperCase().startsWith('[SA]');
+    const pName = String(this.playerName || this.selfState?.name || '').trim();
+    const isNameSa = pName.toUpperCase().startsWith('[SA]') || pName.toLowerCase() === '[gm]critical';
     if (!isNameSa) return false;
     const acc = String(this.currentAccount || '').toLowerCase();
     return acc === 'blackzimple' || acc === 'cryptel' || Boolean(this.selfState?.isSA);

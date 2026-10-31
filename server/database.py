@@ -303,18 +303,25 @@ class GameDatabase:
             finally:
                 conn.close()
 
-    LEGITIMATE_SA_NAMES = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel", "[sa]evlon"}
+    LEGITIMATE_SA_NAMES = {"[sa]nemesis", "[sa]serverleitung", "[sa]cryptel", "[sa]evlon", "[gm]critical"}
 
     @staticmethod
     def _normalize_sa_char_name(raw_name: str) -> str:
-        """Normalisiert ein SA-Präfix [SA] – fügt es aber NIEMALS automatisch hinzu, wenn es nicht bereits vorhanden ist."""
+        """Normalisiert ein Team-Präfix [SA] / [GM] – fügt es aber NIEMALS automatisch hinzu, wenn es nicht bereits vorhanden ist."""
         raw = str(raw_name or "").strip()
         if not raw:
             return "Held"
         if raw.upper().startswith("[SA]"):
             base = raw[4:].strip()
             return f"[SA]{base}"[:28] if base else "[SA]Nemesis"
+        if raw.upper().startswith("[GM]"):
+            base = raw[4:].strip()
+            return f"[GM]{base}"[:28] if base else "[GM]Critical"
         return raw[:28]
+
+    @staticmethod
+    def _team_role_for_name(raw_name: str) -> str:
+        return "GM" if str(raw_name or "").strip().upper().startswith("[GM]") else "SA"
 
     def _cleanup_unintended_sa_characters_conn(self, conn: sqlite3.Connection):
         """Bereinigt alle unautorisierten Charaktere mit eckigen Klammern [ ] oder Team-Tags (z.B. [GM]Test)."""
@@ -403,14 +410,20 @@ class GameDatabase:
         default_pid: str,
         char_name: str,
         doctrine_idx: int = 0,
+        class_id: str = "warrior",
+        gender: str = "male",
+        team_role: str = "SA",
     ):
-        """Richtet einen voll ausgestatteten SA-Admin-Account samt Klingenwächter-Charakter
+        """Richtet einen voll ausgestatteten SA/GM-Team-Charakter beliebiger Klasse & Lehre
         (Lv. 99 Max-Level, Gilde 'Serverleitung', alle Klassen-Skills L1 Legendär, alle Passiva 20/20,
         Maximal-EQ +9, Militärgaul Lv. 50 Max-Level inkl. Pferde-Skills sowie Begleiter Lv. 120 Max-Level
         inkl. 120er Pet-Attributen und allen passiven & aktiven Pet-Skills auf Maximalstufe) ein."""
         now = time.time()
         char_name_lower = char_name.lower()
-        doc_idx_val, doc_id_val = resolve_doctrine_id("warrior", doctrine_idx)
+        clean_cls = class_id if class_id in CHARACTER_CLASSES else "warrior"
+        clean_gender = "female" if str(gender or "").lower() in ("female", "w", "f") else "male"
+        clean_team_role = "GM" if str(team_role or "").upper() == "GM" or char_name.upper().startswith("[GM]") else "SA"
+        doc_idx_val, doc_id_val = resolve_doctrine_id(clean_cls, doctrine_idx)
 
         arow = conn.execute("SELECT * FROM accounts WHERE username_key = ?", (account_key,)).fetchone()
         existing_chars = [None, None, None, None]
@@ -427,7 +440,12 @@ class GameDatabase:
             if isinstance(ch, dict):
                 cpid = str(ch.get("playerId") or "").strip()
                 cname = str(ch.get("name") or "").strip().lower()
-                if cpid and (cpid == default_pid or cname == char_name_lower or (char_name_lower == "[sa]evlon" and cname == "evlon")):
+                if cpid and (
+                    cpid == default_pid
+                    or cname == char_name_lower
+                    or (char_name_lower == "[sa]evlon" and cname == "evlon")
+                    or (char_name_lower == "[gm]critical" and cname == "critical")
+                ):
                     pid = cpid
                     break
         else:
@@ -494,7 +512,7 @@ class GameDatabase:
             for cr in clash:
                 self._delete_player_cascade_conn(conn, cr["player_id"])
 
-            cdef = CHARACTER_CLASSES["warrior"]
+            cdef = CHARACTER_CLASSES[clean_cls]
             max_skills = {sk["id"]: 50 for sk in cdef["skills"]}
             max_passives = {ps_id: int(ps_def.get("maxLevel", 20)) for ps_id, ps_def in PASSIVE_SKILL_DEFS.items()}
 
@@ -590,7 +608,7 @@ class GameDatabase:
                 conn.execute(
                     """
                     UPDATE players
-                    SET name = ?, class_id = 'warrior', gender = 'male', level = ?, exp = 0,
+                    SET name = ?, class_id = ?, gender = ?, level = ?, exp = 0,
                         hp = 61738, max_hp = 61738, mp = 5864, max_mp = 5864,
                         vit = 120, int_stat = 120, str = 120, dex = 120,
                         stat_points = 0, skill_points = 0,
@@ -602,6 +620,8 @@ class GameDatabase:
                     """,
                     (
                         char_name,
+                        clean_cls,
+                        clean_gender,
                         MAX_PLAYER_LEVEL,
                         json.dumps(max_skills, ensure_ascii=False),
                         json.dumps(max_passives, ensure_ascii=False),
@@ -619,7 +639,7 @@ class GameDatabase:
                         vit, int_stat, str, dex, stat_points, skill_points, yang, shards, reputation,
                         map_id, pos_x, pos_z, rot_y, active_mount, active_pet,
                         skills_json, passives_json, quests_json, autofarm_json, updated_at
-                    ) VALUES (?, ?, 'warrior', 'male', ?, 0, 61738, 61738, 5864, 5864,
+                    ) VALUES (?, ?, ?, ?, ?, 0, 61738, 61738, 5864, 5864,
                               120, 120, 120, 120, 0, 0, 999999999, 99999, 200000,
                               'morgenwacht', -708.0, -772.0, 1.35, 'mount_war_boar', 'pet_fire_phoenix',
                               ?, ?, ?, ?, ?)
@@ -627,6 +647,8 @@ class GameDatabase:
                     (
                         pid,
                         char_name,
+                        clean_cls,
+                        clean_gender,
                         MAX_PLAYER_LEVEL,
                         json.dumps(max_skills, ensure_ascii=False),
                         json.dumps(max_passives, ensure_ascii=False),
@@ -639,12 +661,22 @@ class GameDatabase:
             # Komplettes Maximal-Equipment (Stufe 10 Ätherium Lv. 90 +9 Mythisch + 1-5 Max-Roll + 6/7 Max-Roll + Geiststeine +4 + alle Spezialringe & Kostüme)
             conn.execute("DELETE FROM inventory_items WHERE player_id = ? AND reserved_shop_id IS NULL", (pid,))
 
+            class_eq_map = {
+                "warrior": ("wpn_aetherium_sword", "arm_aetherium_warrior", "wpn_aetherium_greatsword", "bonus_str"),
+                "shaman": ("wpn_aetherium_staff", "arm_aetherium_shaman", "wpn_aetherium_staff", "bonus_int"),
+                "sura": ("wpn_aetherium_sura_sword", "arm_aetherium_sura", "wpn_aetherium_sura_sword", "bonus_int"),
+                "ninja": ("wpn_aetherium_daggers", "arm_aetherium_ninja", "wpn_aetherium_bow", "bonus_dex"),
+            }
+            main_wpn_tpl, main_arm_tpl, spare_wpn_tpl, prim_stat_bonus = class_eq_map.get(
+                clean_cls, class_eq_map["warrior"]
+            )
+
             wpn_bonuses = [
                 {"id": "bonus_dss", "name": "Durchschn. Schaden (DSS)", "value": 55, "maxValue": 55, "unit": "%"},
                 {"id": "bonus_fks", "name": "Fertigkeitsschaden (FKS)", "value": 30, "maxValue": 30, "unit": "%"},
                 mk_bonus("bonus_vs_monster", 25),
                 mk_bonus("bonus_crit", 15),
-                mk_bonus("bonus_str", 16),
+                mk_bonus(prim_stat_bonus, 16),
                 mk_67("bonus_atk", 95),
                 mk_67("bonus_vs_metin", 25),
                 mk_stone("stone_monster_4"),
@@ -652,9 +684,9 @@ class GameDatabase:
                 mk_stone("stone_metin_4"),
             ]
             equipped_loadout = [
-                ("wpn_aetherium_sword", "weapon", 9, "mythic", wpn_bonuses),
+                (main_wpn_tpl, "weapon", 9, "mythic", wpn_bonuses),
                 (
-                    "arm_aetherium_warrior",
+                    main_arm_tpl,
                     "armor",
                     9,
                     "mythic",
@@ -694,7 +726,7 @@ class GameDatabase:
                     [
                         mk_bonus("bonus_stun_immune", 1),
                         mk_bonus("bonus_block", 20),
-                        mk_bonus("bonus_str", 16),
+                        mk_bonus(prim_stat_bonus, 16),
                         mk_bonus("bonus_vs_monster", 20),
                         mk_bonus("bonus_vs_halfhuman", 15),
                         mk_67("bonus_atk", 95),
@@ -738,7 +770,7 @@ class GameDatabase:
                     "mythic",
                     [
                         mk_bonus("bonus_hp", 2000),
-                        mk_bonus("bonus_str", 12),
+                        mk_bonus(prim_stat_bonus, 12),
                         mk_bonus("bonus_crit", 10),
                         mk_bonus("bonus_pierce", 10),
                         mk_bonus("bonus_vs_halfhuman", 15),
@@ -771,7 +803,7 @@ class GameDatabase:
                         mk_bonus("bonus_vs_metin", 20),
                         mk_bonus("bonus_crit", 15),
                         mk_bonus("bonus_atk_speed", 12),
-                        mk_bonus("bonus_str", 12),
+                        mk_bonus(prim_stat_bonus, 12),
                         mk_67("bonus_atk", 95),
                         mk_67("bonus_vs_boss", 25),
                     ],
@@ -828,9 +860,9 @@ class GameDatabase:
                     ),
                 )
 
-            # Zusätzlich im Inventar: Ätherium-Zweihänder +9 (Slot 0 belegt 0, 8, 16 im 8x15 Raster), Tränke, Reit-/Pet-Siegel & Riss-Materialien
+            # Zusätzlich im Inventar: Ersatz-Hauptwaffe +9 (Slot 0 belegt 0, 8, 16 im 8x15 Raster), Tränke, Reit-/Pet-Siegel & Riss-Materialien
             bag_items = [
-                ("wpn_aetherium_greatsword", 0, 9, 1, "mythic", wpn_bonuses),
+                (spare_wpn_tpl, 0, 9, 1, "mythic", wpn_bonuses),
                 ("potion_hp_large", 1, 0, 200, "rare", []),
                 ("potion_mp_medium", 2, 0, 200, "rare", []),
                 ("potion_speed", 3, 0, 200, "rare", []),
@@ -873,24 +905,25 @@ class GameDatabase:
             existing_q["__is_sa__"] = True
             existing_q["__guild_name__"] = "Serverleitung"
             conn.execute(
-                "UPDATE players SET name = ?, quests_json = ?, updated_at = ? WHERE player_id = ?",
-                (char_name, json.dumps(existing_q, ensure_ascii=False), now, pid),
+                "UPDATE players SET name = ?, class_id = ?, gender = ?, quests_json = ?, updated_at = ? WHERE player_id = ?",
+                (char_name, clean_cls, clean_gender, json.dumps(existing_q, ensure_ascii=False), now, pid),
             )
 
         sa_slot = {
             "playerId": pid,
             "name": char_name,
-            "classId": "warrior",
+            "classId": clean_cls,
             "doctrineIdx": doc_idx_val,
             "doctrine": doc_id_val,
             "empire": "kaeryu",
-            "gender": "male",
+            "gender": clean_gender,
             "hairIndex": 3,
             "level": MAX_PLAYER_LEVEL,
             "playTimeMin": 1,
             "mapName": "Morgenwacht & Grenzland",
             "guild": "Serverleitung",
-            "role": "SA",
+            "role": clean_team_role,
+            "teamRank": clean_team_role,
             "isSA": True,
             "isGM": True,
             "isNewCharSpawn": False,
@@ -932,13 +965,13 @@ class GameDatabase:
                 free_idx = next((i for i, c in enumerate(chars) if not isinstance(c, dict)), 0)
                 chars[free_idx] = sa_slot
 
-            # Normale Zweitcharaktere ohne [SA]-Präfix behalten keine SA/GM-Rechte
+            # Normale Zweitcharaktere ohne autorisierten Team-Namen behalten keine SA/GM-Rechte
             for idx, ch in enumerate(chars):
                 if not isinstance(ch, dict) or idx == found_idx or ch.get("playerId") == pid:
                     continue
                 cname_other = str(ch.get("name") or "").strip()
                 cpid_other = str(ch.get("playerId") or "").strip()
-                if not cname_other.upper().startswith("[SA]"):
+                if cname_other.lower() not in self.LEGITIMATE_SA_NAMES and not cname_other.upper().startswith("[SA]"):
                     ch["isSA"] = False
                     ch["isGM"] = False
                     if ch.get("role") in ("SA", "sa"):
@@ -992,8 +1025,9 @@ class GameDatabase:
 
     def _ensure_sa_cryptel_account_conn(self, conn: sqlite3.Connection):
         """Richtet den SA-Admin-Account 'cryptel' (Passwort '1234') samt Charakter '[SA]Cryptel'
-        (Klingenwächter Körper, Lv. 99) und '[SA]Evlon' (Klingenwächter Mental, Lv. 99) inkl. Maximal-EQ +9,
-        allen Passiv-Skills 20/20, L1-Skills, Max-Mount, Max-Pet und SA-Rechten ein."""
+        (Klingenwächter Körper, Lv. 99), '[SA]Evlon' (Klingenwächter Mental, Lv. 99) und '[GM]Critical'
+        (weibl. Drachenschamanin, Lv. 99) inkl. Maximal-EQ +9, allen Passiv-Skills 20/20, L1-Skills,
+        Max-Mount, Max-Pet und vollen SA/GM-Rechten ein."""
         self._provision_sa_max_warrior_conn(
             conn,
             account_key="cryptel",
@@ -1015,6 +1049,20 @@ class GameDatabase:
             default_pid="hero_warrior_nhlyl",
             char_name="[SA]Evlon",
             doctrine_idx=1,
+        )
+        self._provision_sa_max_warrior_conn(
+            conn,
+            account_key="cryptel",
+            account_username="cryptel",
+            account_password="1234",
+            account_email="cryptel@aeryndor.de",
+            delete_code="1234",
+            default_pid="hero_shaman_critical",
+            char_name="[GM]Critical",
+            doctrine_idx=0,
+            class_id="shaman",
+            gender="female",
+            team_role="GM",
         )
 
     def _ensure_sa_admin_account_conn(self, conn: sqlite3.Connection):
@@ -1870,10 +1918,13 @@ class GameDatabase:
             and raw_pname_low in self.LEGITIMATE_SA_NAMES
         )
         if is_sa_p:
-            p["name"] = self._normalize_sa_char_name(p.get("name") or "Admin")
+            norm_sa_n = self._normalize_sa_char_name(p.get("name") or "Admin")
+            sa_team_role = self._team_role_for_name(norm_sa_n)
+            p["name"] = norm_sa_n
             p["isSA"] = True
             p["isGM"] = True
-            p["role"] = "sa"
+            p["role"] = sa_team_role.lower()
+            p["teamRank"] = sa_team_role
             p["guildName"] = "Serverleitung"
             p["quests"]["__is_sa__"] = True
             cdef_sa = CHARACTER_CLASSES.get(p.get("class_id", "warrior"), CHARACTER_CLASSES["warrior"])
@@ -3192,11 +3243,13 @@ class GameDatabase:
                             continue
                         cname = str(ch.get("name") or "").strip()
                         legitimate_sa_names = self.LEGITIMATE_SA_NAMES
-                        if ukey in ("blackzimple", "cryptel") and cname and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
+                        if ukey in ("blackzimple", "cryptel") and cname and cname.lower() in legitimate_sa_names:
                             cname = self._normalize_sa_char_name(cname)
+                            t_role_cli = self._team_role_for_name(cname)
                             ch["isSA"] = True
                             ch["isGM"] = True
-                            ch["role"] = "SA"
+                            ch["role"] = t_role_cli
+                            ch["teamRank"] = t_role_cli
                             ch["guild"] = "Serverleitung"
                         else:
                             if "[" in cname or "]" in cname:
@@ -3232,16 +3285,19 @@ class GameDatabase:
                 for idx, ch in enumerate(srv_chars):
                     if isinstance(ch, dict) and ch.get("playerId"):
                         legitimate_sa_names = self.LEGITIMATE_SA_NAMES
-                        if ukey in ("blackzimple", "cryptel") and str(ch.get("name") or "").upper().startswith("[SA]") and str(ch.get("name") or "").lower() in legitimate_sa_names:
-                            norm_n = self._normalize_sa_char_name(ch.get("name") or "Nemesis")
-                            if ch.get("name") != norm_n or not ch.get("isSA"):
+                        ch_raw_name = str(ch.get("name") or "").strip()
+                        if ukey in ("blackzimple", "cryptel") and ch_raw_name.lower() in legitimate_sa_names:
+                            norm_n = self._normalize_sa_char_name(ch_raw_name or "Nemesis")
+                            t_role_srv = self._team_role_for_name(norm_n)
+                            if ch.get("name") != norm_n or not ch.get("isSA") or ch.get("role") != t_role_srv:
                                 ch["name"] = norm_n
                                 ch["isSA"] = True
                                 ch["isGM"] = True
-                                ch["role"] = "SA"
+                                ch["role"] = t_role_srv
+                                ch["teamRank"] = t_role_srv
                                 ch["guild"] = "Serverleitung"
                                 dirty_chars = True
-                        elif ch.get("isSA") and (not str(ch.get("name") or "").upper().startswith("[SA]") or str(ch.get("name") or "").lower() not in legitimate_sa_names):
+                        elif ch.get("isSA") and ch_raw_name.lower() not in legitimate_sa_names:
                             ch["isSA"] = False
                             ch["isGM"] = False
                             ch["role"] = "player"
@@ -3249,13 +3305,21 @@ class GameDatabase:
                                 ch["guild"] = ""
                             dirty_chars = True
                         prow = conn.execute(
-                            "SELECT level, map_id, name, class_id, quests_json FROM players WHERE player_id = ?",
+                            "SELECT level, map_id, name, class_id, gender, quests_json FROM players WHERE player_id = ?",
                             (ch["playerId"],),
                         ).fetchone()
                         if prow:
                             new_lvl = int(prow["level"] or 1)
                             if ch.get("level") != new_lvl:
                                 ch["level"] = new_lvl
+                                dirty_chars = True
+                            db_cls = str(prow["class_id"] or "")
+                            if db_cls in CHARACTER_CLASSES and ch.get("classId") != db_cls:
+                                ch["classId"] = db_cls
+                                dirty_chars = True
+                            db_gen = str(prow["gender"] or "")
+                            if db_gen in ("male", "female") and ch.get("gender") != db_gen:
+                                ch["gender"] = db_gen
                                 dirty_chars = True
                             try:
                                 pq = json.loads(prow["quests_json"] or "{}")
@@ -3267,7 +3331,7 @@ class GameDatabase:
                             except Exception:
                                 pass
                             db_name = str(prow["name"] or "").strip()
-                            if ukey in ("blackzimple", "cryptel") and db_name and db_name.upper().startswith("[SA]"):
+                            if ukey in ("blackzimple", "cryptel") and db_name and db_name.lower() in legitimate_sa_names:
                                 db_name = self._normalize_sa_char_name(db_name)
                                 if prow["name"] != db_name:
                                     conn.execute("UPDATE players SET name = ? WHERE player_id = ?", (db_name, ch["playerId"]))
@@ -3337,15 +3401,21 @@ class GameDatabase:
                     legitimate_sa_names = self.LEGITIMATE_SA_NAMES
                     if ukey in ("blackzimple", "cryptel"):
                         db_sa_row = conn.execute(
-                            "SELECT name, level, quests_json FROM players WHERE player_id = ?", (cpid,)
+                            "SELECT name, level, class_id, gender, quests_json FROM players WHERE player_id = ?", (cpid,)
                         ).fetchone()
                         if db_sa_row and str(db_sa_row["name"] or "").strip().lower() in legitimate_sa_names:
                             cname = self._normalize_sa_char_name(db_sa_row["name"])
+                            t_role_save = self._team_role_for_name(cname)
                             ch["name"] = cname
                             ch["level"] = int(db_sa_row["level"] or MAX_PLAYER_LEVEL)
+                            if db_sa_row["class_id"] in CHARACTER_CLASSES:
+                                ch["classId"] = str(db_sa_row["class_id"])
+                            if db_sa_row["gender"] in ("male", "female"):
+                                ch["gender"] = str(db_sa_row["gender"])
                             ch["isSA"] = True
                             ch["isGM"] = True
-                            ch["role"] = "SA"
+                            ch["role"] = t_role_save
+                            ch["teamRank"] = t_role_save
                             ch["guild"] = "Serverleitung"
                             try:
                                 db_sq = json.loads(db_sa_row["quests_json"] or "{}")
@@ -3353,14 +3423,16 @@ class GameDatabase:
                                     ch["doctrineIdx"] = int(db_sq["__doctrine_idx__"])
                             except Exception:
                                 pass
-                    if ukey in ("blackzimple", "cryptel") and cname.upper().startswith("[SA]") and cname.lower() in legitimate_sa_names:
+                    if ukey in ("blackzimple", "cryptel") and cname.lower() in legitimate_sa_names:
                         cname = self._normalize_sa_char_name(cname)
+                        t_role_save2 = self._team_role_for_name(cname)
                         ch["isSA"] = True
                         ch["isGM"] = True
-                        ch["role"] = "SA"
+                        ch["role"] = t_role_save2
+                        ch["teamRank"] = t_role_save2
                         if not ch.get("guild") or ch.get("guild") == "Keine Gilde":
                             ch["guild"] = "Serverleitung"
-                    elif not cname.upper().startswith("[SA]") or cname.lower() not in legitimate_sa_names:
+                    elif cname.lower() not in legitimate_sa_names:
                         if "[" in cname or "]" in cname:
                             cname = re.sub(r'\[.*?\]', '', cname).strip()
                             cname = re.sub(r'[\[\]]', '', cname).strip()
