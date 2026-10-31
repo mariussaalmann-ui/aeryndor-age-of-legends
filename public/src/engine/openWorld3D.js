@@ -15,7 +15,40 @@ import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261026_v52
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
 import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
-import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v611';
+import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v613';
+
+// Modulweite Caches für 3D-GLB-Templates & Modell-Texturen:
+// Teilen geparste Geometrien, Skelette, Animations-Clips und Texturen nahtlos zwischen Login-Preloader,
+// Charakterauswahl-/Erstellungs-Podest (CharacterShowcase3D) und der 3D-Open-World (OpenWorld3DEngine),
+// sodass Heldenmodelle beim Wechsel vom Login in die Charakterauswahl sofort (0 ms) ohne Dummy erscheinen.
+const GLOBAL_MODEL_TEXTURE_CACHE = new Map();
+const GLOBAL_GLB_TEMPLATE_CACHE = new Map();
+const GLOBAL_GLB_RESOLVED_CACHE = new Map();
+
+const HERO_GLB_BY_CLASS = {
+  warrior: {
+    glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw3',
+    tex: ['/assets/models/heroes/klingenwaechter_male.png?v=20261031_kw3'],
+    normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw3',
+    height: 1.88,
+  },
+  ninja: {
+    glb: '/assets/models/npcs/plechi_old_warrior1.glb',
+    tex: ['/assets/models/npcs/old_warrior1_tex.png'],
+    height: 1.78,
+  },
+  sura: {
+    glb: '/assets/models/npcs/pewi_guan.glb',
+    tex: ['/assets/models/npcs/pewi_guan.png'],
+    height: 1.86,
+    hasBuiltinWeapon: true,
+  },
+  shaman: {
+    glb: '/assets/models/npcs/plechi_noble_npc2.glb',
+    tex: ['/assets/models/npcs/noble_npc2_tex.png'],
+    height: 1.76,
+  },
+};
 
 // Wiederverwendbarer Farb-Ringpuffer für Per-Frame-Berechnungen (vermeidet GC-Spitzen durch
 // dutzende `new THREE.Color()` pro Frame). Nur für kurzlebige Zwischenwerte innerhalb eines Aufrufs!
@@ -2964,32 +2997,47 @@ export class OpenWorld3DEngine {
 
 
 
-  loadModelTexture(url) {
-    if (!this._modelTextureCache) this._modelTextureCache = new Map();
+  loadModelTexture(url, isDataTex = false) {
+    if (!this._modelTextureCache) this._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
     if (this._modelTextureCache.has(url)) {
-      return this._modelTextureCache.get(url);
+      const existing = this._modelTextureCache.get(url);
+      if (isDataTex && existing && existing.colorSpace !== THREE.NoColorSpace) {
+        existing.colorSpace = THREE.NoColorSpace;
+      }
+      return existing;
     }
     const loader = new THREE.TextureLoader();
     const tex = loader.load(url);
     tex.flipY = false; // GLTF 2.0 UV-Konvention
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.colorSpace = isDataTex ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+    tex.userData = { ...(tex.userData || {}), isCached: true, isShared: true };
     this._modelTextureCache.set(url, tex);
     return tex;
   }
 
   loadGLBTemplate(url) {
-    if (!this._glbTemplateCache) this._glbTemplateCache = new Map();
+    if (!this._glbTemplateCache) this._glbTemplateCache = GLOBAL_GLB_TEMPLATE_CACHE;
+    if (!this._glbResolvedTemplates) this._glbResolvedTemplates = GLOBAL_GLB_RESOLVED_CACHE;
     if (this._glbTemplateCache.has(url)) {
       return this._glbTemplateCache.get(url);
     }
 
-    const promise = fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-        return res.arrayBuffer();
-      })
+    const fetchArrayBuffer = (attempt = 0) =>
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+          return res.arrayBuffer();
+        })
+        .catch((err) => {
+          if (attempt < 1) {
+            return new Promise((resolve) => setTimeout(resolve, 350)).then(() => fetchArrayBuffer(attempt + 1));
+          }
+          throw err;
+        });
+
+    const promise = fetchArrayBuffer()
       .then((buffer) => {
         const dv = new DataView(buffer);
         const magic = dv.getUint32(0, true);
@@ -4050,6 +4098,9 @@ export class OpenWorld3DEngine {
           }
         }
 
+        for (const g of geometries) {
+          if (g) g.userData = { ...(g.userData || {}), isCached: true, isShared: true };
+        }
         const resolvedTpl = {
           nodes: gltf.nodes || [],
           rootBoneIndices,
@@ -4065,9 +4116,15 @@ export class OpenWorld3DEngine {
           isMultiShardMonolith,
           isYUp,
         };
-        if (!this._glbResolvedTemplates) this._glbResolvedTemplates = new Map();
+        if (!this._glbResolvedTemplates) this._glbResolvedTemplates = GLOBAL_GLB_RESOLVED_CACHE;
         this._glbResolvedTemplates.set(url, resolvedTpl);
         return resolvedTpl;
+      })
+      .catch((err) => {
+        if (this._glbTemplateCache?.get(url) === promise) {
+          this._glbTemplateCache.delete(url);
+        }
+        throw err;
       });
 
     this._glbTemplateCache.set(url, promise);
@@ -4326,6 +4383,7 @@ export class OpenWorld3DEngine {
             targetKey === 'attack7' ||
             targetKey === 'mount_attack' ||
             targetKey === 'mount_attack2' ||
+            targetKey === 'mount_attack3' ||
             targetKey === 'skill' ||
             targetKey.startsWith('skill_') ||
             targetKey === 'knockdown' ||
@@ -4378,7 +4436,8 @@ export class OpenWorld3DEngine {
       }
     };
 
-    const cachedResolved = this._glbResolvedTemplates?.get(glbUrl);
+    if (!this._glbResolvedTemplates) this._glbResolvedTemplates = GLOBAL_GLB_RESOLVED_CACHE;
+    const cachedResolved = this._glbResolvedTemplates.get(glbUrl);
     if (cachedResolved) {
       buildInstance(cachedResolved);
       return;
@@ -4389,6 +4448,9 @@ export class OpenWorld3DEngine {
       .catch((err) => {
         if (parentGroup?.userData?._glbLoadSeq === reqSeq) {
           parentGroup.userData._glbIsLoading = false;
+        }
+        if (fallbackGroup && opts.showFallbackOnError) {
+          fallbackGroup.visible = true;
         }
         console.warn(`GLB-Ladefehler für ${glbUrl}:`, err);
       });
@@ -21566,7 +21628,8 @@ export class OpenWorld3DEngine {
     let bz = baseZ;
     let attachedToLimb = false;
     const bLower = String(boneName || '').toLowerCase();
-    if (actor?.root && bLower) {
+    const isFootsteps = bLower.includes('footstep') || bLower === 'foot' || bLower.includes(' toe');
+    if (actor?.root && bLower && !isFootsteps) {
       if (!this._tmpMetinBoneVec) this._tmpMetinBoneVec = new THREE.Vector3();
       if (!this._tmpMetinBoneQuat) this._tmpMetinBoneQuat = new THREE.Quaternion();
       const glbAct = actor.heroGlbHolder?.userData?.glbActor;
@@ -21576,7 +21639,7 @@ export class OpenWorld3DEngine {
           actor.weaponGroup.getWorldPosition(this._tmpMetinBoneVec);
           actor.weaponGroup.getWorldQuaternion(this._tmpMetinBoneQuat);
           // Entlang der Schwertklinge (+Z) auf Klingenmitte verschieben (geom.mse / geom_sword_making / palbang_sword)
-          const bladeMid = new THREE.Vector3(0, 0, 0.44).applyQuaternion(this._tmpMetinBoneQuat);
+          const bladeMid = new THREE.Vector3(0, 0, 0.56).applyQuaternion(this._tmpMetinBoneQuat);
           bx = this._tmpMetinBoneVec.x + bladeMid.x;
           by = this._tmpMetinBoneVec.y + bladeMid.y;
           bz = this._tmpMetinBoneVec.z + bladeMid.z;
@@ -21610,6 +21673,9 @@ export class OpenWorld3DEngine {
           by = baseY + 1.75;
           attachedToLimb = true;
         }
+      } else if (bLower.includes('spine') || bLower.includes('pelvis') || bLower === 'bip01' || bLower === 'body') {
+        by = baseY + (actor?.mountGroup?.visible ? 1.46 : 0.96);
+        attachedToLimb = true;
       }
     }
     const lx = ((evPos && evPos[0]) || 0) * 0.01;
@@ -21640,6 +21706,8 @@ export class OpenWorld3DEngine {
     const tier = Number(opts.tier || 1);
     const scaleMult = opts.scaleMult || (isLSkill ? 1.24 : tier >= 4 ? 1.12 : tier >= 3 ? 1.05 : 1.0);
     const followBone = opts.followBone || '';
+    const evPos = opts.evPos || [0, 0, 0];
+    const eventIndex = Number(opts.eventIndex || 0);
     const attachedToLimb = Boolean(opts.attachedToLimb);
     const cosR = Math.cos(rotY || 0);
     const sinR = Math.sin(rotY || 0);
@@ -21692,7 +21760,7 @@ export class OpenWorld3DEngine {
             });
             this.scene.add(mdeGroup);
             const fDelay = mCfg.frameDelay || 0.025;
-            const totalDur = Math.max(0.45, Math.min(2.5, mdeData.frameCount * fDelay * (mCfg.loops || 1)));
+            const totalDur = Math.max(0.52, Math.min(2.6, mdeData.frameCount * fDelay * (mCfg.loops || 1)));
             this.vfxList.push({
               type: 'metin_mde',
               mesh: mdeGroup,
@@ -21703,6 +21771,10 @@ export class OpenWorld3DEngine {
               maxAge: totalDur,
               followActor: opts.follow ? actor : null,
               followBone,
+              evPos,
+              localMdeOffsetX: wx,
+              localMdeOffsetY: baseLift + oy,
+              localMdeOffsetZ: wz,
               offsetX: (opts.offsetX || 0) + wx,
               offsetY: (opts.offsetY || 0) + baseLift + oy,
               offsetZ: (opts.offsetZ || 0) + wz,
@@ -21712,7 +21784,7 @@ export class OpenWorld3DEngine {
       }
     }
 
-    // 2. Originalgetreue Metin2 EffectLib .mse-Partikelschichten (BILLBOARD_TYPE_LIE=3, Y=2, NONE=0, ALL=1)
+    // 2. Originalgetreue Metin2 EffectLib .mse-Partikelschichten (LIE=3, Y=2, 2_SIDE=4, 3_SIDE=5, NONE=0, ALL=1)
     if (Array.isArray(effectDef.particles) && effectDef.particles.length > 0) {
       const pGroup = new THREE.Group();
       const groupLift = attachedToLimb ? 0.0 : 0.03;
@@ -21722,12 +21794,15 @@ export class OpenWorld3DEngine {
       const verticalPlanes = [];
       const sprites = [];
       const fileLower = (effectDef.file || '').toLowerCase();
-      let maxLayerEnd = isLSkill ? 1.15 : 0.95;
+      let maxLayerEnd = isLSkill ? 1.18 : 0.98;
 
       if (!this._sharedUnitPlaneGeo) {
         this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
         this._sharedUnitPlaneGeo.userData = { isShared: true };
       }
+
+      const isPalbangSpin = fileLower.includes('palbang_spin') || (fileLower.includes('palbang') && !fileLower.includes('badak'));
+      const isSamyeonSlash = fileLower.includes('samyeon') && !fileLower.includes('badak');
 
       for (const pCfg of effectDef.particles) {
         if (!pCfg.tex) continue;
@@ -21737,10 +21812,18 @@ export class OpenWorld3DEngine {
         const [r1, g1, b1] = pCfg.c1 || pCfg.color || [r0, g0, b0];
         const cStart = new THREE.Color(r0, g0, b0);
         const cEnd = new THREE.Color(r1, g1, b1);
-        const peakAlpha = Math.max(0.22, Math.min(1.0, pCfg.a ?? 0.92));
-        const layerDelay = Math.max(0, Math.min(0.85, (pCfg.t || 0) * 0.85));
-        const layerLife = Math.max(0.32, Math.min(1.85, pCfg.life || 0.72));
-        maxLayerEnd = Math.max(maxLayerEnd, layerDelay + layerLife);
+        const peakAlpha = Math.max(0.24, Math.min(1.0, pCfg.a ?? 0.94));
+        const layerDelay = Math.max(0, Math.min(0.95, (pCfg.t || 0) * 0.85));
+        const minPersistence = isPalbangSpin ? 0.86 : isSamyeonSlash ? 0.54 : 0.44;
+        const layerLife = Math.max(minPersistence, Math.min(1.95, pCfg.life || 0.72));
+        const hasCycleCascade =
+          !attachedToLimb &&
+          !fileLower.includes('_loop') &&
+          (Boolean(pCfg.loop) || Number(pCfg.cycle || 0) > Number(pCfg.life || 0) * 1.35);
+        const effectiveCycle = hasCycleCascade
+          ? Math.min(1.35, Math.max(0.55, Number(pCfg.cycle || 0.82)))
+          : 0;
+        maxLayerEnd = Math.max(maxLayerEnd, layerDelay + layerLife + (effectiveCycle > 0 ? effectiveCycle * 0.48 : 0));
 
         const ox = (pCfg.pos?.[0] || 0) * 0.01;
         const oy = (pCfg.pos?.[2] || 0) * 0.01;
@@ -21755,53 +21838,85 @@ export class OpenWorld3DEngine {
           texLower.includes('circle');
 
         if (isHorizLieDisc) {
-          // BILLBOARD_TYPE_LIE (3): Horizontale Scheibe auf exakter .mse-Höhe oy (z.B. 0.04m Runensiegel oder 0.95m palbang_spin Schwertwirbel!)
-          const rawS0 = (pCfg.s0 || pCfg.size || 96) * 0.0115 * scaleMult;
-          const rawS1 = (pCfg.s1 || pCfg.size || 160) * 0.0115 * scaleMult;
-          const startDiam = Math.max(0.55, Math.min(5.8, Math.abs(rawS1 - rawS0) < 0.08 ? rawS0 * 0.72 : rawS0));
-          const endDiam = Math.max(0.75, Math.min(6.4, Math.abs(rawS1 - rawS0) < 0.08 ? rawS1 * 1.18 : rawS1));
-          const rMat = new THREE.MeshBasicMaterial({
-            map: tex,
-            color: cStart.clone(),
-            transparent: true,
-            opacity: layerDelay > 0.02 ? 0.0 : peakAlpha,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          });
-          const rMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, rMat);
-          rMesh.rotation.x = -Math.PI / 2;
-          rMesh.rotation.z = Math.random() * Math.PI * 2;
-          const discY = attachedToLimb ? oy : Math.max(0.02 + groundRings.length * 0.008, oy + groundRings.length * 0.006);
-          rMesh.position.set(ox, discY, oz);
-          rMesh.scale.setScalar(startDiam);
-          pGroup.add(rMesh);
+          // BILLBOARD_TYPE_LIE (3): Horizontale / 3D-geneigte Schwertwirbel- & Sichelscheiben
+          const samyeonBoost = isSamyeonSlash && eventIndex >= 2 ? 1.18 : 1.0;
+          const rawS0 = (pCfg.s0 || pCfg.size || 96) * 0.0118 * scaleMult * samyeonBoost;
+          const rawS1 = (pCfg.s1 || pCfg.size || 160) * 0.0118 * scaleMult * samyeonBoost;
+          const startDiam = Math.max(0.58, Math.min(6.0, Math.abs(rawS1 - rawS0) < 0.08 ? rawS0 * 0.74 : rawS0));
+          const endDiam = Math.max(0.80, Math.min(6.6, Math.abs(rawS1 - rawS0) < 0.08 ? rawS1 * 1.20 : rawS1));
 
-          let spinRad = 0;
-          if (Math.abs(pCfg.rs || 0) > 1.0) {
-            spinRad = (pCfg.rs * Math.PI) / 180.0;
-          } else if (fileLower.includes('spin') || fileLower.includes('palbang') || fileLower.includes('charyun') || fileLower.includes('yonggwon')) {
-            spinRad = (groundRings.length % 2 === 0 ? -1 : 1) * 8.2;
+          const addDiscLayer = (tiltX, tiltY, yAdd, spinMult, alphaMult, delayAdd = 0) => {
+            const rMat = new THREE.MeshBasicMaterial({
+              map: tex,
+              color: cStart.clone(),
+              transparent: true,
+              opacity: layerDelay + delayAdd > 0.02 ? 0.0 : peakAlpha * alphaMult,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            });
+            const rMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, rMat);
+            rMesh.rotation.order = 'YXZ';
+            rMesh.rotation.x = -Math.PI / 2 + tiltX;
+            rMesh.rotation.y = tiltY;
+            rMesh.rotation.z = Math.random() * Math.PI * 2;
+            const baseDiscY = attachedToLimb
+              ? oy
+              : isSamyeonSlash && oy < 0.35
+              ? 0.96 + (eventIndex % 3) * 0.10
+              : Math.max(0.02 + groundRings.length * 0.008, oy + groundRings.length * 0.006);
+            rMesh.position.set(ox, baseDiscY + yAdd, oz + (isSamyeonSlash ? 0.38 : 0.0));
+            rMesh.scale.setScalar(startDiam);
+            pGroup.add(rMesh);
+
+            let spinRad = 0;
+            if (Math.abs(pCfg.rs || 0) > 1.0) {
+              spinRad = ((pCfg.rs * Math.PI) / 180.0) * spinMult;
+            } else if (
+              fileLower.includes('spin') ||
+              fileLower.includes('palbang') ||
+              fileLower.includes('charyun') ||
+              fileLower.includes('yonggwon')
+            ) {
+              spinRad = (groundRings.length % 2 === 0 ? -1 : 1) * 10.4 * spinMult;
+            } else if (isSamyeonSlash) {
+              spinRad = (eventIndex % 2 === 0 ? -1 : 1) * 7.2 * spinMult;
+            } else {
+              spinRad = (groundRings.length % 2 === 0 ? 1 : -1) * 0.95 * spinMult;
+            }
+            groundRings.push({
+              mesh: rMesh,
+              mat: rMat,
+              s0: startDiam,
+              s1: endDiam,
+              c0: cStart,
+              c1: cEnd,
+              peakAlpha: peakAlpha * alphaMult,
+              delay: layerDelay + delayAdd,
+              life: layerLife,
+              spinSpeed: spinRad,
+            });
+          };
+
+          if (isSamyeonSlash) {
+            // Dreiwege-Schnitt: 3 markante diagonale 3D-Schwert-Schnittebenen passend zu Hieb 1, 2 & 3!
+            const slashBankY = eventIndex % 3 === 0 ? 0.44 : eventIndex % 3 === 1 ? -0.46 : 0.0;
+            const slashPitchX = eventIndex % 3 === 2 ? 0.30 : 0.20;
+            addDiscLayer(slashPitchX, slashBankY, 0.0, 1.0, 1.0, 0.0);
           } else {
-            spinRad = (groundRings.length % 2 === 0 ? 1 : -1) * 0.85;
+            addDiscLayer(0.0, 0.0, 0.0, 1.0, 1.0, 0.0);
+            if (isPalbangSpin && oy > 0.25 && groundRings.length <= 4) {
+              // Volumetrischer 3D-Schwertwirbel-Zyklon (kein papierdünner Strich bei flacher Kamera!)
+              addDiscLayer(0.24, 0.18, 0.16, 1.25, 0.82, 0.04);
+              addDiscLayer(-0.22, -0.20, -0.14, -1.18, 0.78, 0.08);
+            }
           }
-          groundRings.push({
-            mesh: rMesh,
-            mat: rMat,
-            s0: startDiam,
-            s1: endDiam,
-            c0: cStart,
-            c1: cEnd,
-            peakAlpha,
-            delay: layerDelay,
-            life: layerLife,
-            spinSpeed: spinRad,
-          });
-        } else if (bill === 2 || bill === 0) {
-          // BILLBOARD_TYPE_Y (2) = vertikale Energiesäule / Blitzstrahl; BILLBOARD_TYPE_NONE (0) = gerichtete 3D-Schwertwelle
-          const startSz = Math.max(0.55, Math.min(4.8, (pCfg.s0 || pCfg.size || 80) * 0.012 * scaleMult));
-          const endSz = Math.max(0.70, Math.min(5.4, (pCfg.s1 || pCfg.size || 120) * 0.012 * scaleMult));
-          const planeCnt = bill === 2 ? 2 : 1;
+        } else if (bill === 2 || bill === 4 || bill === 5 || bill === 0) {
+          // BILLBOARD_TYPE_Y (2), 2_SIDE (4), 3_SIDE (5) = gekreuzte 3D-Energiesäulen (Kampfrausch / Starker Körper!); NONE (0) = 3D-Welle
+          const startSz = Math.max(0.58, Math.min(5.0, (pCfg.s0 || pCfg.size || 84) * 0.0122 * scaleMult));
+          const endSz = Math.max(0.75, Math.min(5.6, (pCfg.s1 || pCfg.size || 126) * 0.0122 * scaleMult));
+          const isCrossedPillar = bill === 2 || bill === 4 || bill === 5;
+          const planeCnt = bill === 5 ? 3 : isCrossedPillar ? 2 : 1;
           for (let pk = 0; pk < planeCnt; pk++) {
             const pMat = new THREE.MeshBasicMaterial({
               map: tex,
@@ -21813,80 +21928,84 @@ export class OpenWorld3DEngine {
               side: THREE.DoubleSide,
             });
             const pMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, pMat);
-            const py = attachedToLimb ? oy : Math.max(startSz * 0.42, oy);
+            const py = attachedToLimb ? oy : Math.max(startSz * 0.44, oy);
             pMesh.position.set(ox, py, oz);
-            if (bill === 2) {
-              pMesh.rotation.y = pk * (Math.PI * 0.5);
+            if (isCrossedPillar) {
+              pMesh.rotation.y = pk * (Math.PI / planeCnt);
             } else {
               pMesh.rotation.set(-0.28, 0, (Math.random() - 0.5) * 0.45);
             }
-            pMesh.scale.set(startSz, startSz * (bill === 2 ? 1.25 : 1.0), 1);
+            const aspectY = isCrossedPillar ? 1.28 : 1.0;
+            pMesh.scale.set(startSz, startSz * aspectY, 1);
             pGroup.add(pMesh);
             verticalPlanes.push({
               mesh: pMesh,
               mat: pMat,
               s0: startSz,
               s1: endSz,
-              aspectY: bill === 2 ? 1.25 : 1.0,
+              aspectY,
               c0: cStart,
               c1: cEnd,
               peakAlpha,
               delay: layerDelay,
               life: layerLife,
-              rotZ: ((pCfg.rs || 0) * Math.PI) / 180.0 * 0.35,
+              rotZ: (((pCfg.rs || 0) * Math.PI) / 180.0) * 0.35,
             });
           }
         } else {
-          // BILLBOARD_TYPE_ALL (1): Echte kamerazugewandte Energie-/Funken-/Flammen-Sprites an exakter .mse-Position
+          // BILLBOARD_TYPE_ALL (1): Kamerazugewandte Energie-/Funken-/Flammen-Sprites (mit mehrstufigen Cycle-Wellen!)
           const rawCnt = pCfg.count || 6;
-          const emitCount = attachedToLimb
+          const baseEmitCount = attachedToLimb
             ? Math.min(7, Math.max(2, Math.round(rawCnt * 0.35)))
-            : Math.min(12, Math.max(2, Math.round(rawCnt * 0.45)));
-          const s0Base = Math.max(0.28, Math.min(3.4, (pCfg.s0 || pCfg.size || 36) * 0.0115)) * scaleMult;
-          const s1Base = Math.max(0.28, Math.min(3.8, (pCfg.s1 || pCfg.size || 42) * 0.0115)) * scaleMult;
-          const emitRad = Math.min(1.65, Math.max(attachedToLimb ? 0.06 : 0.14, (pCfg.rad || 0) * 0.01)) * scaleMult;
-          const velM = Math.min(3.2, Math.max(0.12, Math.abs(pCfg.vel || 24) * 0.01)) * scaleMult;
+            : Math.min(12, Math.max(3, Math.round(rawCnt * 0.48)));
+          const waveCount = effectiveCycle > 0.35 ? 2 : 1;
+          const s0Base = Math.max(0.28, Math.min(3.5, (pCfg.s0 || pCfg.size || 36) * 0.0118)) * scaleMult;
+          const s1Base = Math.max(0.28, Math.min(3.9, (pCfg.s1 || pCfg.size || 44) * 0.0118)) * scaleMult;
+          const emitRad = Math.min(1.75, Math.max(attachedToLimb ? 0.06 : 0.16, (pCfg.rad || 0) * 0.01)) * scaleMult;
+          const velM = Math.min(3.4, Math.max(0.14, Math.abs(pCfg.vel || 26) * 0.01)) * scaleMult;
 
-          for (let k = 0; k < emitCount; k++) {
-            const sMat = new THREE.SpriteMaterial({
-              map: tex,
-              color: cStart.clone(),
-              transparent: true,
-              opacity: layerDelay > 0.02 ? 0.0 : peakAlpha,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-              rotation: Math.random() * Math.PI * 2,
-            });
-            const sp = new THREE.Sprite(sMat);
-            const ang = (k / emitCount) * Math.PI * 2 + Math.random() * 0.55;
-            const rDist = emitRad * (0.25 + Math.random() * 0.75);
-            const localY = attachedToLimb
-              ? oy + (Math.random() - 0.35) * 0.28
-              : (oy > 0.08 ? oy + (Math.random() - 0.5) * 0.28 : 0.28 + Math.random() * 0.85);
-            sp.position.set(
-              ox + Math.cos(ang) * rDist,
-              localY,
-              oz + Math.sin(ang) * rDist
-            );
-            const jitter = 0.82 + Math.random() * 0.36;
-            const sNow = s0Base * jitter;
-            sp.scale.set(sNow, sNow, 1);
-            sp.userData = {
-              vx: Math.cos(ang) * velM * (0.45 + Math.random() * 0.65),
-              vy: attachedToLimb ? (0.25 + Math.random() * 0.55) : (0.35 + velM * 0.45 + Math.random() * 0.85),
-              vz: Math.sin(ang) * velM * (0.45 + Math.random() * 0.65),
-              swirl: (k % 2 === 0 ? 1 : -1) * (attachedToLimb ? 1.1 : 1.8),
-              rotSpd: Math.abs(pCfg.rs || 0) > 1 ? ((pCfg.rs * Math.PI) / 180.0) * 0.5 : (k % 2 === 0 ? 1.4 : -1.4),
-              s0: s0Base * jitter,
-              s1: s1Base * jitter,
-              c0: cStart,
-              c1: cEnd,
-              peakAlpha,
-              delay: layerDelay + (k / emitCount) * Math.min(0.16, layerLife * 0.22),
-              life: layerLife,
-            };
-            pGroup.add(sp);
-            sprites.push(sp);
+          for (let wIdx = 0; wIdx < waveCount; wIdx++) {
+            const waveDelay = wIdx * (effectiveCycle * 0.46);
+            const emitCount = wIdx === 0 ? baseEmitCount : Math.max(2, Math.round(baseEmitCount * 0.75));
+            for (let k = 0; k < emitCount; k++) {
+              const sMat = new THREE.SpriteMaterial({
+                map: tex,
+                color: cStart.clone(),
+                transparent: true,
+                opacity: layerDelay + waveDelay > 0.02 ? 0.0 : peakAlpha,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                rotation: Math.random() * Math.PI * 2,
+              });
+              const sp = new THREE.Sprite(sMat);
+              const ang = (k / emitCount) * Math.PI * 2 + Math.random() * 0.55 + wIdx * 0.8;
+              const rDist = emitRad * (0.25 + Math.random() * 0.75);
+              const localY = attachedToLimb
+                ? oy + (Math.random() - 0.35) * 0.26
+                : oy > 0.08
+                ? oy + (Math.random() - 0.5) * 0.30
+                : 0.28 + Math.random() * 0.88;
+              sp.position.set(ox + Math.cos(ang) * rDist, localY, oz + Math.sin(ang) * rDist);
+              const jitter = 0.82 + Math.random() * 0.36;
+              const sNow = s0Base * jitter;
+              sp.scale.set(sNow, sNow, 1);
+              sp.userData = {
+                vx: Math.cos(ang) * velM * (0.45 + Math.random() * 0.65),
+                vy: attachedToLimb ? 0.25 + Math.random() * 0.55 : 0.38 + velM * 0.45 + Math.random() * 0.85,
+                vz: Math.sin(ang) * velM * (0.45 + Math.random() * 0.65),
+                swirl: (k % 2 === 0 ? 1 : -1) * (attachedToLimb ? 1.1 : isPalbangSpin ? 3.8 : 1.8),
+                rotSpd: Math.abs(pCfg.rs || 0) > 1 ? ((pCfg.rs * Math.PI) / 180.0) * 0.5 : k % 2 === 0 ? 1.4 : -1.4,
+                s0: s0Base * jitter,
+                s1: s1Base * jitter,
+                c0: cStart,
+                c1: cEnd,
+                peakAlpha,
+                delay: layerDelay + waveDelay + (k / emitCount) * Math.min(0.18, layerLife * 0.24),
+                life: layerLife,
+              };
+              pGroup.add(sp);
+              sprites.push(sp);
+            }
           }
         }
       }
@@ -21932,9 +22051,10 @@ export class OpenWorld3DEngine {
           verticalPlanes,
           sprites,
           age: 0,
-          maxAge: Math.max(0.55, Math.min(2.2, maxLayerEnd)),
+          maxAge: Math.max(0.60, Math.min(2.45, maxLayerEnd)),
           followActor: opts.follow ? actor : null,
           followBone,
+          evPos,
           offsetX: opts.offsetX || 0,
           offsetY: (opts.offsetY || 0) + groupLift,
           offsetZ: opts.offsetZ || 0,
@@ -21985,11 +22105,25 @@ export class OpenWorld3DEngine {
     const rawMsaDur = Math.max(0.75, Math.min(2.7, resolved.msa?.duration || 1.4));
     const playSpeed = rawMsaDur >= 2.2 ? 1.32 : 1.18;
     const animDur = rawMsaDur / playSpeed;
+    const meleeRibbonCodes = new Set([
+      'samyeon', 'palbang', 'tanhwan', 'gigongcham', 'gyeoksan', 'finish',
+      'noegeom', 'gihyeol', 'amseup', 'charyun', 'swaeryeong', 'yonggwon',
+    ]);
     if (actor) {
       actor._activeSkillClip = clipName;
       actor._activeSkillTimer = animDur;
       actor._activeSkillSpeed = playSpeed;
       actor._activeSkillForceRestart = true;
+      actor._activeSkillIsLSkill = Boolean(isLSkill);
+      if (meleeRibbonCodes.has(code)) {
+        actor._ribbonSwingTimer = Math.max(actor._ribbonSwingTimer || 0, animDur * 0.88);
+      }
+    }
+
+    // Sausen (tanhwan) & Blitzangriff (gungsin): spürbarer Vorwärts-Sturmimpuls in Blickrichtung!
+    if (opts.isLocal && !this.localPlayerActor?.mountGroup?.visible && (code === 'tanhwan' || code === 'gungsin')) {
+      this.combatLungeTimer = 0.24;
+      this.combatLungeSpeed = 9.8;
     }
 
     if (resolved.soundUrl) {
@@ -21999,13 +22133,18 @@ export class OpenWorld3DEngine {
     if (!this._scheduledMetinEvents) this._scheduledMetinEvents = [];
     const events = resolved.msa?.events || [];
     if (events.length > 0) {
+      let evIdx = 0;
       for (const ev of events) {
+        const curEvIdx = evIdx++;
         const delay = Math.max(0, Math.min(2.1, Number(ev.t || 0) / playSpeed));
+        const evPos = ev.pos || [0, 0, 0];
         if (delay <= 0.02) {
-          const att = this.getActorMetinAttachWorldPos(actor, ev.bone, ev.pos, x, y, z, rotY);
+          const att = this.getActorMetinAttachWorldPos(actor, ev.bone, evPos, x, y, z, rotY);
           this.spawnMetinMseEffect(ev.effect, att.x, att.y, att.z, rotY, actor, {
             follow: ev.follow,
             followBone: ev.follow ? (ev.bone || '') : '',
+            evPos,
+            eventIndex: curEvIdx,
             attachedToLimb: att.attachedToLimb,
             offsetX: att.offsetX,
             offsetY: att.offsetY,
@@ -22018,7 +22157,8 @@ export class OpenWorld3DEngine {
             remaining: delay,
             effect: ev.effect,
             bone: ev.bone || '',
-            pos: ev.pos || [0, 0, 0],
+            pos: evPos,
+            eventIndex: curEvIdx,
             x,
             y,
             z,
@@ -22060,10 +22200,13 @@ export class OpenWorld3DEngine {
         const by = useLiveActor ? item.actor.root.position.y : item.y;
         const bz = useLiveActor ? item.actor.root.position.z : item.z;
         const aRot = useLiveActor ? item.actor.root.rotation.y : item.rotY;
-        const att = this.getActorMetinAttachWorldPos(item.actor, item.bone, item.pos, bx, by, bz, aRot);
+        const evPos = item.pos || [0, 0, 0];
+        const att = this.getActorMetinAttachWorldPos(item.actor, item.bone, evPos, bx, by, bz, aRot);
         this.spawnMetinMseEffect(item.effect, att.x, att.y, att.z, aRot, item.actor, {
           follow: item.follow,
           followBone: item.follow ? (item.bone || '') : '',
+          evPos,
+          eventIndex: item.eventIndex || 0,
           attachedToLimb: att.attachedToLimb,
           offsetX: att.offsetX,
           offsetY: att.offsetY,
@@ -22096,11 +22239,11 @@ export class OpenWorld3DEngine {
               tier: res.tier,
               isLSkill: res.isLSkill,
               loop: res.loop,
-              expiresAt: performance.now() + (Number(b.remaining || 15) * 1000),
+              expiresAt: performance.now() + Number(b.remaining || 15) * 1000,
             });
           }
         } else {
-          existing.expiresAt = performance.now() + (Number(b.remaining || 15) * 1000);
+          existing.expiresAt = performance.now() + Number(b.remaining || 15) * 1000;
         }
       }
     }
@@ -22114,37 +22257,57 @@ export class OpenWorld3DEngine {
 
   applyActorWeaponAuraTintFromMetinLoop(actor) {
     const bladeAura = actor?.weaponGroup?.userData?.bladeAuraGroup;
-    if (!bladeAura || !actor?._activeMetinBuffLoops) return;
+    if (!actor) return;
     let chosen = null;
-    for (const entry of actor._activeMetinBuffLoops.values()) {
-      if (entry.loop?.bone === 'right_hand' || entry.code === 'geomgyeong' || entry.code === 'gwigeom') {
-        chosen = entry;
-        break;
+    if (actor._activeMetinBuffLoops) {
+      for (const entry of actor._activeMetinBuffLoops.values()) {
+        if (entry.loop?.bone === 'right_hand' || entry.code === 'geomgyeong' || entry.code === 'gwigeom') {
+          chosen = entry;
+          break;
+        }
       }
-      if (!chosen) chosen = entry;
     }
-    if (!chosen || !chosen.loop?.effect?.particles?.length) return;
+    if (!chosen || !chosen.loop?.effect?.particles?.length) {
+      actor._hasMetinWeaponBladeBuff = false;
+      actor._weaponTrailColorHex = null;
+      if (actor === this.localPlayerActor) {
+        this.hasActiveWeaponBuff = false;
+      }
+      if (bladeAura?.userData) {
+        if (bladeAura.userData.innerAuraMat && bladeAura.userData.defaultCoreHex) {
+          bladeAura.userData.innerAuraMat.color.setHex(bladeAura.userData.defaultCoreHex);
+        }
+        if (bladeAura.userData.outerAuraMat && bladeAura.userData.defaultOuterHex) {
+          bladeAura.userData.outerAuraMat.color.setHex(bladeAura.userData.defaultOuterHex);
+        }
+        if (bladeAura.userData.flameMat && bladeAura.userData.defaultOuterHex) {
+          bladeAura.userData.flameMat.color.setHex(bladeAura.userData.defaultOuterHex);
+        }
+      }
+      return;
+    }
     const p0 = chosen.loop.effect.particles[0];
-    const [r, g, b] = p0.color || [0.2, 0.9, 0.8];
+    const [r, g, b] = p0.color || [1.0, 0.45, 0.12];
     const loopColor = new THREE.Color(
       chosen.isLSkill ? Math.min(1, r * 1.15 + 0.22) : r,
       chosen.isLSkill ? Math.min(1, g * 0.92 + 0.10) : g,
       chosen.isLSkill ? Math.min(1, b * 1.25 + 0.28) : b
     );
-    if (bladeAura.userData.innerAuraMat) {
-      bladeAura.userData.innerAuraMat.color.copy(loopColor);
+    const coreHotColor = loopColor.clone().lerp(new THREE.Color(0xffffff), 0.42);
+    actor._hasMetinWeaponBladeBuff = true;
+    actor._weaponTrailColorHex = loopColor.getHex();
+    if (actor === this.localPlayerActor) {
+      this.hasActiveWeaponBuff = true;
     }
-    if (bladeAura.userData.outerAuraMat) {
-      bladeAura.userData.outerAuraMat.color.copy(loopColor);
-    }
-    if (bladeAura.userData.auraSparks && p0.tex) {
-      const sparkTex = this.loadSkillTexture(p0.tex);
-      for (const sp of bladeAura.userData.auraSparks) {
-        if (sp.material) {
-          if (sparkTex) sp.material.map = sparkTex;
-          sp.material.color.copy(loopColor);
-          sp.material.needsUpdate = true;
-        }
+    if (bladeAura?.userData) {
+      if (bladeAura.userData.innerAuraMat) {
+        bladeAura.userData.innerAuraMat.color.copy(coreHotColor);
+      }
+      if (bladeAura.userData.outerAuraMat) {
+        bladeAura.userData.outerAuraMat.color.copy(loopColor);
+      }
+      if (bladeAura.userData.flameMat) {
+        bladeAura.userData.flameMat.color.copy(loopColor);
       }
     }
   }
@@ -22153,7 +22316,7 @@ export class OpenWorld3DEngine {
     if (!actor || !actor._activeMetinBuffLoops || actor._activeMetinBuffLoops.size === 0) return;
     actor._metinLoopTimer = (actor._metinLoopTimer || 0) - dt;
     if (actor._metinLoopTimer > 0) return;
-    actor._metinLoopTimer = 1.05;
+    actor._metinLoopTimer = 1.12;
     if (!actor.root || !actor.root.visible) return;
     const rx = actor.root.position.x;
     const ry = actor.root.position.y;
@@ -22162,7 +22325,7 @@ export class OpenWorld3DEngine {
     for (const entry of actor._activeMetinBuffLoops.values()) {
       if (entry.loop?.effect) {
         const bone = entry.loop.bone || '';
-        const isHand = bone.includes('hand');
+        const isHand = bone.includes('hand') || entry.code === 'geomgyeong' || entry.code === 'gwigeom';
         const att = this.getActorMetinAttachWorldPos(actor, bone, [0, 0, 0], rx, ry, rz, rotY);
         this.spawnMetinMseEffect(entry.loop.effect, att.x, att.y, att.z, rotY, actor, {
           follow: true,
@@ -22173,10 +22336,302 @@ export class OpenWorld3DEngine {
           offsetZ: att.offsetZ,
           tier: entry.tier,
           isLSkill: entry.isLSkill,
-          scaleMult: isHand ? (entry.isLSkill ? 0.74 : 0.62) : (entry.isLSkill ? 0.88 : 0.76),
+          scaleMult: isHand ? (entry.isLSkill ? 0.56 : 0.46) : entry.isLSkill ? 0.88 : 0.76,
         });
       }
     }
+  }
+
+  getBladeAuraFlameTexture() {
+    if (this._bladeAuraFlameTex) return this._bladeAuraFlameTex;
+    const w = 64;
+    const h = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+    const data = img.data;
+    for (let y = 0; y < h; y++) {
+      // v=0 (Spitze) bis v=1 (Parierstange): schlank zulaufende Energiescheide
+      const v = y / (h - 1);
+      const tipTaper = Math.pow(Math.sin(Math.min(1, Math.max(0, v)) * Math.PI), 0.58);
+      const widthEnv = 0.24 + 0.76 * tipTaper;
+      for (let x = 0; x < w; x++) {
+        const u = Math.abs((x / (w - 1)) * 2.0 - 1.0);
+        const normDist = u / Math.max(0.08, widthEnv);
+        let alpha = 0.0;
+        let coreBoost = 0.0;
+        if (normDist < 1.0) {
+          const wave = 0.86 + 0.14 * Math.sin(v * 26.0 + u * 6.0);
+          alpha = Math.pow(1.0 - normDist, 1.85) * tipTaper * wave;
+          coreBoost = Math.pow(Math.max(0, 1.0 - normDist * 2.4), 2.0);
+        }
+        const idx = (y * w + x) * 4;
+        const lum = Math.min(255, Math.round(195 + coreBoost * 60));
+        data[idx] = lum;
+        data[idx + 1] = lum;
+        data[idx + 2] = lum;
+        data[idx + 3] = Math.min(255, Math.max(0, Math.round(alpha * 255)));
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    tex.userData = { isShared: true };
+    this._bladeAuraFlameTex = tex;
+    return tex;
+  }
+
+  getSwordRibbonTrailTexture() {
+    if (this._swordRibbonTrailTex) return this._swordRibbonTrailTex;
+    const w = 128;
+    const h = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+    const data = img.data;
+    for (let y = 0; y < h; y++) {
+      // v=0 (Heft/Parierstange) bis v=1 (Klingenspitze)
+      const v = 1.0 - y / (h - 1);
+      const radialEnv =
+        v < 0.08
+          ? 0.0
+          : Math.min(1.0, Math.pow((v - 0.08) / 0.92, 0.72)) * (1.0 - Math.pow(Math.max(0, (v - 0.96) / 0.04), 2.0));
+      const tipRim = Math.exp(-Math.pow((v - 0.90) / 0.075, 2.0)) * 0.45;
+      for (let x = 0; x < w; x++) {
+        // u=0 (direkt an der Schneide) bis u=1 (auslaufendes Schweif-Ende)
+        const u = x / (w - 1);
+        const leadFlash = Math.exp(-u * 18.0) * 0.65;
+        const wakeFade = Math.pow(Math.max(0, 1.0 - u), 1.85);
+        const alpha = Math.min(1.0, (wakeFade * 0.82 + leadFlash * 0.55) * (radialEnv + tipRim));
+        const whiteCore = Math.min(1.0, leadFlash + tipRim * wakeFade);
+        const idx = (y * w + x) * 4;
+        data[idx] = Math.round(215 + whiteCore * 40);
+        data[idx + 1] = Math.round(220 + whiteCore * 35);
+        data[idx + 2] = Math.round(235 + whiteCore * 20);
+        data[idx + 3] = Math.min(255, Math.max(0, Math.round(alpha * 255)));
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    tex.userData = { isShared: true };
+    this._swordRibbonTrailTex = tex;
+    return tex;
+  }
+
+  updateActorWeaponRibbonTrail(actor, isSwinging, dt) {
+    if (!actor || !actor.weaponGroup || !actor.root) return;
+    const parentScene = this.scene || (actor.root.parent?.isScene ? actor.root.parent : null);
+    if (!parentScene) return;
+
+    const MAX_KNOTS = 14;
+    const SUB_DIV = 4;
+    const MAX_SLICES = (MAX_KNOTS - 1) * SUB_DIV + 3; // 55 Slices -> sicherer Puffer!
+    const MAX_AGE = 0.21;
+
+    let trail = actor._bladeTrail;
+    if (!trail) {
+      if (!isSwinging) return;
+      const vertCount = MAX_SLICES * 2;
+      const posArr = new Float32Array(vertCount * 3);
+      const uvArr = new Float32Array(vertCount * 2);
+      const idxArr = new Uint16Array((MAX_SLICES - 1) * 6);
+      let ptr = 0;
+      for (let s = 0; s < MAX_SLICES - 1; s++) {
+        const i0 = s * 2;
+        const i1 = s * 2 + 1;
+        const i2 = (s + 1) * 2;
+        const i3 = (s + 1) * 2 + 1;
+        idxArr[ptr++] = i0;
+        idxArr[ptr++] = i1;
+        idxArr[ptr++] = i2;
+        idxArr[ptr++] = i2;
+        idxArr[ptr++] = i1;
+        idxArr[ptr++] = i3;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
+      geo.setIndex(new THREE.BufferAttribute(idxArr, 1));
+      geo.setDrawRange(0, 0);
+
+      const mat = new THREE.MeshBasicMaterial({
+        map: this.getSwordRibbonTrailTexture(),
+        color: 0xdbeafe,
+        transparent: true,
+        opacity: 0.82,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 14;
+      mesh.visible = false;
+      parentScene.add(mesh);
+
+      trail = {
+        mesh,
+        geo,
+        mat,
+        posArr,
+        uvArr,
+        knots: [],
+        vBase: new THREE.Vector3(),
+        vTip: new THREE.Vector3(),
+      };
+      actor._bladeTrail = trail;
+    }
+
+    // Bestehende Knoten altern lassen & abgelaufene Punkte kappen
+    const knots = trail.knots;
+    for (let i = knots.length - 1; i >= 0; i--) {
+      knots[i].age += dt;
+      if (knots[i].age >= MAX_AGE) {
+        knots.splice(i, 1);
+      }
+    }
+
+    if (isSwinging && actor.root.visible) {
+      actor.root.updateMatrixWorld(true);
+      const bLen = actor.weaponGroup.userData?.bladeAuraGroup?.userData?.len || 1.28;
+      trail.vBase.set(0, 0, 0.20).applyMatrix4(actor.weaponGroup.matrixWorld);
+      trail.vTip.set(0, 0, 0.22 + bLen).applyMatrix4(actor.weaponGroup.matrixWorld);
+
+      let shouldInsert = knots.length === 0;
+      if (!shouldInsert) {
+        const k0 = knots[0];
+        const tipDistSq =
+          (trail.vTip.x - k0.tx) * (trail.vTip.x - k0.tx) +
+          (trail.vTip.y - k0.ty) * (trail.vTip.y - k0.ty) +
+          (trail.vTip.z - k0.tz) * (trail.vTip.z - k0.tz);
+        if (tipDistSq > 0.0006) {
+          shouldInsert = true;
+        } else {
+          // Aktuelle Klingenposition am neuesten Knoten nachführen
+          k0.bx = trail.vBase.x;
+          k0.by = trail.vBase.y;
+          k0.bz = trail.vBase.z;
+          k0.tx = trail.vTip.x;
+          k0.ty = trail.vTip.y;
+          k0.tz = trail.vTip.z;
+          k0.age = 0;
+        }
+      }
+      if (shouldInsert) {
+        knots.unshift({
+          bx: trail.vBase.x,
+          by: trail.vBase.y,
+          bz: trail.vBase.z,
+          tx: trail.vTip.x,
+          ty: trail.vTip.y,
+          tz: trail.vTip.z,
+          age: 0,
+        });
+        if (knots.length > MAX_KNOTS) {
+          knots.length = MAX_KNOTS;
+        }
+      }
+    }
+
+    if (knots.length < 2) {
+      trail.mesh.visible = false;
+      trail.geo.setDrawRange(0, 0);
+      return;
+    }
+
+    // Catmull-Rom-Spline-Unterteilung für seidenweiche 3D-Klingenbögen ohne Polygon-Kanten
+    const cr = (p0, p1, p2, p3, t) => {
+      const t2 = t * t;
+      const t3 = t2 * t;
+      return (
+        0.5 *
+        (2.0 * p1 +
+          (-p0 + p2) * t +
+          (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 +
+          (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+      );
+    };
+
+    const n = knots.length;
+    const posArr = trail.posArr;
+    const uvArr = trail.uvArr;
+    let sliceCnt = 0;
+
+    for (let k = 0; k < n - 1; k++) {
+      const k0 = knots[Math.max(0, k - 1)];
+      const k1 = knots[k];
+      const k2 = knots[k + 1];
+      const k3 = knots[Math.min(n - 1, k + 2)];
+      const steps = k === n - 2 ? SUB_DIV + 1 : SUB_DIV;
+      for (let s = 0; s < steps; s++) {
+        if (sliceCnt >= MAX_SLICES) break;
+        const t = s / SUB_DIV;
+        const bx = cr(k0.bx, k1.bx, k2.bx, k3.bx, t);
+        const by = cr(k0.by, k1.by, k2.by, k3.by, t);
+        const bz = cr(k0.bz, k1.bz, k2.bz, k3.bz, t);
+        const tx = cr(k0.tx, k1.tx, k2.tx, k3.tx, t);
+        const ty = cr(k0.ty, k1.ty, k2.ty, k3.ty, t);
+        const tz = cr(k0.tz, k1.tz, k2.tz, k3.tz, t);
+        const interpAge = k1.age + (k2.age - k1.age) * t;
+        const u = Math.min(1.0, Math.max(0.0, interpAge / MAX_AGE));
+
+        const pOff = sliceCnt * 6;
+        posArr[pOff] = bx;
+        posArr[pOff + 1] = by;
+        posArr[pOff + 2] = bz;
+        posArr[pOff + 3] = tx;
+        posArr[pOff + 4] = ty;
+        posArr[pOff + 5] = tz;
+
+        const uOff = sliceCnt * 4;
+        uvArr[uOff] = u;
+        uvArr[uOff + 1] = 0.0;
+        uvArr[uOff + 2] = u;
+        uvArr[uOff + 3] = 1.0;
+        sliceCnt++;
+      }
+    }
+
+    if (sliceCnt < 2) {
+      trail.mesh.visible = false;
+      trail.geo.setDrawRange(0, 0);
+      return;
+    }
+
+    // Dynamische Metin2-Farbgebung: L-Skill (Violett-Gold) > Aktive Klingenaura (Aura des Schwertes) > RSB > Stahl-Silber
+    const activeSkillL = (actor._activeSkillTimer || 0) > 0 && actor._activeSkillIsLSkill;
+    const trailHex = activeSkillL
+      ? 0xe879f9
+      : actor._weaponTrailColorHex
+      ? actor._weaponTrailColorHex
+      : actor.weaponVisual === 'rsb'
+      ? 0xf87171
+      : 0xcbd5e1;
+    trail.mat.color.setHex(trailHex);
+    trail.mat.opacity = activeSkillL || actor._hasMetinWeaponBladeBuff ? 0.94 : 0.74;
+
+    trail.geo.attributes.position.needsUpdate = true;
+    trail.geo.attributes.uv.needsUpdate = true;
+    trail.geo.setDrawRange(0, (sliceCnt - 1) * 6);
+    trail.mesh.visible = true;
+  }
+
+  disposeActorWeaponRibbonTrail(actor) {
+    if (!actor || !actor._bladeTrail) return;
+    const tr = actor._bladeTrail;
+    if (tr.mesh?.parent) {
+      tr.mesh.parent.remove(tr.mesh);
+    }
+    tr.geo?.dispose();
+    tr.mat?.dispose();
+    actor._bladeTrail = null;
   }
 
   getBaltazarPortalTheme(targetMapId, isReturn = false) {
@@ -24693,7 +25148,7 @@ export class OpenWorld3DEngine {
 
     // Mount-Gruppe: Echtes 3D-Pferd vom Stallburschen (pewi_mount_horse.glb) mit 5 Textur-/Fellvarianten (col1..col5)!
     const mountGroup = new THREE.Group();
-    if (!cfg.noMountAndPet) {
+    if (!cfg.noMountAndPet && !cfg.lazyMount) {
       let savedSkin = 'col1';
       try {
         savedSkin = localStorage.getItem('aeryndor_mount_skin_v1') || 'col1';
@@ -24723,7 +25178,7 @@ export class OpenWorld3DEngine {
 
     // Pet-Begleiter: 8 wählbare Custom 3D Skeletal GLB Begleiter + Elementar-Aura
     const petGroup = new THREE.Group();
-    if (!cfg.noMountAndPet) {
+    if (!cfg.noMountAndPet && !cfg.skipPet) {
       let savedPetKey = cfg.petSkin || this.customPetSkin || 'ridack_dragonpet';
       if (!cfg.petSkin) {
         try {
@@ -24810,35 +25265,14 @@ export class OpenWorld3DEngine {
 
     // --- 1. ECHTES 3D-GLB-HELDENMODELL PRO KLASSE (Krieger, Ninja, Sura, Schamane) ---
     const classKey = cfg.classId || 'warrior';
-    const HERO_GLB_BY_CLASS = {
-      warrior: {
-        glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw2',
-        tex: ['/assets/models/heroes/klingenwaechter_male.png?v=20261031_kw2'],
-        normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw2',
-        height: 1.88,
-      },
-      ninja: {
-        glb: '/assets/models/npcs/plechi_old_warrior1.glb',
-        tex: ['/assets/models/npcs/old_warrior1_tex.png'],
-        height: 1.78,
-      },
-      sura: {
-        glb: '/assets/models/npcs/pewi_guan.glb',
-        tex: ['/assets/models/npcs/pewi_guan.png'],
-        height: 1.86,
-        hasBuiltinWeapon: true,
-      },
-      shaman: {
-        glb: '/assets/models/npcs/plechi_noble_npc2.glb',
-        tex: ['/assets/models/npcs/noble_npc2_tex.png'],
-        height: 1.76,
-      },
-    };
     const heroGlbCfg = HERO_GLB_BY_CLASS[classKey] || HERO_GLB_BY_CLASS.warrior;
     const heroGlbHolder = new THREE.Group();
     root.add(heroGlbHolder);
 
     if (this.attachGLBModelToGroup && !cfg.disableGlbHero) {
+      // Niemals den alten prozeduralen Zylinder/Kugel-"Lego-Dummy" (bodyGroup) anzeigen!
+      bodyGroup.visible = false;
+
       if (heroGlbCfg.hasBuiltinWeapon && weaponGroup) {
         // Das 3D-Modell (z.B. pewi_guan) besitzt bereits eine eigene fest modellierte Waffe im Mesh!
         // Deshalb blenden wir die prozedurale Zusatz-Schwertgeometrie aus (keine 2 Waffen gleichzeitig!),
@@ -24855,7 +25289,7 @@ export class OpenWorld3DEngine {
         heroGlbCfg.glb,
         heroGlbCfg.tex,
         heroGlbCfg.height,
-        bodyGroup, // Blendet den primitiven Block-Dummy automatisch aus, sobald das echte GLB geladen ist
+        bodyGroup,
         false,
         {
           color: new THREE.Color(1.22, 1.20, 1.18),
@@ -24867,133 +25301,154 @@ export class OpenWorld3DEngine {
           useMapAsEmissive: true,
         }
       );
-      if (this.loadGLBTemplate) {
+
+      const bindHeroWeaponAndIk = (tpl) => {
+        const glbAct = heroGlbHolder.userData?.glbActor;
+        if (!glbAct || !tpl?.nodes || !glbAct.rigGroup || glbAct._weaponAndIkBound) return;
+        glbAct._weaponAndIkBound = true;
+
+        // Falls das Modell eine eigene Waffe im Mesh besitzt (Prop1 bei pewi_guan), Referenz speichern
+        // und alle prozeduralen Schwerter in weaponGroup ausblenden (damit das Modell nur seine eigene Waffe trägt!).
+        if (heroGlbCfg.hasBuiltinWeapon) {
+          const propIdx = tpl.nodes.findIndex((n) => /^prop1$/i.test((n.name || '').trim()));
+          if (propIdx >= 0) {
+            const propBone = glbAct.rigGroup.getObjectByName(`bone_${propIdx}`);
+            if (propBone) {
+              glbAct.builtinWeaponBone = propBone;
+              propBone.scale.setScalar(cfg.hasWeapon !== false ? 1.0 : 0.0001);
+            }
+          }
+          if (weaponGroup) {
+            for (const ch of weaponGroup.children) {
+              if (ch !== weaponShining && ch !== weaponGroup.userData?.bladeAuraGroup) {
+                ch.visible = false;
+              }
+            }
+          }
+        }
+
+        // 1. Kalibrierter Weapon-Socket in der rechten Hand (Griff sitzt exakt in den geschlossenen Fingern,
+        //    Klinge zeigt heroisch nach vorn-oben statt rückwärts in Körper/Kopf oder in den Boden!)
+        const handIdx = tpl.nodes.findIndex((n) =>
+          /^(bip01 r hand|r_hand|r hand|righthand)$/i.test((n.name || '').trim())
+        );
+        const fallbackHandIdx =
+          handIdx >= 0
+            ? handIdx
+            : tpl.nodes.findIndex((n) => /bip01 r hand|r_hand|r hand|righthand|weapon/i.test(n.name || ''));
+
+        if (fallbackHandIdx >= 0) {
+          const handBone = glbAct.rigGroup.getObjectByName(`bone_${fallbackHandIdx}`);
+          if (handBone) {
+            glbAct.rightHandBone = handBone;
+          }
+          if (handBone && weaponGroup) {
+            const weaponSocket = new THREE.Group();
+            weaponSocket.name = 'weaponSocket';
+            if (heroGlbCfg.glb.includes('klingenwaechter_male')) {
+              // Exakt anatomisch aus R_Hand-Bindpose (Knöchel-Achse +X, Handflächen-Normale +Y, Daumen/Klinge +Z)
+              // berechneter lokaler Faust-Socket – 100 % unabhängig von der aktuellen Mixer-Animationsphase!
+              weaponSocket.position.set(-0.0177, -0.0118, 0.0389);
+              weaponSocket.quaternion.set(0.04521, 0.66362, 0.67493, -0.31941);
+            } else {
+              heroGlbHolder.updateMatrixWorld(true);
+              const qRootWorld = new THREE.Quaternion();
+              const qHandWorld = new THREE.Quaternion();
+              heroGlbHolder.getWorldQuaternion(qRootWorld);
+              handBone.getWorldQuaternion(qHandWorld);
+              const qHandInRoot = qRootWorld.clone().invert().multiply(qHandWorld);
+              const targetSwordQuatInRoot = new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(-0.50, -0.16, 0.32, 'YXZ')
+              );
+              if (tpl.isYUp) {
+                weaponSocket.position.set(-0.022, -0.028, 0.032);
+              } else {
+                weaponSocket.position.set(6.2, 0.6, 0.0);
+              }
+              weaponSocket.quaternion.copy(qHandInRoot).invert().multiply(targetSwordQuatInRoot);
+            }
+            const invScale = 1.0 / Math.max(0.005, glbAct.rigGroup.scale.x || 0.01);
+            weaponSocket.scale.setScalar(invScale * (tpl.isYUp ? 0.92 : 0.86));
+
+            weaponGroup.position.set(0, 0, 0);
+            weaponGroup.rotation.set(0, 0, 0);
+            weaponGroup.scale.setScalar(1.0);
+            weaponSocket.add(weaponGroup);
+            handBone.add(weaponSocket);
+            glbAct.weaponSocket = weaponSocket;
+          }
+        }
+        const leftHandIdx = tpl.nodes.findIndex((n) =>
+          /^(bip01 l hand|l_hand|l hand|lefthand)$/i.test((n.name || '').trim())
+        );
+        if (leftHandIdx >= 0) {
+          glbAct.leftHandBone = glbAct.rigGroup.getObjectByName(`bone_${leftHandIdx}`) || null;
+        }
+        const headIdx = tpl.nodes.findIndex((n) =>
+          /^(bip01 head|head)$/i.test((n.name || '').trim())
+        );
+        if (headIdx >= 0) {
+          glbAct.headBone = glbAct.rigGroup.getObjectByName(`bone_${headIdx}`) || null;
+        }
+
+        // 2. Foot-IK Knochenreferenzen & lokale Welt-X-Pitch-Achsen für Two-Bone-IK auf Unebenheiten/Schrägen ermitteln
+        heroGlbHolder.updateMatrixWorld(true);
+        const qRigWorld = new THREE.Quaternion();
+        glbAct.rigGroup.getWorldQuaternion(qRigWorld);
+        const findLegBone = (regex) => {
+          const bIdx = tpl.nodes.findIndex((n) => regex.test((n.name || '').trim()));
+          if (bIdx < 0) return null;
+          const bone = glbAct.rigGroup.getObjectByName(`bone_${bIdx}`);
+          if (!bone) return null;
+          const qBoneW = new THREE.Quaternion();
+          bone.getWorldQuaternion(qBoneW);
+          const qBoneInRig = qRigWorld.clone().invert().multiply(qBoneW);
+          const localPitchAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(qBoneInRig.invert()).normalize();
+          return { bone, localPitchAxis };
+        };
+        glbAct.ikBones = {
+          lThigh: findLegBone(/^(bip01 l thigh|l_thigh|l thigh)$/i),
+          rThigh: findLegBone(/^(bip01 r thigh|r_thigh|r thigh)$/i),
+          lCalf: findLegBone(/^(bip01 l calf|l_calf|l calf)$/i),
+          rCalf: findLegBone(/^(bip01 r calf|r_calf|r calf)$/i),
+          lFoot: findLegBone(/^(bip01 l foot|l_foot|l foot)$/i),
+          rFoot: findLegBone(/^(bip01 r foot|r_foot|r foot)$/i),
+        };
+      };
+
+      const cachedHeroTpl = (this._glbResolvedTemplates || GLOBAL_GLB_RESOLVED_CACHE).get(heroGlbCfg.glb);
+      if (cachedHeroTpl) {
+        bindHeroWeaponAndIk(cachedHeroTpl);
+      } else if (this.loadGLBTemplate) {
         this.loadGLBTemplate(heroGlbCfg.glb)
-          .then((tpl) => {
-            const glbAct = heroGlbHolder.userData?.glbActor;
-            if (!glbAct || !tpl?.nodes || !glbAct.rigGroup) return;
-
-            // Falls das Modell eine eigene Waffe im Mesh besitzt (Prop1 bei pewi_guan), Referenz speichern
-            // und alle prozeduralen Schwerter in weaponGroup ausblenden (damit das Modell nur seine eigene Waffe trägt!).
-            if (heroGlbCfg.hasBuiltinWeapon) {
-              const propIdx = tpl.nodes.findIndex((n) => /^prop1$/i.test((n.name || '').trim()));
-              if (propIdx >= 0) {
-                const propBone = glbAct.rigGroup.getObjectByName(`bone_${propIdx}`);
-                if (propBone) {
-                  glbAct.builtinWeaponBone = propBone;
-                  propBone.scale.setScalar(cfg.hasWeapon !== false ? 1.0 : 0.0001);
-                }
-              }
-              if (weaponGroup) {
-                for (const ch of weaponGroup.children) {
-                  if (ch !== weaponShining && ch !== weaponGroup.userData?.bladeAuraGroup) {
-                    ch.visible = false;
-                  }
-                }
-              }
-            }
-
-            // 1. Kalibrierter Weapon-Socket in der rechten Hand (Griff sitzt exakt in den geschlossenen Fingern,
-            //    Klinge zeigt heroisch nach vorn-oben statt rückwärts in Körper/Kopf oder in den Boden!)
-            const handIdx = tpl.nodes.findIndex((n) =>
-              /^(bip01 r hand|r_hand|r hand|righthand)$/i.test((n.name || '').trim())
-            );
-            const fallbackHandIdx =
-              handIdx >= 0
-                ? handIdx
-                : tpl.nodes.findIndex((n) => /bip01 r hand|r_hand|r hand|righthand|weapon/i.test(n.name || ''));
-
-            if (fallbackHandIdx >= 0) {
-              const handBone = glbAct.rigGroup.getObjectByName(`bone_${fallbackHandIdx}`);
-              if (handBone) {
-                glbAct.rightHandBone = handBone;
-              }
-              if (handBone && weaponGroup) {
-                const weaponSocket = new THREE.Group();
-                weaponSocket.name = 'weaponSocket';
-                if (heroGlbCfg.glb.includes('klingenwaechter_male')) {
-                  // Exakt anatomisch aus R_Hand-Bindpose (Knöchel-Achse +X, Handflächen-Normale +Y, Daumen/Klinge +Z)
-                  // berechneter lokaler Faust-Socket – 100 % unabhängig von der aktuellen Mixer-Animationsphase!
-                  weaponSocket.position.set(-0.0177, -0.0118, 0.0389);
-                  weaponSocket.quaternion.set(0.04521, 0.66362, 0.67493, -0.31941);
-                } else {
-                  heroGlbHolder.updateMatrixWorld(true);
-                  const qRootWorld = new THREE.Quaternion();
-                  const qHandWorld = new THREE.Quaternion();
-                  heroGlbHolder.getWorldQuaternion(qRootWorld);
-                  handBone.getWorldQuaternion(qHandWorld);
-                  const qHandInRoot = qRootWorld.clone().invert().multiply(qHandWorld);
-                  const targetSwordQuatInRoot = new THREE.Quaternion().setFromEuler(
-                    new THREE.Euler(-0.50, -0.16, 0.32, 'YXZ')
-                  );
-                  if (tpl.isYUp) {
-                    weaponSocket.position.set(-0.022, -0.028, 0.032);
-                  } else {
-                    weaponSocket.position.set(6.2, 0.6, 0.0);
-                  }
-                  weaponSocket.quaternion.copy(qHandInRoot).invert().multiply(targetSwordQuatInRoot);
-                }
-                const invScale = 1.0 / Math.max(0.005, glbAct.rigGroup.scale.x || 0.01);
-                weaponSocket.scale.setScalar(invScale * (tpl.isYUp ? 0.92 : 0.86));
-
-                weaponGroup.position.set(0, 0, 0);
-                weaponGroup.rotation.set(0, 0, 0);
-                weaponGroup.scale.setScalar(1.0);
-                weaponSocket.add(weaponGroup);
-                handBone.add(weaponSocket);
-                glbAct.weaponSocket = weaponSocket;
-              }
-            }
-            const leftHandIdx = tpl.nodes.findIndex((n) =>
-              /^(bip01 l hand|l_hand|l hand|lefthand)$/i.test((n.name || '').trim())
-            );
-            if (leftHandIdx >= 0) {
-              glbAct.leftHandBone = glbAct.rigGroup.getObjectByName(`bone_${leftHandIdx}`) || null;
-            }
-            const headIdx = tpl.nodes.findIndex((n) =>
-              /^(bip01 head|head)$/i.test((n.name || '').trim())
-            );
-            if (headIdx >= 0) {
-              glbAct.headBone = glbAct.rigGroup.getObjectByName(`bone_${headIdx}`) || null;
-            }
-
-            // 2. Foot-IK Knochenreferenzen & lokale Welt-X-Pitch-Achsen für Two-Bone-IK auf Unebenheiten/Schrägen ermitteln
-            heroGlbHolder.updateMatrixWorld(true);
-            const qRigWorld = new THREE.Quaternion();
-            glbAct.rigGroup.getWorldQuaternion(qRigWorld);
-            const findLegBone = (regex) => {
-              const bIdx = tpl.nodes.findIndex((n) => regex.test((n.name || '').trim()));
-              if (bIdx < 0) return null;
-              const bone = glbAct.rigGroup.getObjectByName(`bone_${bIdx}`);
-              if (!bone) return null;
-              const qBoneW = new THREE.Quaternion();
-              bone.getWorldQuaternion(qBoneW);
-              const qBoneInRig = qRigWorld.clone().invert().multiply(qBoneW);
-              const localPitchAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(qBoneInRig.invert()).normalize();
-              return { bone, localPitchAxis };
-            };
-            glbAct.ikBones = {
-              lThigh: findLegBone(/^(bip01 l thigh|l_thigh|l thigh)$/i),
-              rThigh: findLegBone(/^(bip01 r thigh|r_thigh|r thigh)$/i),
-              lCalf: findLegBone(/^(bip01 l calf|l_calf|l calf)$/i),
-              rCalf: findLegBone(/^(bip01 r calf|r_calf|r calf)$/i),
-              lFoot: findLegBone(/^(bip01 l foot|l_foot|l foot)$/i),
-              rFoot: findLegBone(/^(bip01 r foot|r_foot|r foot)$/i),
-            };
-          })
+          .then(bindHeroWeaponAndIk)
           .catch(() => {});
       }
     }
 
     // --- 2. METIN2 +7 / +8 / +9 RÜSTUNGS- & WAFFEN-FUNKELN (SHINING PARTIKEL) ---
     const armorPlusLvl = Number(cfg.armorPlus ?? plus ?? 0);
-    const buildShiningEmitter = (plusLvl, rad = 0.44, hSpan = 0.82, yOff = 1.12) => {
+    const buildShiningEmitter = (plusLvl, rad = 0.44, hSpan = 0.82, axisOff = 1.12, alongZ = false) => {
       if (plusLvl < 7) return null;
       const g = new THREE.Group();
-      g.position.y = yOff;
+      if (alongZ) {
+        g.position.set(0, 0, axisOff);
+      } else {
+        g.position.y = axisOff;
+      }
       const colMain = plusLvl >= 9 ? 0xfbbf24 : plusLvl === 8 ? 0xc084fc : 0x38bdf8;
-      const colSub = plusLvl >= 9 ? 0xef4444 : plusLvl === 8 ? 0x60a5fa : 0xe0f2fe;
-      const count = plusLvl >= 9 ? 18 : plusLvl === 8 ? 12 : 8;
+      const colSub = plusLvl >= 9 ? 0xfef08a : plusLvl === 8 ? 0x60a5fa : 0xe0f2fe;
+      const count = alongZ
+        ? plusLvl >= 9
+          ? 10
+          : plusLvl === 8
+          ? 7
+          : 5
+        : plusLvl >= 9
+        ? 18
+        : plusLvl === 8
+        ? 12
+        : 8;
       const spTex = this.getShiningSparkleTexture ? this.getShiningSparkleTexture() : null;
       const sparks = [];
       for (let i = 0; i < count; i++) {
@@ -25001,28 +25456,42 @@ export class OpenWorld3DEngine {
           map: spTex,
           color: i % 3 === 0 ? colSub : colMain,
           transparent: true,
-          opacity: 0.88,
+          opacity: alongZ ? 0.78 : 0.88,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         const sp = new THREE.Sprite(sm);
-        const s = plusLvl >= 9 ? 0.24 : plusLvl === 8 ? 0.20 : 0.16;
+        const s = alongZ
+          ? plusLvl >= 9
+            ? 0.088
+            : plusLvl === 8
+            ? 0.074
+            : 0.06
+          : plusLvl >= 9
+          ? 0.22
+          : plusLvl === 8
+          ? 0.18
+          : 0.15;
         sp.scale.set(s, s, 1);
         const ang = (i / count) * Math.PI * 2;
         const r = rad * (0.78 + (i % 3) * 0.14);
-        const yb = ((i / count) - 0.5) * hSpan;
-        sp.position.set(Math.cos(ang) * r, yb, Math.sin(ang) * r);
+        const yb = (i / count - 0.5) * hSpan;
+        if (alongZ) {
+          sp.position.set(Math.cos(ang) * r, Math.sin(ang) * r, yb);
+        } else {
+          sp.position.set(Math.cos(ang) * r, yb, Math.sin(ang) * r);
+        }
         sp.userData = { angle: ang, speed: 1.9 + (i % 4) * 0.42, radius: r, yBase: yb, phase: i * 0.65, baseScale: s };
         g.add(sp);
         sparks.push(sp);
       }
-      g.userData = { sparks, plusLvl };
+      g.userData = { sparks, plusLvl, alongZ, axisOff };
       return g;
     };
 
-    const armorShining = buildShiningEmitter(armorPlusLvl, 0.46, 0.84, 1.15);
+    const armorShining = buildShiningEmitter(armorPlusLvl, 0.46, 0.84, 1.15, false);
     if (armorShining) root.add(armorShining);
-    const weaponShining = buildShiningEmitter(plus, 0.16, 0.78, 0.42);
+    const weaponShining = buildShiningEmitter(plus, 0.042, 1.02, 0.76, true);
     if (weaponShining) weaponGroup.add(weaponShining);
 
     // --- 3. LEBENDIGE 3D-ANGELRUTE & SCHWIMMER (POSE) + 3D-BERGBAU-ERZADER & SPITZHACKE ---
@@ -25166,12 +25635,16 @@ export class OpenWorld3DEngine {
         }
       } else if (isMounted) {
         if (isAttacking) {
-          const useSecondMountSlash = ((comboStep || 0) % 2 === 1) && heroGlbAct.clips?.mount_attack2;
-          targetClip = useSecondMountSlash
-            ? 'mount_attack2'
-            : heroGlbAct.clips?.mount_attack
-            ? 'mount_attack'
-            : 'attack1';
+          const mStep = (comboStep || 0) % 3;
+          if (mStep === 2 && heroGlbAct.clips?.mount_attack3) {
+            targetClip = 'mount_attack3';
+          } else if (mStep === 1 && heroGlbAct.clips?.mount_attack2) {
+            targetClip = 'mount_attack2';
+          } else if (heroGlbAct.clips?.mount_attack) {
+            targetClip = 'mount_attack';
+          } else {
+            targetClip = 'attack1';
+          }
           speedMult = 1.15;
           fadeTime = 0.08;
         } else if (isMoving) {
@@ -25185,7 +25658,7 @@ export class OpenWorld3DEngine {
         speedMult = 1.05;
         fadeTime = 0.10;
       } else if (isAttacking || gatherMode === 'mining') {
-        const comboLen = heroGlbAct.clips?.attack7 ? 7 : 6;
+        const comboLen = heroGlbAct.clips?.attack4 ? 4 : heroGlbAct.clips?.attack7 ? 7 : 6;
         const stepIdx = ((comboStep || 0) % comboLen) + 1;
         const stepKey = `attack${stepIdx}`;
         targetClip = heroGlbAct.clips?.[stepKey]
@@ -25193,8 +25666,8 @@ export class OpenWorld3DEngine {
           : heroGlbAct.clips?.attack1
           ? 'attack1'
           : 'attack';
-        speedMult = stepIdx >= 6 ? 1.06 : 1.14;
-        fadeTime = 0.07;
+        speedMult = stepIdx === 4 || stepIdx >= 6 ? 1.08 : 1.14;
+        fadeTime = 0.08;
       } else if (isJumping && heroGlbAct.clips?.jump) {
         targetClip = 'jump';
         speedMult = 1.0;
@@ -25249,19 +25722,39 @@ export class OpenWorld3DEngine {
       }
     }
 
-    // 1b. Aktive Metin2- & L-Skill-Waffen-/Körper-Buff-Loops (Tiers 1..5) animieren
+    // 1b. Aktive Metin2- & L-Skill-Waffen-/Körper-Buff-Loops (Tiers 1..5) & 3D-Knochen-Schwertschweif animieren
     this.updateActorMetinBuffLoop(actor, dt, elapsed);
+    if ((actor._ribbonSwingTimer || 0) > 0) {
+      actor._ribbonSwingTimer = Math.max(0, actor._ribbonSwingTimer - dt);
+    }
+    if (actor !== this.localPlayerActor && isAttacking && !isDead) {
+      actor._ribbonSwingTimer = Math.max(actor._ribbonSwingTimer || 0, 0.12);
+    }
+    if (heroGlbAct?.weaponSocket) {
+      this.updateActorWeaponRibbonTrail(actor, (actor._ribbonSwingTimer || 0) > 0 && !isDead, dt);
+    }
 
     // 2. +7 / +8 / +9 Rüstungs- & Waffen-Funkeln (Metin2 Shinings) rotieren & pulsieren lassen
     for (const shGroup of [actor.armorShining, actor.weaponShining]) {
       if (shGroup && shGroup.userData?.sparks) {
-        shGroup.position.y = shGroup === actor.armorShining ? (isMounted ? 1.68 : 1.15) : 0.42;
+        const alongZ = Boolean(shGroup.userData.alongZ);
+        if (alongZ) {
+          shGroup.position.set(0, 0, shGroup.userData.axisOff || 0.76);
+        } else {
+          shGroup.position.y = isMounted ? 1.68 : 1.15;
+        }
         for (const sp of shGroup.userData.sparks) {
           const ud = sp.userData;
           const a = ud.angle + elapsed * ud.speed;
-          sp.position.x = Math.cos(a) * ud.radius;
-          sp.position.z = Math.sin(a) * ud.radius;
-          sp.position.y = ud.yBase + Math.sin(elapsed * 3.4 + ud.phase) * 0.12;
+          if (alongZ) {
+            sp.position.x = Math.cos(a) * ud.radius;
+            sp.position.y = Math.sin(a) * ud.radius;
+            sp.position.z = ud.yBase + Math.sin(elapsed * 3.8 + ud.phase) * 0.08;
+          } else {
+            sp.position.x = Math.cos(a) * ud.radius;
+            sp.position.z = Math.sin(a) * ud.radius;
+            sp.position.y = ud.yBase + Math.sin(elapsed * 3.4 + ud.phase) * 0.12;
+          }
           const pulse = (0.72 + 0.38 * Math.sin(elapsed * 7.5 + ud.phase)) * ud.baseScale;
           sp.scale.set(pulse, pulse, 1);
         }
@@ -25610,66 +26103,71 @@ export class OpenWorld3DEngine {
     );
     fuller.position.z = 0.18 + bodyLen * 0.46;
 
-    // 4. Formschlüssige Smaragd-/Runen-Klingenaura ("Aura des Schwertes", verdeckt nicht die Klingenform!)
+    // 4. Formschlüssige, spitz zulaufende Metin2-Energiescheide ("Aura des Schwertes" – 0 Kreis-Blobs!)
     const bladeAuraGroup = new THREE.Group();
-    const auraColorCore = weaponVisual === 'rsb' ? 0xf87171 : 0x34d399;
-    const auraColorOuter = weaponVisual === 'rsb' ? 0xef4444 : 0x2dd4bf;
+    const defaultCoreHex = weaponVisual === 'rsb' ? 0xfca5a5 : 0xfef08a;
+    const defaultOuterHex = weaponVisual === 'rsb' ? 0xef4444 : 0xf97316;
 
     const innerAuraMat = new THREE.MeshBasicMaterial({
-      color: auraColorCore,
+      color: defaultCoreHex,
       transparent: true,
-      opacity: 0.34,
+      opacity: weaponVisual === 'rsb' ? 0.22 : 0.0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
     const innerAura = new THREE.Mesh(
-      new THREE.BoxGeometry(0.138, 0.044, len * 0.94),
+      new THREE.BoxGeometry(0.118, 0.028, len * 0.92),
       innerAuraMat
     );
-    innerAura.position.z = 0.18 + len * 0.47;
+    innerAura.position.z = 0.18 + len * 0.46;
 
     const outerAuraMat = new THREE.MeshBasicMaterial({
-      color: auraColorOuter,
+      color: defaultOuterHex,
       transparent: true,
-      opacity: 0.16,
+      opacity: weaponVisual === 'rsb' ? 0.14 : 0.0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
     const outerAura = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.092, len + 0.14, 10, 1, true),
+      new THREE.CylinderGeometry(0.008, 0.066, len * 1.02, 10, 1, true),
       outerAuraMat
     );
     outerAura.rotation.x = Math.PI / 2;
-    outerAura.position.z = 0.18 + len * 0.5;
+    outerAura.position.z = 0.18 + len * 0.50;
 
-    const auraSparks = [];
-    const sparkTex = this.getShiningSparkleTexture ? this.getShiningSparkleTexture() : null;
-    for (let i = 0; i < 6; i++) {
-      const spMat = new THREE.SpriteMaterial({
-        map: sparkTex,
-        color: i % 2 === 0 ? 0x6ee7b7 : 0x2dd4bf,
-        transparent: true,
-        opacity: 0.64,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const sp = new THREE.Sprite(spMat);
-      const frac = (i + 0.5) / 6;
-      sp.position.set(
-        (i % 2 === 0 ? 1 : -1) * 0.045,
-        0.015,
-        0.22 + frac * len
-      );
-      sp.scale.set(0.22, 0.22, 1);
-      sp.userData = { baseZ: 0.22 + frac * len, phase: i * 1.15 };
-      bladeAuraGroup.add(sp);
-      auraSparks.push(sp);
-    }
+    const flameTex = this.getBladeAuraFlameTexture ? this.getBladeAuraFlameTexture() : null;
+    const flameMat = new THREE.MeshBasicMaterial({
+      map: flameTex,
+      color: defaultOuterHex,
+      transparent: true,
+      opacity: weaponVisual === 'rsb' ? 0.28 : 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const flameGeo = new THREE.PlaneGeometry(0.24, len * 1.06);
+    flameGeo.rotateX(Math.PI / 2);
+    const flamePlaneA = new THREE.Mesh(flameGeo, flameMat);
+    flamePlaneA.position.z = 0.18 + len * 0.51;
+    const flamePlaneB = new THREE.Mesh(flameGeo, flameMat);
+    flamePlaneB.position.z = 0.18 + len * 0.51;
+    flamePlaneB.rotation.z = Math.PI * 0.5;
 
-    bladeAuraGroup.add(innerAura, outerAura);
-    bladeAuraGroup.userData = { innerAura, outerAura, innerAuraMat, outerAuraMat, auraSparks, len };
+    bladeAuraGroup.add(innerAura, outerAura, flamePlaneA, flamePlaneB);
+    bladeAuraGroup.userData = {
+      innerAura,
+      outerAura,
+      flamePlaneA,
+      flamePlaneB,
+      innerAuraMat,
+      outerAuraMat,
+      flameMat,
+      defaultCoreHex,
+      defaultOuterHex,
+      len,
+    };
     g.add(hilt, pommel, guard, guardGem, blade, bladeTip, fuller, bladeAuraGroup);
     g.userData.bladeAuraGroup = bladeAuraGroup;
 
@@ -28134,6 +28632,7 @@ export class OpenWorld3DEngine {
         if (mesh.teamEmblemGroup) {
           this.teamEmblemSystem?.destroyEmblemGroup(mesh.teamEmblemGroup);
         }
+        this.disposeActorWeaponRibbonTrail(mesh);
         this.entityGroup.remove(mesh.root);
         this.otherPlayerMeshes.delete(id);
       }
@@ -28889,7 +29388,15 @@ export class OpenWorld3DEngine {
       const hasGlbCaster = Boolean(casterActor?.heroGlbHolder?.userData?.glbActor);
       if (isLocalPlayerEvent && ev.type === 'skill_buff') {
         if (!hasGlbCaster) this.localBuffAnimTimer = 0.72;
-        this.hasActiveWeaponBuff = true;
+        if (
+          metinSk?.loop?.bone === 'right_hand' ||
+          metinSk?.code === 'geomgyeong' ||
+          metinSk?.code === 'gwigeom' ||
+          d.skillId === 'aura_sword' ||
+          d.skillId === 'enchanted_blade'
+        ) {
+          this.hasActiveWeaponBuff = true;
+        }
       }
       const isLSkill = Boolean(metinSk?.isLSkill) || Number(d.skillTier) === 5;
       const displayBuffName = metinSk?.name || d.skillName;
@@ -29990,9 +30497,11 @@ export class OpenWorld3DEngine {
 
   triggerNextComboSwing(withLunge = true) {
     const now = performance.now();
-    const isMounted = Boolean(this.localPlayerActor?.mountGroup?.visible);
-    const maxCombo = isMounted ? 4 : (this.localMaxComboSteps || 6);
-    if (now - (this._lastComboSwingAt || 0) > 2100) {
+    const lp = this.localPlayerActor;
+    const isMounted = Boolean(lp?.mountGroup?.visible);
+    const hasGlbHeroSocket = Boolean(lp?.heroGlbHolder?.userData?.glbActor?.weaponSocket);
+    const maxCombo = hasGlbHeroSocket ? (isMounted ? 3 : 4) : isMounted ? 4 : this.localMaxComboSteps || 6;
+    if ((this.localAttackAnimTimer || 0) <= 0.06 || now - (this._lastComboSwingAt || 0) > 760) {
       this.localComboStep = 0;
     } else {
       this.localComboStep = ((this.localComboStep ?? -1) + 1) % maxCombo;
@@ -30000,9 +30509,22 @@ export class OpenWorld3DEngine {
     this._lastComboSwingAt = now;
     // Vom Pferd aus gibt es keinen abschließenden Finisher mit Pause/Knockback — kontinuierlicher Reit-Schlag im Kreis!
     const isFinisher = !isMounted && this.localComboStep === maxCombo - 1;
-    this.localAttackAnimDuration = isFinisher ? 0.60 : 0.46;
+    // Volle .gr2-Recovery-Dauer zulassen, damit beim Aufhören der Charakter weich in die Guard-Pose zurückkehrt (0° Snap!),
+    // während autoAttackSwingCooldown schnelles Weiterketten am exakten Follow-Through-Übergang erlaubt!
+    this.localAttackAnimDuration = hasGlbHeroSocket
+      ? isMounted
+        ? 0.76
+        : isFinisher
+        ? 1.08
+        : 0.84
+      : isFinisher
+      ? 0.60
+      : 0.46;
     this.localAttackAnimTimer = this.localAttackAnimDuration;
     this.autoAttackSwingCooldown = isFinisher ? 0.58 : 0.44;
+    if (lp) {
+      lp._ribbonSwingTimer = isMounted ? 0.50 : isFinisher ? 0.62 : 0.45;
+    }
     this.clientClickTarget = null;
     this.pendingPickupDropId = null;
     this.pendingInteract = null;
@@ -30013,14 +30535,17 @@ export class OpenWorld3DEngine {
       window.aeryndorAudio.playWeaponSwing(false, this.localWeaponSubType || 'one_hand', isFinisher, isMounted);
     }
 
-    // 3D-Sichel-Schwertschweif passend zum Combo-Hieb erzeugen
-    this.spawnSlashArcVFX(
-      this.localPlayerPos.x,
-      this.localPlayerPos.y + (isMounted ? 1.54 : 1.16),
-      this.localPlayerPos.z,
-      this.localPlayerRotY,
-      this.localComboStep % 6
-    );
+    // Bei echten 3D-GLB-Helden mit Hand-Socket zeichnet updateActorWeaponRibbonTrail den exakten 3D-Klingen-Schweif;
+    // der flache prozedurale RingGeometry-Teller wird nur noch als Fallback für Block-Dummies genutzt!
+    if (!hasGlbHeroSocket) {
+      this.spawnSlashArcVFX(
+        this.localPlayerPos.x,
+        this.localPlayerPos.y + (isMounted ? 1.54 : 1.16),
+        this.localPlayerPos.z,
+        this.localPlayerRotY,
+        this.localComboStep % 6
+      );
+    }
 
     // Vorwärts-Schrittimpuls (Lunge) wie im Gyazo-Referenzvideo (nur zu Fuß!)
     if (withLunge && !this.localPlayerMoving && !isMounted) {
@@ -31940,6 +32465,14 @@ export class OpenWorld3DEngine {
     if (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
     const turnSpeed = isMountedNow ? 12.5 : 18.0;
     this._smoothedPlayerRotY += rotDiff * Math.min(1.0, turnSpeed * dt);
+    if (
+      this.localPlayerMoving &&
+      (this.autoAttackSwingCooldown || 0) <= 0 &&
+      !this.keys.space &&
+      this.localAttackAnimTimer > 0
+    ) {
+      this.localAttackAnimTimer = 0;
+    }
     const isAttackingNow = Boolean(this.keys.space) || this.localAttackAnimTimer > 0 || this.localWhirlwindTimer > 0;
     const isTurningInPlace = !this.localPlayerMoving && !isAttackingNow && Math.abs(rotDiff) > 0.04;
     const turnLeanRoll = this.localPlayerMoving ? Math.max(-0.14, Math.min(0.14, -rotDiff * 0.22)) : 0.0;
@@ -32261,34 +32794,37 @@ export class OpenWorld3DEngine {
       }
     }
 
-    // Smaragd-Türkise Schwert-Aura ("Aura des Schwertes") entlang der Klinge animieren
+    // Formschlüssige Metin2-Energiescheide ("Aura des Schwertes" / "Verzauberte Klinge") entlang der Klinge animieren
     const bladeAura = lp.weaponGroup?.userData?.bladeAuraGroup;
     if (bladeAura) {
-      const inCombatOrBuffed =
-        Boolean(this.hasActiveWeaponBuff) ||
-        this.localAttackAnimTimer > 0 ||
-        this.localBuffAnimTimer > 0 ||
-        (lp.weaponPlus || 0) >= 6;
-      const pulse = 0.85 + Math.sin(elapsed * 11.0) * 0.18;
-      const intensityBoost = this.localBuffAnimTimer > 0 ? 1.55 : this.localAttackAnimTimer > 0 ? 1.32 : inCombatOrBuffed ? 1.05 : 0.72;
-      if (bladeAura.userData.innerAuraMat) {
-        bladeAura.userData.innerAuraMat.opacity = Math.min(0.88, 0.42 * pulse * intensityBoost);
-      }
-      if (bladeAura.userData.outerAuraMat) {
-        bladeAura.userData.outerAuraMat.opacity = Math.min(0.58, 0.24 * pulse * intensityBoost);
-        const s = 0.92 + Math.sin(elapsed * 14.0) * 0.16;
-        bladeAura.userData.outerAura.scale.set(s, 1.0, s);
-      }
-      if (bladeAura.userData.auraSparks) {
-        const bLen = bladeAura.userData.len || 1.25;
-        for (const sp of bladeAura.userData.auraSparks) {
-          const cyc = (elapsed * 1.45 + sp.userData.phase) % 1.0;
-          sp.position.z = 0.20 + cyc * bLen;
-          sp.position.x = Math.sin(elapsed * 8.5 + sp.userData.phase) * 0.075;
-          sp.position.y = Math.cos(elapsed * 7.2 + sp.userData.phase) * 0.045;
-          const spScale = (0.18 + Math.sin(cyc * Math.PI) * 0.16) * intensityBoost;
-          sp.scale.set(spScale, spScale, 1);
+      const hasBladeBuff = Boolean(lp._hasMetinWeaponBladeBuff || this.hasActiveWeaponBuff);
+      const isRsb = lp.weaponVisual === 'rsb';
+      const pulse = 0.88 + Math.sin(elapsed * 12.5) * 0.14;
+      const flicker = 0.86 + Math.sin(elapsed * 21.0) * 0.10 + Math.cos(elapsed * 33.0) * 0.06;
+      const swingBoost = (lp._ribbonSwingTimer || 0) > 0 ? 1.18 : 1.0;
+      if (hasBladeBuff) {
+        if (bladeAura.userData.innerAuraMat) {
+          bladeAura.userData.innerAuraMat.opacity = Math.min(0.92, 0.56 * pulse * swingBoost);
         }
+        if (bladeAura.userData.outerAuraMat) {
+          bladeAura.userData.outerAuraMat.opacity = Math.min(0.62, 0.32 * pulse * swingBoost);
+          const s = 0.94 + Math.sin(elapsed * 15.0) * 0.14;
+          bladeAura.userData.outerAura.scale.set(s, 1.0, s);
+        }
+        if (bladeAura.userData.flameMat) {
+          bladeAura.userData.flameMat.opacity = Math.min(0.95, 0.78 * flicker * swingBoost);
+          const fw = 0.92 + Math.sin(elapsed * 19.0) * 0.16;
+          if (bladeAura.userData.flamePlaneA) bladeAura.userData.flamePlaneA.scale.set(fw, 1.0, 1.0);
+          if (bladeAura.userData.flamePlaneB) bladeAura.userData.flamePlaneB.scale.set(fw, 1.0, 1.0);
+        }
+      } else if (isRsb) {
+        if (bladeAura.userData.innerAuraMat) bladeAura.userData.innerAuraMat.opacity = 0.20 * pulse;
+        if (bladeAura.userData.outerAuraMat) bladeAura.userData.outerAuraMat.opacity = 0.10 * pulse;
+        if (bladeAura.userData.flameMat) bladeAura.userData.flameMat.opacity = 0.24 * flicker;
+      } else {
+        if (bladeAura.userData.innerAuraMat) bladeAura.userData.innerAuraMat.opacity = 0.0;
+        if (bladeAura.userData.outerAuraMat) bladeAura.userData.outerAuraMat.opacity = 0.0;
+        if (bladeAura.userData.flameMat) bladeAura.userData.flameMat.opacity = 0.0;
       }
     }
 
@@ -34011,13 +34547,18 @@ export class OpenWorld3DEngine {
             const att = this.getActorMetinAttachWorldPos(
               v.followActor,
               v.followBone,
-              [0, 0, 0],
+              v.evPos || [0, 0, 0],
               v.followActor.root.position.x,
               v.followActor.root.position.y,
               v.followActor.root.position.z,
               v.followActor.root.rotation.y
             );
-            v.mesh.position.set(att.x, att.y, att.z);
+            v.mesh.position.set(
+              att.x + (v.localMdeOffsetX || 0),
+              att.y + (v.localMdeOffsetY || 0),
+              att.z + (v.localMdeOffsetZ || 0)
+            );
+            v.mesh.rotation.y = v.followActor.root.rotation.y;
           } else {
             v.mesh.position.x = v.followActor.root.position.x + (v.offsetX || 0);
             v.mesh.position.y = v.followActor.root.position.y + (v.offsetY || 0.08);
@@ -34044,7 +34585,7 @@ export class OpenWorld3DEngine {
             const att = this.getActorMetinAttachWorldPos(
               v.followActor,
               v.followBone,
-              [0, 0, 0],
+              v.evPos || [0, 0, 0],
               v.followActor.root.position.x,
               v.followActor.root.position.y,
               v.followActor.root.position.z,
@@ -34590,6 +35131,38 @@ export class OpenWorld3DEngine {
 // 8. 3D-HELDEN-PODEST FÜR CHARAKTERAUSWAHL & CHARAKTERERSTELLUNG
 // ============================================================================
 export class CharacterShowcase3D {
+  static preloadHeroModels(priorityClassId = 'warrior') {
+    if (!CharacterShowcase3D._preloadHelper) {
+      const h = Object.create(OpenWorld3DEngine.prototype);
+      h._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
+      h._glbTemplateCache = GLOBAL_GLB_TEMPLATE_CACHE;
+      h._glbResolvedTemplates = GLOBAL_GLB_RESOLVED_CACHE;
+      CharacterShowcase3D._preloadHelper = h;
+    }
+    const helper = CharacterShowcase3D._preloadHelper;
+    const warmClass = (clsKey) => {
+      const entry = HERO_GLB_BY_CLASS[clsKey];
+      if (!entry) return Promise.resolve();
+      if (Array.isArray(entry.tex)) {
+        for (const tUrl of entry.tex) {
+          if (tUrl) helper.loadModelTexture(tUrl, false);
+        }
+      }
+      if (entry.normalMap) {
+        helper.loadModelTexture(entry.normalMap, true);
+      }
+      return helper.loadGLBTemplate(entry.glb).catch(() => null);
+    };
+
+    const firstKey = HERO_GLB_BY_CLASS[priorityClassId] ? priorityClassId : 'warrior';
+    const otherKeys = Object.keys(HERO_GLB_BY_CLASS).filter((k) => k !== firstKey);
+    warmClass(firstKey).finally(() => {
+      for (const k of otherKeys) {
+        warmClass(k);
+      }
+    });
+  }
+
   constructor(container, initialCfg = {}) {
     this.container = container;
     this.disposed = false;
@@ -34598,6 +35171,7 @@ export class CharacterShowcase3D {
     this.currentRotY = 0.0;
     this.targetZoom = 4.85;
     this.currentZoom = 4.85;
+    this._heroRetryTimer = 0;
 
     if (!this.container) return;
 
@@ -34646,12 +35220,28 @@ export class CharacterShowcase3D {
     this.runeRingInner.rotation.x = -Math.PI / 2;
     this.runeRingInner.position.y = 0.015;
 
-    this.pedestalGroup.add(this.runeRingOuter, this.runeRingInner);
+    // Dezenter goldener Beschwörungs-Lichtschleier (nur sichtbar falls GLB im ersten Moment noch streamt – niemals Lego-Dummy!)
+    this.summonAura = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.66, 1.95, 28, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xfbbf24,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.16,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    this.summonAura.position.y = 0.98;
+    this.summonAura.visible = false;
+
+    this.pedestalGroup.add(this.runeRingOuter, this.runeRingInner, this.summonAura);
     this.scene.add(this.pedestalGroup);
 
     this.helperEngine = Object.create(OpenWorld3DEngine.prototype);
-    this.helperEngine._modelTextureCache = new Map();
-    this.helperEngine._glbTemplateCache = new Map();
+    this.helperEngine._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
+    this.helperEngine._glbTemplateCache = GLOBAL_GLB_TEMPLATE_CACHE;
+    this.helperEngine._glbResolvedTemplates = GLOBAL_GLB_RESOLVED_CACHE;
     this.helperEngine._sharedGlbMaterialCache = new Map();
     this.helperEngine._objectWeatherUniforms = {
       uSnowCoverage: { value: 0.0 },
@@ -34663,15 +35253,45 @@ export class CharacterShowcase3D {
     this.animate();
   }
 
+  _ensureMountLoaded() {
+    if (!this.actor || !this.actor.mountGroup) return;
+    const mg = this.actor.mountGroup;
+    if (mg.userData?.glbActor || mg.userData?._glbIsLoading) return;
+    let savedSkin = 'col1';
+    try {
+      savedSkin = localStorage.getItem('aeryndor_mount_skin_v1') || 'col1';
+    } catch (_) {}
+    const horseCfg = this.helperEngine.getHorseSkinConfig(savedSkin);
+    this.helperEngine.attachGLBModelToGroup(
+      mg,
+      horseCfg.glb || '/assets/models/npcs/pewi_mount_horse.glb',
+      horseCfg.tex || [`/assets/models/npcs/${horseCfg.texFile}`],
+      horseCfg.height || 1.92,
+      null,
+      false,
+      {
+        color: horseCfg.color.clone(),
+        emissive: horseCfg.emissive.clone(),
+        emissiveIntensity: horseCfg.emissiveIntensity,
+        useMapAsEmissive: true,
+        roughness: horseCfg.roughness,
+        metalness: horseCfg.metalness,
+      }
+    );
+    mg.userData.mountSkin = horseCfg.key;
+  }
+
   setCharacter(cfg = {}) {
     if (!this.scene) return;
     this.lastCfg = { ...cfg };
+    this._heroRetryTimer = 0;
     if (this.actor) {
       this.scene.remove(this.actor.root);
       this.helperEngine.disposeSafeHierarchy?.(this.actor.root);
     }
     if (!cfg || cfg.empty) {
       this.actor = null;
+      if (this.summonAura) this.summonAura.visible = false;
       return;
     }
     this.actor = this.helperEngine.createCharacterRig({
@@ -34680,15 +35300,20 @@ export class CharacterShowcase3D {
       hairIndex: cfg.hairIndex || 0,
       weaponPlus: cfg.weaponPlus ?? 8,
       showPet: false,
+      skipPet: true,
+      lazyMount: !this.isMountedPreview,
     });
+    if (this.actor.bodyGroup) {
+      this.actor.bodyGroup.visible = false;
+    }
     this.actor.root.scale.setScalar(1.16);
     if (this.isMountedPreview && this.actor.mountGroup) {
+      this._ensureMountLoaded();
       this.actor.mountGroup.visible = true;
-      if (this.actor.bodyGroup) {
-        this.actor.bodyGroup.position.set(0, 0.72, -0.06);
-      }
     }
     this.scene.add(this.actor.root);
+    // Restliche Heldenklassen im Hintergrund nachwärmen
+    CharacterShowcase3D.preloadHeroModels(cfg.classId || 'warrior');
   }
 
   triggerActionPose() {
@@ -34698,9 +35323,12 @@ export class CharacterShowcase3D {
   toggleMountPreview() {
     this.isMountedPreview = !this.isMountedPreview;
     if (this.actor && this.actor.mountGroup) {
+      if (this.isMountedPreview) {
+        this._ensureMountLoaded();
+      }
       this.actor.mountGroup.visible = this.isMountedPreview;
       if (this.actor.bodyGroup) {
-        this.actor.bodyGroup.position.set(0, this.isMountedPreview ? 0.72 : 0.0, this.isMountedPreview ? -0.06 : 0.0);
+        this.actor.bodyGroup.visible = false;
       }
       this.targetZoom = this.isMountedPreview ? 5.65 : 4.85;
     }
@@ -34797,23 +35425,36 @@ export class CharacterShowcase3D {
     if (this.runeRingInner) this.runeRingInner.rotation.z -= dt * 0.75 * ringSpeedMult;
 
     if (this.actor) {
+      if (this.actor.bodyGroup) {
+        this.actor.bodyGroup.visible = false;
+      }
+      const heroReady = Boolean(this.actor.heroGlbHolder?.userData?.glbActor);
+      const heroLoading = Boolean(this.actor.heroGlbHolder?.userData?._glbIsLoading);
+      if (this.summonAura) {
+        this.summonAura.visible = !heroReady;
+        if (!heroReady) {
+          this.summonAura.rotation.y = t * 1.6;
+          this.summonAura.material.opacity = 0.11 + 0.08 * Math.sin(t * 4.5);
+        }
+      }
+      if (!heroReady && !heroLoading && this.lastCfg && !this.lastCfg.empty) {
+        this._heroRetryTimer = (this._heroRetryTimer || 0) + dt;
+        if (this._heroRetryTimer > 1.2) {
+          this._heroRetryTimer = -10.0; // Maximal 1 automatischer Retry pro Wechsel
+          this.setCharacter(this.lastCfg);
+          return;
+        }
+      }
+
       this.actor.root.rotation.y = this.currentRotY;
       if (this.actionTimer > 0) {
         this.actionTimer = Math.max(0, this.actionTimer - dt);
-        const p = 1.0 - this.actionTimer / 1.05;
-        const swing = Math.sin(p * Math.PI * 2.0);
-        this.actor.torso.position.y = 1.08 + Math.sin(p * Math.PI) * 0.14;
-        this.actor.torso.rotation.y = swing * 0.48;
-        this.actor.rightArmPivot.rotation.x = -1.35 + Math.cos(p * Math.PI * 2.0) * 0.95;
-        this.actor.leftArmPivot.rotation.x = -0.65 - swing * 0.35;
-      } else {
-        this.actor.torso.position.y = 1.08 + Math.sin(t * 2.2) * 0.018;
-        this.actor.torso.rotation.y = 0;
-        this.actor.rightArmPivot.rotation.x = -0.38 + Math.sin(t * 2.2) * 0.06;
-        this.actor.leftArmPivot.rotation.x = -0.22 - Math.sin(t * 2.2) * 0.05;
       }
       if (this.actor.auraRing) {
         this.actor.auraRing.rotation.z = t * 1.8 * ringSpeedMult;
+      }
+      if (this.isMountedPreview && this.actor.mountGroup?.userData?.glbActor?.mixer) {
+        this.actor.mountGroup.userData.glbActor.mixer.update(dt);
       }
       if (this.helperEngine?.updateCharacterRigExtras) {
         this.helperEngine.updateCharacterRigExtras(this.actor, {
@@ -34826,6 +35467,8 @@ export class CharacterShowcase3D {
           dt,
         });
       }
+    } else if (this.summonAura) {
+      this.summonAura.visible = false;
     }
 
     this.renderer.render(this.scene, this.camera);

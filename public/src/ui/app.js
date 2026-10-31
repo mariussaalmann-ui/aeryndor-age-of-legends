@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v611';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v613';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -2184,6 +2184,9 @@ class AeryndorMMOApp {
     this.portalMode = 'login';
     this.audio?.setBgmContext?.('login');
     this.disposeShowcase3D();
+    // 3D-Heldenmodelle & Texturen bereits während des Login-Bildschirms im Hintergrund vorladen,
+    // damit beim Wechsel in die Charakterauswahl sofort das echte 3D-GLB-Modell (0 ms, ohne Dummy) steht!
+    CharacterShowcase3D.preloadHeroModels?.('warrior');
     const portal = document.getElementById('portal-view');
     if (!portal) return;
     portal.classList.remove('hidden');
@@ -2557,6 +2560,9 @@ class AeryndorMMOApp {
     this.portalMode = 'register';
     this.audio?.setBgmContext?.('login');
     this.disposeShowcase3D();
+    // 3D-Heldenmodelle & Texturen bereits während des Login-Bildschirms im Hintergrund vorladen,
+    // damit beim Wechsel in die Charakterauswahl sofort das echte 3D-GLB-Modell (0 ms, ohne Dummy) steht!
+    CharacterShowcase3D.preloadHeroModels?.('warrior');
     const portal = document.getElementById('portal-view');
     if (!portal) return;
     portal.classList.remove('hidden');
@@ -2694,6 +2700,9 @@ class AeryndorMMOApp {
     this.portalMode = 'charselect';
     this.audio?.setBgmContext?.('select');
     this.disposeShowcase3D();
+    // 3D-Heldenmodelle & Texturen bereits während des Login-Bildschirms im Hintergrund vorladen,
+    // damit beim Wechsel in die Charakterauswahl sofort das echte 3D-GLB-Modell (0 ms, ohne Dummy) steht!
+    CharacterShowcase3D.preloadHeroModels?.('warrior');
     const portal = document.getElementById('portal-view');
     if (!portal) return;
     portal.classList.remove('hidden');
