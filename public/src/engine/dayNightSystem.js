@@ -1487,7 +1487,7 @@ export class PostProcessingComposer {
       depthTexture: depthTex,
     });
 
-    this.ssaoTarget = new THREE.WebGLRenderTarget(Math.floor(w * 0.5), Math.floor(h * 0.5), {
+    this.ssaoTarget = new THREE.WebGLRenderTarget(Math.floor(w * 0.85), Math.floor(h * 0.85), {
       type: THREE.UnsignedByteType,
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
@@ -1508,15 +1508,15 @@ export class PostProcessingComposer {
       depthBuffer: false,
     });
 
-    // 1. GTAO / SSAO Shader (Depth-basierte Umgebungsverdeckung für Bäume, Gras, Felsen, Mauern & Charaktere)
+    // 1. High-Res Dual-Scale GTAO / SSAO Shader (Mikro-Kontaktschatten an Stiefeln/Rüstungsfugen + Makro-Bodenverankerung)
     this.ssaoMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uDepthTex: { value: this.sceneTarget.depthTexture },
-        uResolution: { value: new THREE.Vector2(w * 0.5, h * 0.5) },
-        uCameraNear: { value: 0.5 },
+        uResolution: { value: new THREE.Vector2(w * 0.85, h * 0.85) },
+        uCameraNear: { value: 0.35 },
         uCameraFar: { value: 900.0 },
-        uRadius: { value: 1.45 },
-        uIntensity: { value: 1.15 },
+        uRadius: { value: 1.38 },
+        uIntensity: { value: 1.28 },
       },
       depthWrite: false,
       depthTest: false,
@@ -1552,7 +1552,7 @@ export class PostProcessingComposer {
             return;
           }
           float centerZ = linearizeZ(rawD);
-          if (centerZ > 115.0) {
+          if (centerZ > 125.0) {
             gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
             return;
           }
@@ -1566,31 +1566,51 @@ export class PostProcessingComposer {
           float slopeX = (abs(zR - centerZ) < abs(centerZ - zL)) ? (zR - centerZ) : (centerZ - zL);
           float slopeY = (abs(zU - centerZ) < abs(centerZ - zD)) ? (zU - centerZ) : (centerZ - zD);
 
-          float rotAngle = ign(gl_FragCoord.xy) * 6.2831853;
-          float screenRad = clamp(uRadius * 18.0 / max(2.5, centerZ), 1.5, 16.0);
-          float occ = 0.0;
+          float noiseVal = ign(gl_FragCoord.xy);
+          float rotAngle = noiseVal * 6.2831853;
 
+          // Skala A: 4 enge Mikro-Kontaktschatten-Taps (Stiefelsohlen auf Kopfsteinpflaster, Kleidungsschichten, Rüstungskanten)
+          float microRad = clamp(6.5 / max(1.8, centerZ * 0.45), 1.35, 6.0);
+          float microOcc = 0.0;
+          for (int m = 0; m < 4; m++) {
+            float fm = float(m);
+            float mAng = rotAngle + fm * 1.5707963;
+            vec2 mOff = vec2(cos(mAng), sin(mAng)) * (microRad * (0.55 + 0.45 * fract(noiseVal + fm * 0.25)));
+            float mRaw = texture2D(uDepthTex, vUv + mOff * texel).r;
+            if (mRaw < 0.9995) {
+              float mZ = linearizeZ(mRaw);
+              float expZ = centerZ + slopeX * mOff.x + slopeY * mOff.y;
+              float zDiff = expZ - mZ;
+              float mRange = smoothstep(0.0, 1.0, 0.34 / max(0.03, abs(centerZ - mZ)));
+              microOcc += step(0.009, zDiff) * smoothstep(0.009, 0.11, zDiff) * mRange;
+            }
+          }
+          microOcc *= 0.25;
+
+          // Skala B: 8 Golden-Angle Makro-GTAO-Taps (weiche Umgebungsverdeckung unter Charakteren, Pferden, Mauern & Felsen)
+          float screenRad = clamp(uRadius * 23.0 / max(2.2, centerZ), 2.2, 22.0);
+          float macroOcc = 0.0;
           for (int i = 0; i < 8; i++) {
             float fi = float(i);
-            float r = (fi + 0.5) / 8.0;
-            float ang = rotAngle + fi * 2.3999632; // Golden-Angle Spirale
+            float r = (fi + 0.45) / 8.0;
+            float ang = rotAngle + fi * 2.3999632;
             vec2 dir = vec2(cos(ang), sin(ang));
             vec2 offsetPx = dir * (r * screenRad);
             vec2 sUv = vUv + offsetPx * texel;
             float sRaw = texture2D(uDepthTex, sUv).r;
             if (sRaw < 0.9995) {
               float sampleZ = linearizeZ(sRaw);
-              // Erwartete Tiefe entlang der lokalen Oberflächentangente (verhindert Selbst-Abschattung auf flachem Boden!)
               float expectedZ = centerZ + slopeX * offsetPx.x + slopeY * offsetPx.y;
               float zDiff = expectedZ - sampleZ;
-              float rangeCheck = smoothstep(0.0, 1.0, (uRadius * 1.65) / max(0.08, abs(centerZ - sampleZ)));
-              occ += step(0.045, zDiff) * smoothstep(0.045, 0.42, zDiff) * rangeCheck;
+              float rangeCheck = smoothstep(0.0, 1.0, (uRadius * 1.55) / max(0.07, abs(centerZ - sampleZ)));
+              macroOcc += step(0.026, zDiff) * smoothstep(0.026, 0.46, zDiff) * rangeCheck;
             }
           }
+          macroOcc *= 0.125;
 
-          occ = (occ / 8.0) * uIntensity;
-          float distFade = 1.0 - smoothstep(55.0, 110.0, centerZ);
-          float ao = clamp(1.0 - occ * distFade, 0.34, 1.0);
+          float occ = (microOcc * 0.48 + macroOcc * 0.64) * uIntensity;
+          float distFade = 1.0 - smoothstep(58.0, 118.0, centerZ);
+          float ao = clamp(1.0 - occ * distFade, 0.25, 1.0);
           gl_FragColor = vec4(ao, ao, ao, 1.0);
         }
       `,
@@ -1678,7 +1698,7 @@ export class PostProcessingComposer {
       `,
     });
 
-    // 3. Final Composite Pass (Bilateral GTAO + Unreal-Bloom + AMD CAS Sharpening + ACES ToneMapping)
+    // 3. Final Composite Pass (9-Tap Depth-Bilateral GTAO + Unreal-Bloom + AMD CAS Sharpening + ACES ToneMapping)
     this.compositeMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uSceneTex: { value: this.sceneTarget.texture },
@@ -1686,8 +1706,10 @@ export class PostProcessingComposer {
         uSsaoTex: { value: this.ssaoTarget.texture },
         uBloomTex: { value: this.bloomTargetB.texture },
         uResolution: { value: new THREE.Vector2(w, h) },
+        uCameraNear: { value: 0.35 },
+        uCameraFar: { value: 900.0 },
         uBloomStrength: { value: 0.34 },
-        uAoStrength: { value: 0.72 },
+        uAoStrength: { value: 0.84 },
         uSharpness: { value: 0.32 },
       },
       toneMapped: true,
@@ -1706,10 +1728,17 @@ export class PostProcessingComposer {
         uniform sampler2D uSsaoTex;
         uniform sampler2D uBloomTex;
         uniform vec2 uResolution;
+        uniform float uCameraNear;
+        uniform float uCameraFar;
         uniform float uBloomStrength;
         uniform float uAoStrength;
         uniform float uSharpness;
         varying vec2 vUv;
+
+        float linearizeDepth(float d) {
+          float zn = 2.0 * d - 1.0;
+          return (2.0 * uCameraNear * uCameraFar) / max(0.0001, uCameraFar + uCameraNear - zn * (uCameraFar - uCameraNear));
+        }
 
         void main() {
           vec2 texel = 1.0 / max(vec2(1.0), uResolution);
@@ -1726,22 +1755,38 @@ export class PostProcessingComposer {
           float casWeight = -clamp(uSharpness * (1.0 - smoothstep(0.25, 1.1, localContrast)), 0.0, 0.16);
           vec3 hdrCol = clamp((center + (n + s + e + w) * casWeight) / (1.0 + 4.0 * casWeight), vec3(0.0), maxCol * 1.15);
 
-          // 2. Depth-Bilaterales Upsampling der GTAO / SSAO Kontaktschatten
+          // 2. Echtes 9-Tap Depth-Bilaterales Denoising & Upsampling der GTAO / SSAO Kontaktschatten
+          // (Kein Ausbluten über Charakter-Silhouetten, erhält feine Stiefel-/Pflaster-Kontaktschatten auch im hellen Sonnenlicht!)
           float dCenter = texture2D(uDepthTex, vUv).r;
           if (dCenter < 0.9994 && uAoStrength > 0.01) {
-            vec2 aoStep = texel * 1.5;
-            float ao0 = texture2D(uSsaoTex, vUv).r;
-            float ao1 = texture2D(uSsaoTex, vUv + vec2( aoStep.x,  aoStep.y)).r;
-            float ao2 = texture2D(uSsaoTex, vUv + vec2(-aoStep.x,  aoStep.y)).r;
-            float ao3 = texture2D(uSsaoTex, vUv + vec2( aoStep.x, -aoStep.y)).r;
-            float ao4 = texture2D(uSsaoTex, vUv + vec2(-aoStep.x, -aoStep.y)).r;
-            float aoAvg = ao0 * 0.40 + (ao1 + ao2 + ao3 + ao4) * 0.15;
+            float zC = linearizeDepth(dCenter);
+            vec2 aoStep = texel * 1.35;
+            float aoSum = texture2D(uSsaoTex, vUv).r * 0.28;
+            float wSum = 0.28;
+
+            #define TAP_AO(ox, oy, sw) { \
+              vec2 sUv = vUv + vec2(ox, oy); \
+              float zS = linearizeDepth(texture2D(uDepthTex, sUv).r); \
+              float wTap = (sw) * exp(-abs(zS - zC) * 18.0); \
+              aoSum += texture2D(uSsaoTex, sUv).r * wTap; \
+              wSum += wTap; \
+            }
+            TAP_AO( aoStep.x,  0.0,      0.11)
+            TAP_AO(-aoStep.x,  0.0,      0.11)
+            TAP_AO( 0.0,       aoStep.y, 0.11)
+            TAP_AO( 0.0,      -aoStep.y, 0.11)
+            TAP_AO( aoStep.x,  aoStep.y, 0.07)
+            TAP_AO(-aoStep.x,  aoStep.y, 0.07)
+            TAP_AO( aoStep.x, -aoStep.y, 0.07)
+            TAP_AO(-aoStep.x, -aoStep.y, 0.07)
+            #undef TAP_AO
+            float aoAvg = aoSum / max(0.001, wSum);
             float luma = dot(hdrCol, vec3(0.2126, 0.7152, 0.0722));
-            // Helles Feuer, direkte Sonne & leuchtende Effekte werden nicht durch AO abgedunkelt
-            float aoMask = (1.0 - smoothstep(0.65, 1.65, luma)) * uAoStrength;
+            // Nur echte selbstleuchtende HDR-Emitter (Feuer, Blitze, Magie > 1.45) vor AO schützen – sonnenbeschienenes Pflaster behält vollen Kontaktschatten!
+            float aoMask = (1.0 - smoothstep(1.45, 3.20, luma)) * uAoStrength;
             float finalAo = mix(1.0, aoAvg, aoMask);
-            // Leicht kühler natürlicher Halbschatten-Ton in Kontaktschatten
-            vec3 aoTint = mix(vec3(0.84, 0.89, 0.96) * finalAo, vec3(1.0), finalAo);
+            // Organischer Halbschatten-Farbton (verhindert grauen Schmutzschleier und bindet Charaktere ans Pflaster)
+            vec3 aoTint = mix(vec3(0.83, 0.87, 0.94) * finalAo, vec3(1.0), finalAo);
             hdrCol *= aoTint;
           }
 
@@ -1771,20 +1816,25 @@ export class PostProcessingComposer {
     this.renderer.getDrawingBufferSize(this._bufSize);
     const w = Math.max(320, Math.floor(this._bufSize.x));
     const h = Math.max(180, Math.floor(this._bufSize.y));
+    const isHighAo = Boolean(this.engine?._isPcProfile || (this.engine?._ppTier ?? 1) >= 2);
+    const aoScale = isHighAo ? 1.0 : 0.82;
+    const sw = Math.max(240, Math.floor(w * aoScale));
+    const sh = Math.max(135, Math.floor(h * aoScale));
+
     if (this.sceneTarget.width !== w || this.sceneTarget.height !== h) {
       this.sceneTarget.setSize(w, h);
-      const sw = Math.max(160, Math.floor(w * 0.5));
-      const sh = Math.max(90, Math.floor(h * 0.5));
-      this.ssaoTarget.setSize(sw, sh);
       const bw = Math.max(120, Math.floor(w * 0.35));
       const bh = Math.max(68, Math.floor(h * 0.35));
       this.bloomTargetA.setSize(bw, bh);
       this.bloomTargetB.setSize(bw, bh);
 
-      this.ssaoMaterial.uniforms.uResolution.value.set(sw, sh);
       this.bloomExtractMaterial.uniforms.uTexelSize.value.set(1.0 / w, 1.0 / h);
       this.bloomBlurMaterial.uniforms.uTexelSize.value.set(1.0 / bw, 1.0 / bh);
       this.compositeMaterial.uniforms.uResolution.value.set(w, h);
+    }
+    if (this.ssaoTarget.width !== sw || this.ssaoTarget.height !== sh) {
+      this.ssaoTarget.setSize(sw, sh);
+      this.ssaoMaterial.uniforms.uResolution.value.set(sw, sh);
     }
   }
 
@@ -1823,8 +1873,10 @@ export class PostProcessingComposer {
 
     // 3. Finaler Composite Pass auf den Bildschirm (null)
     const bloomCfg = Number(this.engine?.env?.bloomIntensity ?? 1.2);
+    this.compositeMaterial.uniforms.uCameraNear.value = camera.near;
+    this.compositeMaterial.uniforms.uCameraFar.value = camera.far;
     this.compositeMaterial.uniforms.uBloomStrength.value = Math.min(0.55, 0.24 * bloomCfg);
-    this.compositeMaterial.uniforms.uAoStrength.value = ppTier >= 2 || isPc ? 0.78 : 0.58;
+    this.compositeMaterial.uniforms.uAoStrength.value = ppTier >= 2 || isPc ? 0.88 : 0.70;
     this.compositeMaterial.uniforms.uSharpness.value = isPc ? 0.36 : 0.28;
 
     this.quadMesh.material = this.compositeMaterial;
@@ -2016,10 +2068,10 @@ export class DayNightSystem {
     const shadowDist = (eng._shadowDistScale || 1.4) * 95.0;
     const clampedDirY = Math.max(0.32, activeDir.y);
 
-    // Shadow-Kamera Bounds konfigurieren gegen Clipping (engere Box fr maximale Pixeldichte & scharfe Kanten)
+    // Shadow-Kamera Bounds konfigurieren gegen Clipping (engere Box für maximale Pixeldichte & weiche Kontaktkanten)
     if (eng.sunLight && eng.sunLight.shadow && eng.sunLight.shadow.camera) {
       const sc = eng.sunLight.shadow.camera;
-      const targetD = eng._targetShadowSpan || (eng._isPcProfile ? 65 : 55);
+      const targetD = eng._targetShadowSpan || (eng._isPcProfile ? 56 : 48);
       if (sc.left !== -targetD || sc.right !== targetD) {
         const d = targetD;
         sc.left = -d;
@@ -2072,11 +2124,11 @@ export class DayNightSystem {
     const scaledSunInt = this.celestial.activeLightIntensity * (eng._gfxSunMult ?? 1.0);
     eng.sunLight.intensity += (scaledSunInt - eng.sunLight.intensity) * 0.18;
 
-    // Dynamischer Schatten-Bias abhängig vom Einfallswinkel (verhindert Shadow Acne & Peter-Panning, fein für Gras- & Baumschatten)
+    // Dynamischer Schatten-Bias abhängig vom Einfallswinkel (verhindert Shadow Acne UND Peter-Panning an Charakterfüßen!)
     const elev = Math.max(0.12, clampedDirY);
-    eng.sunLight.shadow.bias = -0.00014 - (1.0 - elev) * 0.00018;
-    eng.sunLight.shadow.normalBias = 0.010 + (1.0 - elev) * 0.006;
-    eng.sunLight.shadow.radius = 1.25;
+    eng.sunLight.shadow.bias = -0.00010 - (1.0 - elev) * 0.00013;
+    eng.sunLight.shadow.normalBias = 0.0062 + (1.0 - elev) * 0.0042;
+    eng.sunLight.shadow.radius = 1.65;
 
     // B) Hemisphärenlicht (Himmel & Bodenrückstrahlung)
     eng.hemiLight.color.lerp(this.celestial.ambientSkyColor, 0.18);
@@ -2102,6 +2154,9 @@ export class DayNightSystem {
       }
       if (eng._objectWeatherUniforms.uAmbientFloor) {
         eng._objectWeatherUniforms.uAmbientFloor.value = this.celestial.ambientFloor;
+      }
+      if (eng._objectWeatherUniforms.uGiSunColor?.value) {
+        eng._objectWeatherUniforms.uGiSunColor.value.copy(this.celestial.activeLightColor);
       }
     }
     if (eng._waterShaderUniforms) {

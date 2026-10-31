@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=20261031_v624';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261031_v626';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -1801,6 +1801,13 @@ class AeryndorMMOApp {
         return false;
       }
       if (result.account) {
+        if (this.accounts && typeof this.accounts === 'object') {
+          for (const k of Object.keys(this.accounts)) {
+            if (k.toLowerCase() === uname.toLowerCase() && k !== uname) {
+              delete this.accounts[k];
+            }
+          }
+        }
         this.accounts[uname] = result.account;
         localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
       }
@@ -1814,8 +1821,9 @@ class AeryndorMMOApp {
     }
   }
 
-  saveAccounts() {
+  saveAccounts(opts = {}) {
     localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
+    if (opts?.skipRemoteSync) return;
     if (this._isAccountLoggedIn && this.currentAccount && this.accounts[this.currentAccount]) {
       const acc = this.accounts[this.currentAccount];
       const syncBody = {
@@ -1921,7 +1929,11 @@ class AeryndorMMOApp {
     const clean = String(name || '').trim().toLowerCase();
     if (!clean) return true;
     const excl = excludePlayerId ? String(excludePlayerId).trim() : null;
-    for (const acc of Object.values(this.accounts || {})) {
+    const accountsToCheck =
+      this.currentAccount && this.accounts?.[this.currentAccount]
+        ? [this.accounts[this.currentAccount]]
+        : Object.values(this.accounts || {});
+    for (const acc of accountsToCheck) {
       if (!acc || !Array.isArray(acc.characters)) continue;
       for (const ch of acc.characters) {
         if (!ch) continue;
@@ -2813,6 +2825,13 @@ class AeryndorMMOApp {
         if (result?.account) {
           serverAccIsSa = Boolean(result.account.isSA || serverAccIsSa);
           result.account.isSA = serverAccIsSa;
+          if (this.accounts && typeof this.accounts === 'object') {
+            for (const k of Object.keys(this.accounts)) {
+              if (k.toLowerCase() === uname.toLowerCase() && k !== uname) {
+                delete this.accounts[k];
+              }
+            }
+          }
           this.accounts[uname] = result.account;
           localStorage.setItem('aeryndor_accounts_v2', JSON.stringify(this.accounts));
         }
@@ -3684,6 +3703,11 @@ class AeryndorMMOApp {
           nameBadge.textContent = '⚠️ Eckige Klammern [ ] sind gesperrt!';
           nameBadge.style.color = '#f87171';
         }
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        portal.querySelector('#btn-cc-confirm')?.click();
       }
     });
     nameInp?.addEventListener('input', validateName);
@@ -3756,7 +3780,10 @@ class AeryndorMMOApp {
       this.showCharSelectPortal();
     });
 
-    portal.querySelector('#btn-cc-confirm')?.addEventListener('click', async () => {
+    const confirmBtn = portal.querySelector('#btn-cc-confirm');
+    let createInFlight = false;
+    confirmBtn?.addEventListener('click', async () => {
+      if (createInFlight) return;
       const rawInputName = (nameInp?.value || '').trim();
       if (rawInputName.includes('[') || rawInputName.includes(']')) {
         this.showToast('⚠️ Eckige Klammern [ ] sind im Charakternamen streng verboten!');
@@ -3810,7 +3837,10 @@ class AeryndorMMOApp {
       const nextChars = [...(acc.characters || [null, null, null, null])];
       nextChars[targetSlotIdx] = newCharObj;
 
+      createInFlight = true;
+      if (confirmBtn) confirmBtn.disabled = true;
       let createSuccess = false;
+      let srvRes = null;
       try {
         const res = await fetch(`${this.apiBase}/api/action`, {
           method: 'POST',
@@ -3826,7 +3856,7 @@ class AeryndorMMOApp {
           }),
         });
         const data = await res.json();
-        const srvRes = data?.result || data;
+        srvRes = data?.result || data;
         if (srvRes && srvRes.ok === false) {
           this.showToast(srvRes.message || `⚠️ Der Spielername „${finalName}“ ist auf dem Server bereits vergeben!`);
           if (nameBadge) {
@@ -3847,15 +3877,24 @@ class AeryndorMMOApp {
         console.error('Character create network error:', err);
         this.showToast('⚠️ Netzwerkfehler bei der Charaktererstellung. Bitte erneut versuchen.');
         return;
+      } finally {
+        if (!createSuccess) {
+          createInFlight = false;
+          if (confirmBtn) confirmBtn.disabled = false;
+        }
       }
 
       if (!createSuccess) return;
 
-      acc.characters[targetSlotIdx] = newCharObj;
+      if (Array.isArray(srvRes?.characters) && srvRes.characters.length === 4) {
+        acc.characters = srvRes.characters;
+      } else {
+        acc.characters[targetSlotIdx] = newCharObj;
+      }
       st.name = '';
-      this.saveAccounts();
+      this.saveAccounts({ skipRemoteSync: true });
       this.selectedSlotIdx = targetSlotIdx;
-      const meta = this.archetypeMeta[st.classId] || { aeryndorName: 'Held' };
+      const meta = this.getClassMeta?.(st.classId, st.gender) || CLASS_META?.[st.classId] || { aeryndorName: 'Held' };
       this.showToast(`✨ ${newCharObj.name} (${meta.aeryndorName}) erfolgreich erschaffen!`);
       this.showCharSelectPortal();
     });
@@ -4585,7 +4624,13 @@ class AeryndorMMOApp {
       };
       this.runeweaverStage?.triggerActionAnimation('switch');
     }
-    const silentSuccessActions = ['allocate_stat', 'upgrade_skill', 'allocate_pet_stat', 'upgrade_pet_skill'];
+    const silentSuccessActions = [
+      'allocate_stat',
+      'upgrade_skill',
+      'allocate_pet_stat',
+      'upgrade_pet_skill',
+      'account_sync_chars',
+    ];
     const msgText = res.message || (!res.ok ? res.error : '');
     if (msgText && !(res.ok && silentSuccessActions.includes(action))) {
       this.showToast(msgText, res.ok === false ? 'warn' : undefined);

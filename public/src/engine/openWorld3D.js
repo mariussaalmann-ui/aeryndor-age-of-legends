@@ -11,25 +11,31 @@
 // ============================================================================
 
 import * as THREE from '../../vendor/three.module.js';
-import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261026_v521';
+import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261031_v625';
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
 import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
 import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v619';
 
-// Modulweite Caches für 3D-GLB-Templates & Modell-Texturen:
+// Modulweite Caches für 3D-GLB-Templates, Modell-Texturen, PBR-IBL-EnvironmentMaps & Kontaktschatten:
 // Teilen geparste Geometrien, Skelette, Animations-Clips und Texturen nahtlos zwischen Login-Preloader,
 // Charakterauswahl-/Erstellungs-Podest (CharacterShowcase3D) und der 3D-Open-World (OpenWorld3DEngine),
 // sodass Heldenmodelle beim Wechsel vom Login in die Charakterauswahl sofort (0 ms) ohne Dummy erscheinen.
 const GLOBAL_MODEL_TEXTURE_CACHE = new Map();
 const GLOBAL_GLB_TEMPLATE_CACHE = new Map();
 const GLOBAL_GLB_RESOLVED_CACHE = new Map();
+const GLOBAL_CHAR_PMREM_CACHE = new WeakMap();
+const GLOBAL_CONTACT_SHADOW_CACHE = {
+  penumbraTex: null,
+  soleTex: null,
+  discGeo: null,
+};
 
 const HERO_GLB_BY_CLASS = {
   warrior: {
-    glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw3',
-    tex: ['/assets/models/heroes/klingenwaechter_male.png?v=20261031_kw3'],
-    normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw3',
+    glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw4',
+    tex: ['/assets/models/heroes/klingenwaechter_male.png?v=20261031_kw4'],
+    normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw4',
     height: 1.88,
   },
   ninja: {
@@ -278,6 +284,9 @@ export class OpenWorld3DEngine {
       uFoliageSSS: { value: 1.0 },
       uTreeColorVariation: { value: 1.0 },
       uCamTargetPos: { value: new THREE.Vector3(0, 2.5, 160) },
+      uGiGroundColor: { value: new THREE.Color(0x9a8f7e) },
+      uGiSunColor: { value: new THREE.Color(0xfff6e0) },
+      uGiBounceStrength: { value: 0.46 },
     };
     this.vegConfig = {
       leafDensity: 1.0,
@@ -2185,7 +2194,240 @@ export class OpenWorld3DEngine {
   }
 
   // ==========================================================================
-  // WETTER-, SCHNEE-, NÄSSE- & WIND-SHADER FÜR BÄUME, BÜSCHE, MONSTER & WELT-OBJEKTE
+  // PBR CHARACTER IBL (PMREM ENVIRONMENT MAP) & DYNAMISCHE WEICHE KONTAKTSCHATTEN
+  // ==========================================================================
+  getCharacterEnvironmentMap(rendererOverride = null) {
+    const r = rendererOverride || this.renderer;
+    if (!r || !THREE.PMREMGenerator) return null;
+    const cached = GLOBAL_CHAR_PMREM_CACHE.get(r);
+    if (cached) return cached;
+    try {
+      const pmrem = new THREE.PMREMGenerator(r);
+      pmrem.compileEquirectangularShader?.();
+      const envScene = new THREE.Scene();
+      const domeGeo = new THREE.SphereGeometry(12, 32, 16);
+      const domeMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        vertexShader: `
+          varying vec3 vDir;
+          void main() {
+            vDir = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vDir;
+          void main() {
+            vec3 d = normalize(vDir);
+            vec3 skyZenith = vec3(0.30, 0.54, 0.88);
+            vec3 skyHorizon = vec3(0.96, 0.90, 0.80);
+            vec3 cobbleBounce = vec3(0.48, 0.44, 0.39);
+            vec3 col = d.y >= 0.0
+              ? mix(skyHorizon, skyZenith, pow(clamp(d.y, 0.0, 1.0), 0.55))
+              : mix(skyHorizon * 0.82, cobbleBounce, smoothstep(0.0, -0.55, d.y));
+            vec3 keyDir = normalize(vec3(0.42, 0.68, 0.58));
+            vec3 rimDir = normalize(vec3(-0.55, 0.42, -0.68));
+            float sunLobe = pow(max(dot(d, keyDir), 0.0), 22.0);
+            float softKey = pow(max(dot(d, keyDir), 0.0), 4.0);
+            float coolRim = pow(max(dot(d, rimDir), 0.0), 8.0);
+            col += vec3(2.15, 1.92, 1.54) * sunLobe + vec3(0.42, 0.36, 0.28) * softKey + vec3(0.24, 0.36, 0.52) * coolRim;
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `,
+      });
+      const domeMesh = new THREE.Mesh(domeGeo, domeMat);
+      envScene.add(domeMesh);
+      const rt = pmrem.fromScene(envScene, 0.035);
+      const envTex = rt?.texture || null;
+      domeGeo.dispose();
+      domeMat.dispose();
+      pmrem.dispose();
+      if (envTex) {
+        GLOBAL_CHAR_PMREM_CACHE.set(r, envTex);
+      }
+      return envTex;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  getContactShadowResources() {
+    if (!GLOBAL_CONTACT_SHADOW_CACHE.discGeo) {
+      const geo = new THREE.CircleGeometry(1.0, 28);
+      geo.rotateX(-Math.PI / 2);
+      GLOBAL_CONTACT_SHADOW_CACHE.discGeo = geo;
+    }
+    if (!GLOBAL_CONTACT_SHADOW_CACHE.penumbraTex && typeof document !== 'undefined') {
+      const makeRadialShadowTex = (innerStop, midAlpha, coreAlpha) => {
+        const sz = 128;
+        const can = document.createElement('canvas');
+        can.width = sz;
+        can.height = sz;
+        const ctx = can.getContext('2d');
+        const g = ctx.createRadialGradient(sz * 0.5, sz * 0.5, 0, sz * 0.5, sz * 0.5, sz * 0.5);
+        g.addColorStop(0.0, `rgba(11, 15, 24, ${coreAlpha})`);
+        g.addColorStop(innerStop, `rgba(13, 18, 28, ${(coreAlpha * 0.82).toFixed(3)})`);
+        g.addColorStop(0.56, `rgba(16, 21, 32, ${midAlpha})`);
+        g.addColorStop(0.82, `rgba(18, 23, 35, ${(midAlpha * 0.26).toFixed(3)})`);
+        g.addColorStop(1.0, 'rgba(18, 23, 35, 0.0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, sz, sz);
+        const tex = new THREE.CanvasTexture(can);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+      };
+      GLOBAL_CONTACT_SHADOW_CACHE.penumbraTex = makeRadialShadowTex(0.24, 0.42, 0.88);
+      GLOBAL_CONTACT_SHADOW_CACHE.soleTex = makeRadialShadowTex(0.32, 0.52, 0.96);
+    }
+    return GLOBAL_CONTACT_SHADOW_CACHE;
+  }
+
+  createActorContactShadowGroup(opts = {}) {
+    const res = this.getContactShadowResources();
+    if (!res.discGeo || !res.penumbraTex) return null;
+    const radius = opts.radius ?? 0.78;
+    const withFeet = opts.withFeet !== false;
+    const baseOpacity = opts.opacity ?? 0.38;
+
+    const group = new THREE.Group();
+    group.name = 'contactShadowGroup';
+
+    const penumbraMat = new THREE.MeshBasicMaterial({
+      map: res.penumbraTex,
+      color: 0xffffff,
+      transparent: true,
+      opacity: baseOpacity,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -3,
+    });
+    const penumbraMesh = new THREE.Mesh(res.discGeo, penumbraMat);
+    penumbraMesh.position.y = 0.016;
+    penumbraMesh.scale.set(radius, 1.0, radius * (opts.elongationZ ?? 1.0));
+    penumbraMesh.renderOrder = 1;
+    group.add(penumbraMesh);
+
+    let lFootPad = null;
+    let rFootPad = null;
+    if (withFeet && res.soleTex) {
+      const makeFootPad = (offX) => {
+        const fMat = new THREE.MeshBasicMaterial({
+          map: res.soleTex,
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.50,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -3,
+          polygonOffsetUnits: -4,
+        });
+        const fMesh = new THREE.Mesh(res.discGeo, fMat);
+        fMesh.position.set(offX, 0.019, 0.02);
+        fMesh.scale.set(0.26, 1.0, 0.33);
+        fMesh.renderOrder = 2;
+        return fMesh;
+      };
+      lFootPad = makeFootPad(-0.17);
+      rFootPad = makeFootPad(0.17);
+      group.add(lFootPad, rFootPad);
+    }
+
+    group.userData = {
+      penumbraMesh,
+      penumbraMat,
+      lFootPad,
+      rFootPad,
+      baseRadius: radius,
+      baseOpacity,
+    };
+    return group;
+  }
+
+  updateActorContactShadow(actor, { isMounted = false, isJumping = false, isDead = false } = {}) {
+    const csg = actor?.contactShadowGroup;
+    if (!csg || !csg.userData) return;
+    if (this._masterTier === 0) {
+      csg.visible = false;
+      return;
+    }
+    csg.visible = true;
+    const ud = csg.userData;
+    const daylight = this._objectWeatherUniforms?.uSunDaylight?.value ?? 0.85;
+    const envStrength = 0.78 + daylight * 0.28;
+
+    if (isMounted) {
+      ud.penumbraMesh.position.set(0, 0.016, 0.04);
+      ud.penumbraMesh.scale.set(1.12, 1.0, 1.78);
+      ud.penumbraMat.opacity = Math.min(0.56, 0.44 * envStrength);
+      if (ud.lFootPad) {
+        ud.lFootPad.position.set(0.0, 0.019, 0.62);
+        ud.lFootPad.scale.set(0.46, 1.0, 0.48);
+        ud.lFootPad.material.opacity = Math.min(0.48, 0.36 * envStrength);
+      }
+      if (ud.rFootPad) {
+        ud.rFootPad.position.set(0.0, 0.019, -0.58);
+        ud.rFootPad.scale.set(0.46, 1.0, 0.48);
+        ud.rFootPad.material.opacity = Math.min(0.48, 0.36 * envStrength);
+      }
+      return;
+    }
+
+    if (isDead) {
+      ud.penumbraMesh.position.set(0, 0.016, 0.0);
+      ud.penumbraMesh.scale.set(1.18, 1.0, 1.38);
+      ud.penumbraMat.opacity = Math.min(0.52, 0.42 * envStrength);
+      if (ud.lFootPad) ud.lFootPad.visible = false;
+      if (ud.rFootPad) ud.rFootPad.visible = false;
+      return;
+    }
+
+    const jumpAtten = isJumping ? 0.52 : 1.0;
+    const jumpSpread = isJumping ? 1.24 : 1.0;
+    ud.penumbraMesh.position.set(0, 0.016, 0.0);
+    ud.penumbraMesh.scale.set(ud.baseRadius * jumpSpread, 1.0, ud.baseRadius * jumpSpread);
+    ud.penumbraMat.opacity = Math.min(0.50, ud.baseOpacity * envStrength * jumpAtten);
+
+    const heroGlbAct = actor.heroGlbHolder?.userData?.glbActor;
+    const ik = heroGlbAct?.ikBones;
+    if (ud.lFootPad && ud.rFootPad) {
+      ud.lFootPad.visible = true;
+      ud.rFootPad.visible = true;
+      if (ik?.lFoot?.bone && ik?.rFoot?.bone && actor.root) {
+        if (!this._tmpContactVec) this._tmpContactVec = new THREE.Vector3();
+        if (!this._tmpContactInvMat) this._tmpContactInvMat = new THREE.Matrix4();
+        actor.root.updateMatrixWorld(true);
+        const invRoot = this._tmpContactInvMat.copy(actor.root.matrixWorld).invert();
+
+        const syncFoot = (bone, pad, fallbackX) => {
+          const v = this._tmpContactVec.setFromMatrixPosition(bone.matrixWorld).applyMatrix4(invRoot);
+          const lx = Number.isFinite(v.x) ? Math.max(-0.85, Math.min(0.85, v.x)) : fallbackX;
+          const lz = Number.isFinite(v.z) ? Math.max(-0.95, Math.min(0.95, v.z)) : 0.02;
+          const liftH = Math.max(0.0, (Number.isFinite(v.y) ? v.y : 0.08) - 0.085);
+          const contactFactor = Math.exp(-liftH * 5.2) * jumpAtten;
+          const spread = 1.0 + Math.min(0.75, liftH * 1.45);
+          pad.position.set(lx, 0.019, lz);
+          pad.scale.set(0.25 * spread, 1.0, 0.32 * spread);
+          pad.material.opacity = Math.min(0.62, (0.12 + 0.44 * contactFactor) * envStrength);
+        };
+
+        syncFoot(ik.lFoot.bone, ud.lFootPad, -0.17);
+        syncFoot(ik.rFoot.bone, ud.rFootPad, 0.17);
+      } else {
+        ud.lFootPad.position.set(-0.17, 0.019, 0.02);
+        ud.rFootPad.position.set(0.17, 0.019, 0.02);
+        ud.lFootPad.scale.set(0.25, 1.0, 0.32);
+        ud.rFootPad.scale.set(0.25, 1.0, 0.32);
+        const fOp = Math.min(0.56, 0.46 * envStrength * jumpAtten);
+        ud.lFootPad.material.opacity = fOp;
+        ud.rFootPad.material.opacity = fOp;
+      }
+    }
+  }
+
+  // ==========================================================================
+  // WETTER-, SCHNEE-, NÄSSE-, PBR-SSS- & GI-BOUNCE-SHADER FÜR CHARAKTERE & WELT-OBJEKTE
   // ==========================================================================
   injectObjectWeatherShader(mat, opts = {}) {
     if (!mat || !this._objectWeatherUniforms || !this._grassShaderUniforms) return mat;
@@ -2198,7 +2440,17 @@ export class OpenWorld3DEngine {
     const objUniforms = this._objectWeatherUniforms;
     const grassUniforms = this._grassShaderUniforms;
 
-    const progCacheKey = `ow_v4_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}`;
+    if (isCreature && !mat.envMap) {
+      const charEnv = this.getCharacterEnvironmentMap?.();
+      if (charEnv) {
+        mat.envMap = charEnv;
+        if (mat.envMapIntensity === undefined || mat.envMapIntensity === 1) {
+          mat.envMapIntensity = 0.68;
+        }
+      }
+    }
+
+    const progCacheKey = `ow_v6_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}_${mat.envMap ? 1 : 0}`;
     mat.customProgramCacheKey = () => progCacheKey;
 
     mat.onBeforeCompile = (shader) => {
@@ -2230,77 +2482,77 @@ export class OpenWorld3DEngine {
         uniform float uVegWindMult;
         uniform float uVegBranchSway;
         ` +
-        shader.vertexShader.replace(
-          '#include <begin_vertex>',
-          `#include <begin_vertex>
-          vLocalPosY = transformed.y;
-          vec3 instOrigin = vec3(modelMatrix[3].xyz);
-          #ifdef USE_INSTANCING
-            instOrigin = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-          #endif
-          vTreeOrigin = instOrigin;
-          vTreeSeed = fract(sin(instOrigin.x * 12.9898 + instOrigin.z * 78.233) * 43758.5453);
-          // Globale Windrichtung (zentrales Windfeld) in den lokalen Objektraum drehen -> alle Bäume wehen gleich gerichtet
-          mat3 windBasis = mat3(modelMatrix);
-          #ifdef USE_INSTANCING
-            windBasis = mat3(modelMatrix) * mat3(instanceMatrix);
-          #endif
-          vec3 localWind3 = transpose(windBasis) * vec3(uWindDir.x, 0.0, uWindDir.y);
-          vec2 localWindDir = length(localWind3.xz) > 0.0001 ? normalize(localWind3.xz) : vec2(0.81, 0.59);
-          ${
-            isFoliage
-              ? `
-          // Live-Blattgrößen-Skalierung um das Kronenzentrum
-          if (transformed.y > 1.6 && abs(uVegLeafScale - 1.0) > 0.005) {
-            vec3 crownPivot = vec3(0.0, 4.2, 0.0);
-            transformed = crownPivot + (transformed - crownPivot) * uVegLeafScale;
-          }
-          `
-              : ''
-          }
-          vec4 objWorldPos4 = vec4(transformed, 1.0);
-          vec3 objWorldNorm3 = objectNormal;
-          #ifdef USE_INSTANCING
-            objWorldPos4 = instanceMatrix * objWorldPos4;
-            objWorldNorm3 = mat3(instanceMatrix) * objWorldNorm3;
-          #endif
-          objWorldPos4 = modelMatrix * objWorldPos4;
-          objWorldNorm3 = normalize(mat3(modelMatrix) * objWorldNorm3);
-          ${
-            isFoliage
-              ? `
-          // Mehrstufige 3D-Windanimation (Stamm fest, Hauptäste schwingen, Zweige & einzelne Blätter flattern mit eigener Phase pro Baum)
-          float branchRadius = length(transformed.xz);
-          float swayWeight = smoothstep(0.15, 2.2, branchRadius + max(0.0, transformed.y - 0.35) * 0.30);
-          float effWind = uWindStrength * uVegWindMult;
-          float treePhase = instOrigin.x * 0.23 + instOrigin.z * 0.19 + vTreeSeed * 6.2831;
-          float boughPhase = uTime * 1.35 + treePhase + transformed.y * 0.26;
-          float boughSway = (sin(boughPhase) + 0.42 * cos(uTime * 2.1 - treePhase * 1.15)) * uVegBranchSway;
-          float twigWave = sin(uTime * 3.4 + objWorldPos4.x * 0.85 + objWorldPos4.z * 0.78 + vTreeSeed * 3.14);
-          float leafFlutter = sin(uTime * 5.8 + objWorldPos4.x * 2.45 + objWorldPos4.y * 2.85 + objWorldPos4.z * 2.15);
-          float swayAlongWind = (boughSway * 0.272 + twigWave * 0.083 + leafFlutter * 0.064) * swayWeight * effWind
-                              + 0.05 * swayWeight * effWind * effWind; // leichte Lee-Neigung in Windrichtung
-          transformed.xz += localWindDir * swayAlongWind;
-          transformed.y += (sin(uTime * 2.9 + objWorldPos4.x * 1.1 + objWorldPos4.z * 1.1) * 0.036 + leafFlutter * 0.018) * swayWeight * effWind;
-          objWorldNorm3 = normalize(mix(objWorldNorm3, vec3(0.0, 1.0, 0.0), 0.38));
-          `
-              : isTreeTrunk
-              ? `
-          // Obere tragende Äste schwingen sanft synchron mit der Baumkrone
-          float branchSwayMask = smoothstep(2.3, 5.8, transformed.y) * smoothstep(0.12, 1.4, length(transformed.xz));
-          if (branchSwayMask > 0.001) {
-            float effWind = uWindStrength * uVegWindMult * uVegBranchSway;
+        shader.vertexShader
+          .replace(
+            '#include <begin_vertex>',
+            `#include <begin_vertex>
+            vLocalPosY = transformed.y;
+            vec3 instOrigin = vec3(modelMatrix[3].xyz);
+            #ifdef USE_INSTANCING
+              instOrigin = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            #endif
+            vTreeOrigin = instOrigin;
+            vTreeSeed = fract(sin(instOrigin.x * 12.9898 + instOrigin.z * 78.233) * 43758.5453);
+            mat3 windBasis = mat3(modelMatrix);
+            #ifdef USE_INSTANCING
+              windBasis = mat3(modelMatrix) * mat3(instanceMatrix);
+            #endif
+            vec3 localWind3 = transpose(windBasis) * vec3(uWindDir.x, 0.0, uWindDir.y);
+            vec2 localWindDir = length(localWind3.xz) > 0.0001 ? normalize(localWind3.xz) : vec2(0.81, 0.59);
+            ${
+              isFoliage
+                ? `
+            if (transformed.y > 1.6 && abs(uVegLeafScale - 1.0) > 0.005) {
+              vec3 crownPivot = vec3(0.0, 4.2, 0.0);
+              transformed = crownPivot + (transformed - crownPivot) * uVegLeafScale;
+            }
+            vec4 preWindWorldPos4 = vec4(transformed, 1.0);
+            #ifdef USE_INSTANCING
+              preWindWorldPos4 = instanceMatrix * preWindWorldPos4;
+            #endif
+            preWindWorldPos4 = modelMatrix * preWindWorldPos4;
+            float branchRadius = length(transformed.xz);
+            float swayWeight = smoothstep(0.15, 2.2, branchRadius + max(0.0, transformed.y - 0.35) * 0.30);
+            float effWind = uWindStrength * uVegWindMult;
             float treePhase = instOrigin.x * 0.23 + instOrigin.z * 0.19 + vTreeSeed * 6.2831;
             float boughPhase = uTime * 1.35 + treePhase + transformed.y * 0.26;
-            float boughSway = sin(boughPhase) + 0.42 * cos(uTime * 2.1 - treePhase * 1.15);
-            transformed.xz += localWindDir * (boughSway * 0.172 * branchSwayMask * effWind);
-          }
-          `
-              : ''
-          }
-          vObjWorldPos = objWorldPos4.xyz;
-          vObjWorldNormal = objWorldNorm3;`
-        );
+            float boughSway = (sin(boughPhase) + 0.42 * cos(uTime * 2.1 - treePhase * 1.15)) * uVegBranchSway;
+            float twigWave = sin(uTime * 3.4 + preWindWorldPos4.x * 0.85 + preWindWorldPos4.z * 0.78 + vTreeSeed * 3.14);
+            float leafFlutter = sin(uTime * 5.8 + preWindWorldPos4.x * 2.45 + preWindWorldPos4.y * 2.85 + preWindWorldPos4.z * 2.15);
+            float swayAlongWind = (boughSway * 0.272 + twigWave * 0.083 + leafFlutter * 0.064) * swayWeight * effWind
+                                + 0.05 * swayWeight * effWind * effWind;
+            transformed.xz += localWindDir * swayAlongWind;
+            transformed.y += (sin(uTime * 2.9 + preWindWorldPos4.x * 1.1 + preWindWorldPos4.z * 1.1) * 0.036 + leafFlutter * 0.018) * swayWeight * effWind;
+            `
+                : isTreeTrunk
+                ? `
+            float branchSwayMask = smoothstep(2.3, 5.8, transformed.y) * smoothstep(0.12, 1.4, length(transformed.xz));
+            if (branchSwayMask > 0.001) {
+              float effWind = uWindStrength * uVegWindMult * uVegBranchSway;
+              float treePhase = instOrigin.x * 0.23 + instOrigin.z * 0.19 + vTreeSeed * 6.2831;
+              float boughPhase = uTime * 1.35 + treePhase + transformed.y * 0.26;
+              float boughSway = sin(boughPhase) + 0.42 * cos(uTime * 2.1 - treePhase * 1.15);
+              transformed.xz += localWindDir * (boughSway * 0.172 * branchSwayMask * effWind);
+            }
+            `
+                : ''
+            }`
+          )
+          .replace(
+            '#include <project_vertex>',
+            `vec4 objWorldPos4 = vec4(transformed, 1.0);
+            vec3 objWorldNorm3 = objectNormal;
+            #ifdef USE_INSTANCING
+              objWorldPos4 = instanceMatrix * objWorldPos4;
+              objWorldNorm3 = mat3(instanceMatrix) * objWorldNorm3;
+            #endif
+            objWorldPos4 = modelMatrix * objWorldPos4;
+            objWorldNorm3 = normalize(mat3(modelMatrix) * objWorldNorm3);
+            ${isFoliage ? 'objWorldNorm3 = normalize(mix(objWorldNorm3, vec3(0.0, 1.0, 0.0), 0.38));' : ''}
+            vObjWorldPos = objWorldPos4.xyz;
+            vObjWorldNormal = objWorldNorm3;
+            #include <project_vertex>`
+          );
 
       shader.fragmentShader =
         `
@@ -2331,6 +2583,9 @@ export class OpenWorld3DEngine {
         uniform float uTreeColorVariation;
         varying vec3 vTreeOrigin;
         uniform vec3 uCamTargetPos;
+        uniform vec3 uGiGroundColor;
+        uniform vec3 uGiSunColor;
+        uniform float uGiBounceStrength;
         ` +
         shader.fragmentShader
           .replace(
@@ -2339,9 +2594,6 @@ export class OpenWorld3DEngine {
             ${
               isFoliage || isTreeTrunk
                 ? `
-            // Kamera-Sichtlinien-Freischnitt (Camera-to-Player Line-of-Sight Occlusion Cutout):
-            // Blendet Baumkronen UND Baumstämme zwischen Kamera und Charakter (sowie direkt vor der Linse) komplett frei,
-            // unabhängig von der Zoomstufe und ohne dass hintere Kronenschichten den Bildschirm verdecken!
             if (${isTreeTrunk ? 'vLocalPosY > 0.42' : 'vLocalPosY > 1.15 || distance(vObjWorldPos, cameraPosition) < 7.5'}) {
               vec2 camXZ = cameraPosition.xz;
               vec2 plrXZ = uCamTargetPos.xz;
@@ -2351,12 +2603,10 @@ export class OpenWorld3DEngine {
               vec2 closestTreeXZ = camXZ + clamp(tTreeXZ, 0.0, 1.0) * segXZ;
               float treeRayDistXZ = distance(vTreeOrigin.xz, closestTreeXZ);
 
-              // 1. Ganzer Baum im Sichtkorridor zwischen Kamera und Charakter (verhindert braune Rückwand durch hintere Kronenebenen)
               float treeKeep = (tTreeXZ > -0.22 && tTreeXZ < 1.05)
                 ? smoothstep(4.5, 6.6, treeRayDistXZ)
                 : 1.0;
 
-              // 2. 3D-Sichtkegel von der Kamera zum Charakter (schneidet auch weit überhängende Seitenäste großer Bäume frei)
               vec3 seg3D = uCamTargetPos - cameraPosition;
               float segLen3D = max(0.05, length(seg3D));
               float tFrag3D = dot(vObjWorldPos - cameraPosition, seg3D) / (segLen3D * segLen3D);
@@ -2368,7 +2618,6 @@ export class OpenWorld3DEngine {
                 ? smoothstep(3.8, 5.8, fragConeDist)
                 : 1.0;
 
-              // 3. Direkter Kamera-Nahbereich
               float fragCamDist = distance(vObjWorldPos, cameraPosition);
               float camKeep = smoothstep(6.8, 11.2, fragCamDist);
 
@@ -2390,7 +2639,6 @@ export class OpenWorld3DEngine {
               isRock
                 ? `
             #ifdef USE_MAP
-              // Nahtloses 3D-Triplanar-Mapping für Felsen & Findlinge (verhindert komplett verzerrte Kugel-UVs, Pol-Verzerrungen & Dreiecks-Nähte!)
               vec3 triW = pow(abs(normalize(vObjWorldNormal)), vec3(4.0));
               triW /= max(0.0001, triW.x + triW.y + triW.z);
               vec3 rP = vObjWorldPos * 0.42 + vec3(vTreeSeed * 3.7, vTreeSeed * 1.9, vTreeSeed * 5.3);
@@ -2398,7 +2646,6 @@ export class OpenWorld3DEngine {
               vec3 colXZ = texture2D(map, rP.xz).rgb;
               vec3 colXY = texture2D(map, rP.xy).rgb;
               vec3 triRockCol = colYZ * triW.x + colXZ * triW.y + colXY * triW.z;
-              // Zweite feinere Detail-Skala für scharfe 3D-Granitstruktur aus der Nähe
               vec3 colDetail = texture2D(map, rP.xz * 2.35 + vec2(0.41, 0.73)).rgb;
               triRockCol = mix(triRockCol, colDetail, 0.28);
               diffuseColor.rgb = diffuse * triRockCol * 1.18;
@@ -2414,9 +2661,37 @@ export class OpenWorld3DEngine {
               + 0.30 * sin(vObjWorldPos.x * 0.37 + vObjWorldPos.z * 0.31 + vObjWorldPos.y * 0.23)
               + 0.20 * cos(vObjWorldPos.x * 0.83 - vObjWorldPos.z * 0.71);
             ${
-              isFoliage
+              isCreature
                 ? `
-            // Organische 3D-Zell-Variation (Gyroid-Noise) & natürliche 3D-Tiefenschattierung (Ambient Occlusion im Kroneninneren)
+            // PBR Materialzonen-Klassifikation (Haut / Metall & Rüstungsdetails / Stoff & Leder) im wahrnehmungstreuen sRGB-Raum
+            vec3 charSrgbAlb = sqrt(clamp(diffuseColor.rgb, 0.0, 1.0));
+            float charAlbMax = max(charSrgbAlb.r, max(charSrgbAlb.g, charSrgbAlb.b));
+            float charAlbMin = min(charSrgbAlb.r, min(charSrgbAlb.g, charSrgbAlb.b));
+            float charSrgbLum = dot(charSrgbAlb, vec3(0.299, 0.587, 0.114));
+            float charAlbSat = (charAlbMax - charAlbMin) / max(0.002, charAlbMax);
+            float charRgRatio = charSrgbAlb.r / max(0.003, charSrgbAlb.g);
+            float charGbDiff = charSrgbAlb.g - charSrgbAlb.b;
+            float charRgDiff = charSrgbAlb.r - charSrgbAlb.g;
+            float charSkinMask = smoothstep(1.12, 1.24, charRgRatio)
+                               * (1.0 - smoothstep(1.56, 1.78, charRgRatio))
+                               * smoothstep(0.015, 0.055, charGbDiff)
+                               * (1.0 - smoothstep(1.35, 1.85, charGbDiff / max(0.01, charRgDiff)))
+                               * smoothstep(0.16, 0.25, charAlbSat)
+                               * (1.0 - smoothstep(0.50, 0.62, charAlbSat))
+                               * smoothstep(0.24, 0.36, charSrgbLum)
+                               * (1.0 - smoothstep(0.88, 0.97, charSrgbLum));
+            float charSteelMask = (1.0 - smoothstep(0.05, 0.16, charAlbSat))
+                                * smoothstep(0.24, 0.46, charSrgbLum);
+            float charGoldMask = smoothstep(0.48, 0.66, charAlbSat)
+                               * smoothstep(0.68, 0.82, charSrgbAlb.g / max(0.003, charSrgbAlb.r))
+                               * smoothstep(0.18, 0.32, charGbDiff)
+                               * smoothstep(0.32, 0.48, charSrgbLum)
+                               * (1.0 - charSkinMask);
+            float charMetalMask = clamp((charSteelMask * 0.78 + charGoldMask * 0.92) * (1.0 - charSkinMask), 0.0, 1.0);
+            float charFabricMask = clamp(1.0 - charSkinMask - charMetalMask, 0.0, 1.0);
+            `
+                : isFoliage
+                ? `
             float pSeed = vTreeSeed * 6.28318;
             float gyroid1 = sin(vObjWorldPos.x * 0.52 + pSeed) * cos(vObjWorldPos.z * 0.52 - pSeed * 0.7)
                           + sin(vObjWorldPos.y * 0.68 + vObjWorldPos.x * 0.31) * cos(vObjWorldPos.z * 0.43 + vObjWorldPos.y * 0.29);
@@ -2425,11 +2700,9 @@ export class OpenWorld3DEngine {
             float effNormY = vLocalPosY < 0.6 ? abs(vObjWorldNormal.y) : vObjWorldNormal.y;
             float heightGrad = vLocalPosY < 0.6 ? 0.65 : smoothstep(2.0, 6.2, vLocalPosY);
             float normalUp = clamp(effNormY * 0.5 + 0.5, 0.0, 1.0);
-            // Ausgewogene 3D-Kronenschattierung: Innere/untere Lagen dunkler für Tiefe, äußere Blattspitzen natürlich schattiert
             float crownAO = mix(0.84, 1.06, heightGrad * 0.52 + normalUp * 0.48);
             bool isAutumnTone = (diffuseColor.r > diffuseColor.g * 1.06 && diffuseColor.r > diffuseColor.b * 1.35);
             if (isAutumnTone && uTreeColorVariation > 0.02) {
-              // Farbvariation bleibt harmonisch in der jeweiligen Baumart-Farbfamilie (keine grellen gelben Kappen auf roten Bäumen!)
               vec3 deeperShade = diffuseColor.rgb * vec3(0.82, 0.75, 0.72);
               vec3 warmerCluster = diffuseColor.rgb * vec3(1.12, 1.06, 0.90);
               float deepMix = smoothstep(0.56, 0.88, 1.0 - clusterPatch) * 0.22 * uTreeColorVariation;
@@ -2438,7 +2711,6 @@ export class OpenWorld3DEngine {
               diffuseColor.rgb = mix(diffuseColor.rgb, warmerCluster, warmMix);
               diffuseColor.rgb *= crownAO * (0.92 + 0.12 * fineLeafVar);
             } else {
-              // Sommer-/Frühlings-Farbnuancen mit natürlicher Waldtiefe
               vec3 sunlitTip = diffuseColor.rgb * vec3(1.05, 1.07, 0.95);
               diffuseColor.rgb = mix(diffuseColor.rgb * (0.88 + 0.14 * clusterPatch), sunlitTip, heightGrad * 0.24);
               diffuseColor.rgb *= crownAO * (0.92 + 0.12 * fineLeafVar);
@@ -2446,14 +2718,12 @@ export class OpenWorld3DEngine {
             `
                 : isTreeTrunk
                 ? `
-            // Natürliche Holzrinden-Schattierung mit dezenter dunkler Wurzelbasis
             float baseShade = smoothstep(0.0, 1.35, vLocalPosY);
             float barkGrain = 0.88 + 0.18 * sin(vObjWorldPos.x * 3.4 + vObjWorldPos.z * 3.4 + vObjWorldPos.y * 0.8);
             diffuseColor.rgb *= (0.76 + 0.24 * baseShade) * barkGrain;
             `
                 : isRock
                 ? `
-            // Natürliche 3D-Felsschattierung: Bodenkontakt-AO an der Unterseite, leichte Verwitterung & dezente Farbnuance pro Findling
             float rockBaseAO = mix(0.74, 1.04, smoothstep(-0.85, 0.55, vLocalPosY));
             float rockTopLight = mix(0.88, 1.06, clamp(vObjWorldNormal.y * 0.5 + 0.5, 0.0, 1.0));
             vec3 seedTint = mix(vec3(0.95, 0.96, 0.98), vec3(1.04, 1.01, 0.96), vTreeSeed);
@@ -2461,10 +2731,8 @@ export class OpenWorld3DEngine {
             `
                 : ''
             }
-            // Langsame Schnee-Ablagerung auf nach oben gerichteten Flächen (Welt-Normale statt Kamera-View-Up für Bäume/Felsen!)
             if (uObjSnow > 0.002) {
-              vec3 worldUpView = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
-              float viewUpDot = dot(normalize(vNormal), worldUpView);
+              float viewUpDot = normalize(vObjWorldNormal).y;
               float upFace = ${
                 isFoliage
                   ? 'smoothstep(0.75, 0.92, vObjWorldNormal.y)'
@@ -2482,7 +2750,6 @@ export class OpenWorld3DEngine {
               vec3 objSnowCol = mix(vec3(0.84, 0.91, 0.98), vec3(0.97, 0.99, 1.0), clamp(upFace * 0.78 + objNoise * 0.32, 0.0, 1.0));
               diffuseColor.rgb = mix(diffuseColor.rgb, objSnowCol, clamp(localObjSnow, 0.0, 0.95));
             }
-            // Langsames Nachdunkeln von Holz, Rinde, Stein, Fell, Rüstung & Laub bei Regen
             if (uObjWetness > 0.002) {
               float localObjWet = uObjWetness * uWetStrength * (0.78 + 0.22 * objNoise) * (1.0 - clamp(uObjSnow, 0.0, 1.0) * 0.95);
               diffuseColor.rgb *= (1.0 - localObjWet * ${isFoliage ? '0.16' : '0.14'});
@@ -2494,7 +2761,6 @@ export class OpenWorld3DEngine {
             ${
               isRock
                 ? `
-            // PBR Triplanare Granit-Mikronormalen & Felsspalten-Relief (verhindert glatten Plastik-Look auf Felsen!)
             vec3 rNPos = vObjWorldPos * 2.6 + vec3(vTreeSeed * 5.1);
             float nRx = sin(rNPos.y * 3.8 + cos(rNPos.z * 2.9) * 1.4) + 0.45 * cos(rNPos.z * 8.4 - rNPos.x * 6.2);
             float nRz = cos(rNPos.x * 3.6 - sin(rNPos.y * 3.1) * 1.4) + 0.45 * sin(rNPos.x * 8.1 + rNPos.y * 6.5);
@@ -2502,15 +2768,15 @@ export class OpenWorld3DEngine {
             `
                 : isTreeTrunk
                 ? `
-            // PBR 3D-Baumrinden-Längsrillen-Normalen
             float barkRidge = cos(vObjWorldPos.x * 16.0 + vObjWorldPos.z * 16.0 + sin(vObjWorldPos.y * 3.2) * 2.4);
             normal = normalize(normal + vec3(barkRidge * 0.11, 0.0, -barkRidge * 0.11));
             `
                 : isCreature
                 ? `
-            // PBR Mikro-Oberflächenstruktur für Rüstungen, Leder & Stoff
-            float armorMicro = sin(vObjWorldPos.x * 28.0 + vObjWorldPos.y * 24.0) * cos(vObjWorldPos.z * 28.0 - vObjWorldPos.y * 19.0);
-            normal = normalize(normal + vec3(armorMicro * 0.045, armorMicro * 0.025, -armorMicro * 0.045));
+            // Materialspezifische PBR-Mikrostruktur: feines Gewebe auf Stoff, glatt-natürliche Poren auf Haut, dezente Maserung auf Rüstung
+            float weaveMicro = sin(vObjWorldPos.x * 46.0 + vObjWorldPos.y * 42.0) * cos(vObjWorldPos.z * 46.0 - vObjWorldPos.y * 38.0);
+            float microAmp = mix(0.036, 0.011, charSkinMask) * mix(1.0, 0.55, charMetalMask);
+            normal = normalize(normal + vec3(weaveMicro * microAmp, weaveMicro * microAmp * 0.55, -weaveMicro * microAmp));
             `
                 : ''
             }`
@@ -2522,11 +2788,28 @@ export class OpenWorld3DEngine {
               isRock
                 ? 'roughnessFactor = clamp(roughnessFactor * (0.82 + 0.26 * objNoise), 0.32, 0.92);'
                 : isCreature
-                ? 'roughnessFactor = clamp(roughnessFactor * (0.78 + 0.22 * objNoise), 0.20, 0.86);'
+                ? `
+            // Dynamische PBR-Roughness je Materialzone: lebendiger Hautglanz (0.43), griffiger Stoff (0.67), polierte Rüstungsdetails (0.24)
+            float targetCharRough = charSkinMask * 0.43 + charFabricMask * 0.67 + charMetalMask * 0.24;
+            float detailRoughVar = 0.88 + 0.24 * (1.0 - charSrgbLum);
+            roughnessFactor = clamp(mix(roughnessFactor, targetCharRough, 0.76) * detailRoughVar, 0.16, 0.88);
+            `
                 : ''
             }
-            roughnessFactor = max(0.16, roughnessFactor * (1.0 - uObjWetness * uWetStrength * (1.0 - uObjSnow) * 0.34));
+            roughnessFactor = max(0.14, roughnessFactor * (1.0 - uObjWetness * uWetStrength * (1.0 - uObjSnow) * 0.34));
             roughnessFactor = mix(roughnessFactor, 0.70, clamp(uObjSnow * uSnowStrength * 0.65, 0.0, 0.75));`
+          )
+          .replace(
+            '#include <metalnessmap_fragment>',
+            `#include <metalnessmap_fragment>
+            ${
+              isCreature
+                ? `
+            // Dielektrische Haut & Stoff (Metalness -> ~0.02) vs. echte metallische Rüstungsplatten & Goldbeschläge (Metalness -> 0.76)
+            metalnessFactor = clamp(mix(metalnessFactor * (1.0 - charSkinMask * 0.94) * (1.0 - charFabricMask * 0.65), max(metalnessFactor, 0.76), charMetalMask), 0.0, 0.92);
+            `
+                : ''
+            }`
           )
           .replace(
             '#include <opaque_fragment>',
@@ -2544,7 +2827,6 @@ export class OpenWorld3DEngine {
             ${
               isFoliage
                 ? `
-            // Dezentes Subsurface-Scattering NUR bei echtem Tages-Sonnenlicht (niemals nachts oder bei Gewitter!)
             vec3 viewDir = normalize(cameraPosition - vObjWorldPos);
             float sunBacklit = pow(clamp(dot(viewDir, -uSunDir), 0.0, 1.0), 2.2);
             float effTopNormY = vLocalPosY < 0.6 ? abs(vObjWorldNormal.y) : vObjWorldNormal.y;
@@ -2554,7 +2836,6 @@ export class OpenWorld3DEngine {
             vec3 sssWarmTint = mix(vec3(0.95, 0.82, 0.48), vec3(0.95, 0.46, 0.14), sunsetWarmth);
             vec3 sssContrib = diffuseColor.rgb * sssWarmTint * (0.16 * sunBacklit + 0.07 * canopyTop) * sunVisible * uFoliageSSS;
             outgoingLight += sssContrib;
-            // Ausgewogene Hemisphären-Umgebungsbeleuchtung: Nachts/bei Gewitter atmosphärisch gedämpft (ohne Leuchten, aber mit klar erkennbarer Laubfarbe), tagsüber volle 3D-Tiefe!
             float foliageFloorFactor = mix(0.35, 0.54, uSunDaylight) * (0.80 + 0.20 * canopyTop);
             vec3 minFoliageLight = diffuseColor.rgb * skyTint * foliageFloorFactor;
             outgoingLight = max(outgoingLight, minFoliageLight);
@@ -2573,18 +2854,82 @@ export class OpenWorld3DEngine {
             `
                 : isRock
                 ? `
-            // Neutrale 3D-Granit-/Felsbeleuchtung ohne orangenen Charakter-Rim-Schein!
             float rockUp = clamp(vObjWorldNormal.y * 0.5 + 0.5, 0.0, 1.0);
             vec3 minRockFloor = diffuseColor.rgb * skyTint * mix(0.34, 0.52, uSunDaylight) * (0.82 + 0.18 * rockUp);
             outgoingLight = max(outgoingLight, minRockFloor);
             `
+                : isCreature
+                ? `
+            // =========================================================================
+            // ADVANCED PBR CHARACTER PIPELINE: CAVITY AO, SKIN SSS, SPECULAR & GI BOUNCE
+            // =========================================================================
+            vec3 N_char = normalize(inverseTransformDirection(normal, viewMatrix));
+            vec3 V_char = normalize(cameraPosition - vObjWorldPos);
+            vec3 L_char = normalize(uSunDir);
+            vec3 H_char = normalize(L_char + V_char);
+            float NdotV_c = clamp(dot(N_char, V_char), 0.0, 1.0);
+            float NdotL_c = dot(N_char, L_char);
+            float NdotH_c = clamp(dot(N_char, H_char), 0.0, 1.0);
+            float sunEnergyC = mix(0.24, 1.0, uSunDaylight);
+
+            // 1. Zoom-invariante 3D-Krümmungs- & Vertiefungs-Mikro-Occlusion (Muskelrillen, Rüstungsfugen, Kleidungsfalten)
+            vec3 dNdxC = dFdx(normal);
+            vec3 dNdyC = dFdy(normal);
+            vec3 dPdxC = dFdx(-vViewPosition);
+            vec3 dPdyC = dFdy(-vViewPosition);
+            float invPixC = inversesqrt(max(1e-7, dot(dPdxC, dPdxC) + dot(dPdyC, dPdyC)));
+            float surfCurvC = clamp((dot(dNdxC, dPdxC) + dot(dNdyC, dPdyC)) * invPixC * 1.15, -0.34, 0.26);
+            float creviceLumAO = mix(0.84, 1.0, smoothstep(0.10, 0.42, charSrgbLum));
+            float cavityAO = clamp(1.0 + surfCurvC * 0.62, 0.72, 1.05) * creviceLumAO;
+            outgoingLight *= mix(cavityAO, mix(0.84, 1.03, clamp(cavityAO, 0.0, 1.0)), charSkinMask * 0.40);
+
+            // 2. Physikalisches Subsurface Scattering (SSS) & Dual-Lobe Epidermis-Glanz auf Hautpartien
+            if (charSkinMask > 0.01) {
+              float wrapNdotL = clamp((NdotL_c + 0.42) / 1.42, 0.0, 1.0);
+              float terminatorSSS = exp(-abs(NdotL_c + 0.06) * 3.4) * smoothstep(-0.58, 0.48, NdotL_c);
+              float backTranslucency = pow(clamp(dot(V_char, -L_char), 0.0, 1.0), 2.3) * pow(1.0 - NdotV_c, 1.5);
+              vec3 dermisColor = vec3(0.96, 0.31, 0.16);
+              vec3 sssLight = diffuseColor.rgb * dermisColor * (terminatorSSS * 0.46 + wrapNdotL * 0.15 + backTranslucency * 0.30) * uGiSunColor * sunEnergyC;
+              float skinSpecLobe = (pow(NdotH_c, 32.0) * 0.14 + pow(NdotH_c, 7.0) * 0.05) * clamp(NdotL_c * 1.5 + 0.1, 0.0, 1.0);
+              outgoingLight += (sssLight + uGiSunColor * skinSpecLobe * sunEnergyC * 0.55) * charSkinMask;
+            }
+
+            // 3. Dynamische Glanzlichter auf Stoffen (Charlie/Velvet Grazing-Sheen) & Metalldetails (GGX Glint)
+            float fresnelGrazing = pow(1.0 - NdotV_c, 3.1);
+            float sunSideWeight = clamp(NdotL_c * 0.55 + 0.45, 0.0, 1.0);
+            vec3 fabricSheen = mix(diffuseColor.rgb, vec3(1.0), 0.36) * uGiSunColor * (fresnelGrazing * sunSideWeight * mix(0.08, 0.22, uSunDaylight) * cavityAO);
+            float metalGlint = pow(NdotH_c, 68.0) * clamp(NdotL_c * 1.7, 0.0, 1.0) * mix(0.18, 0.62, uSunDaylight);
+            vec3 metalSpecTint = mix(vec3(1.0), diffuseColor.rgb * 1.35 + vec3(0.12), charGoldMask);
+            vec3 metalHighlight = metalSpecTint * (uGiSunColor * metalGlint + skyTint * fresnelGrazing * 0.16) * clamp(cavityAO, 0.55, 1.08);
+            outgoingLight += fabricSheen * charFabricMask + metalHighlight * charMetalMask;
+
+            // 4. Dynamische Global Illumination (GI): Lichtrückwurf vom Kopfsteinpflaster/Terrain + Vertikaler Bodenkontakt-AO
+            float hAboveFeet = clamp(vObjWorldPos.y - vTreeOrigin.y, 0.0, 2.4);
+            float giBounceFacing = clamp(-N_char.y * 0.56 + 0.44, 0.0, 1.0);
+            float giBounceHeight = exp(-hAboveFeet * 1.02);
+            vec3 giGroundBounce = diffuseColor.rgb * uGiGroundColor * (giBounceFacing * giBounceHeight * uGiBounceStrength) * cavityAO;
+            outgoingLight += giGroundBounce;
+
+            float footContactZone = 1.0 - smoothstep(0.015, 0.36, hAboveFeet);
+            float footDownBias = clamp(-N_char.y * 0.42 + 0.58, 0.25, 1.0);
+            float verticalGroundAO = 1.0 - footContactZone * footDownBias * 0.27;
+            outgoingLight *= verticalGroundAO;
+
+            // 5. Saubere Konturentrennung (Rim) & tiefer natürlicher Schattenboden (erhält vollen 3D-Kontrast statt flachem 0.56-Clamp!)
+            float cleanRim = pow(1.0 - NdotV_c, 3.4) * clamp(N_char.y * 0.35 + 0.65, 0.0, 1.0);
+            float backSunC = pow(clamp(dot(V_char, -L_char), 0.0, 1.0), 2.0) * smoothstep(0.0, 0.25, L_char.y) * uSunDaylight;
+            outgoingLight += (diffuseColor.rgb * 0.55 + vec3(0.45)) * (skyTint * 0.11 + uGiSunColor * backSunC * 0.22) * cleanRim * verticalGroundAO;
+            vec3 deepCreviceFloor = diffuseColor.rgb * mix(uGiGroundColor * 0.55, skyTint, clamp(N_char.y * 0.5 + 0.5, 0.0, 1.0)) * mix(0.11, 0.18, uSunDaylight) * cavityAO * verticalGroundAO;
+            outgoingLight = max(outgoingLight, deepCreviceFloor);
+            `
                 : `
-            vec3 viewDirC = normalize(cameraPosition - vObjWorldPos);
-            float rimC = pow(1.0 - max(dot(normalize(vObjWorldNormal), viewDirC), 0.0), 2.4);
-            float backSun = pow(clamp(dot(viewDirC, -uSunDir), 0.0, 1.0), 1.8) * smoothstep(0.0, 0.25, uSunDir.y);
-            vec3 minCharFloor = diffuseColor.rgb * skyTint * mix(0.38, 0.56, uSunDaylight);
-            outgoingLight = max(outgoingLight, minCharFloor);
-            outgoingLight += diffuseColor.rgb * (skyTint * 0.28 + vec3(1.0, 0.82, 0.52) * backSun * 0.35) * rimC;
+            // Architektur-, Holz-, Mauer- & Pflaster-Props: natürliche 3D-Kontrasttiefe + subtiler Boden-Bounce
+            vec3 viewDirP = normalize(cameraPosition - vObjWorldPos);
+            float rimP = pow(1.0 - max(dot(normalize(vObjWorldNormal), viewDirP), 0.0), 2.8);
+            float propUp = clamp(vObjWorldNormal.y * 0.5 + 0.5, 0.0, 1.0);
+            vec3 minPropFloor = diffuseColor.rgb * skyTint * mix(0.24, 0.38, uSunDaylight) * (0.82 + 0.18 * propUp);
+            outgoingLight = max(outgoingLight, minPropFloor);
+            outgoingLight += diffuseColor.rgb * skyTint * rimP * 0.12;
             `
             }
             // Echtzeit-3D-Umweltbeleuchtung durch nahe Rissmonolithen (Baumstämme, Baumkronen, Felsen, Büsche & Kreaturen bei Tag & Nacht!)
@@ -2997,6 +3342,16 @@ export class OpenWorld3DEngine {
 
 
 
+  _resolveDirectServerAssetUrl(url) {
+    if (!url || typeof window === 'undefined' || /^https?:\/\//i.test(url)) return null;
+    const srvHost = window.__AERYNDOR_SERVER_HOST__;
+    const isLocalPakHost = window.location?.hostname === 'client.aeryndor.local';
+    if (!srvHost && !isLocalPakHost) return null;
+    const host = srvHost || '207.180.239.190:8090';
+    const sep = url.includes('?') ? '&' : '?';
+    return `http://${host}${url.startsWith('/') ? '' : '/'}${url}${sep}_direct=1`;
+  }
+
   loadModelTexture(url, isDataTex = false) {
     if (!this._modelTextureCache) this._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
     if (this._modelTextureCache.has(url)) {
@@ -3007,7 +3362,19 @@ export class OpenWorld3DEngine {
       return existing;
     }
     const loader = new THREE.TextureLoader();
-    const tex = loader.load(url);
+    loader.setCrossOrigin?.('anonymous');
+    const tex = loader.load(url, undefined, undefined, () => {
+      const directUrl = this._resolveDirectServerAssetUrl?.(url);
+      if (directUrl && typeof Image !== 'undefined') {
+        const fallbackImg = new Image();
+        fallbackImg.crossOrigin = 'anonymous';
+        fallbackImg.onload = () => {
+          tex.image = fallbackImg;
+          tex.needsUpdate = true;
+        };
+        fallbackImg.src = directUrl;
+      }
+    });
     tex.flipY = false; // GLTF 2.0 UV-Konvention
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
@@ -3024,18 +3391,39 @@ export class OpenWorld3DEngine {
       return this._glbTemplateCache.get(url);
     }
 
-    const fetchArrayBuffer = (attempt = 0) =>
-      fetch(url)
+    const validateGlbBuffer = (buf, srcUrl) => {
+      if (!buf || buf.byteLength < 28) {
+        throw new Error(`GLB zu kurz (${buf ? buf.byteLength : 0} Bytes) in ${srcUrl}`);
+      }
+      const dvCheck = new DataView(buf);
+      const magicCheck = dvCheck.getUint32(0, true);
+      if (magicCheck !== 0x46546c67) {
+        throw new Error(`Ungültiger GLB-Header (0x${magicCheck.toString(16)}) in ${srcUrl}`);
+      }
+      const declaredLen = dvCheck.getUint32(8, true);
+      if (declaredLen > buf.byteLength) {
+        throw new Error(`Unvollständiger GLB-Download (${buf.byteLength}/${declaredLen}) in ${srcUrl}`);
+      }
+      return buf;
+    };
+
+    const fetchArrayBuffer = (attempt = 0) => {
+      const directUrl = attempt >= 1 ? this._resolveDirectServerAssetUrl?.(url) : null;
+      const targetUrl = directUrl || url;
+      return fetch(targetUrl)
         .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status} for ${targetUrl}`);
           return res.arrayBuffer();
         })
+        .then((buf) => validateGlbBuffer(buf, targetUrl))
         .catch((err) => {
-          if (attempt < 1) {
-            return new Promise((resolve) => setTimeout(resolve, 350)).then(() => fetchArrayBuffer(attempt + 1));
+          if (attempt < 2) {
+            const delayMs = attempt === 0 && this._resolveDirectServerAssetUrl?.(url) ? 20 : 350;
+            return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => fetchArrayBuffer(attempt + 1));
           }
           throw err;
         });
+    };
 
     const promise = fetchArrayBuffer()
       .then((buffer) => {
@@ -5573,7 +5961,7 @@ export class OpenWorld3DEngine {
     this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileDevice ? 1.0 : 1.25));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap; // scharfe Schattenkanten (statt weichem PCFSoft)
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     if ('outputColorSpace' in this.renderer && THREE.SRGBColorSpace) {
@@ -5587,7 +5975,7 @@ export class OpenWorld3DEngine {
     this.hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x365314, 1.12);
     this.scene.add(this.hemiLight);
 
-    // Haupt-Sonnenlicht mit eng mitgeführter High-Res Shadow-Box
+    // Haupt-Sonnenlicht mit eng mitgeführter High-Res Shadow-Box (weiche PCFSoft-Penumbra & präziser Fußkontakt)
     this.sunLight = new THREE.DirectionalLight(0xfffbeb, 1.75);
     this.sunLight.position.set(45, 78, 195);
     this.sunLight.castShadow = true;
@@ -5595,10 +5983,10 @@ export class OpenWorld3DEngine {
     this.sunLight.shadow.mapSize.height = 4096;
     this.sunLight.shadow.camera.near = 5;
     this.sunLight.shadow.camera.far = 480;
-    this.sunLight.shadow.bias = -0.00018;
-    this.sunLight.shadow.radius = 1.25;
-    this.sunLight.shadow.normalBias = 0.012;
-    const d = 65;
+    this.sunLight.shadow.bias = -0.00011;
+    this.sunLight.shadow.radius = 1.65;
+    this.sunLight.shadow.normalBias = 0.0065;
+    const d = 56;
     this._targetShadowSpan = d;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
@@ -5957,7 +6345,7 @@ export class OpenWorld3DEngine {
     const shadowsEnabled = cs.shadows !== false && shadowTier > 0 && masterTier > 0;
     this._shadowsActive = shadowsEnabled;
     this.renderer.shadowMap.enabled = shadowsEnabled;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap; // scharfe Schattenkanten (statt weichem PCFSoft)
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.needsUpdate = shadowsEnabled;
     this.env.shadowQualityTier = !shadowsEnabled
       ? 0
@@ -5972,30 +6360,30 @@ export class OpenWorld3DEngine {
       let shadowDistScale = 1.0;
       if (isPcProfile) {
         if (shadowTier === 2) {
-          // PC Ultra: 4096-Schattenkarte und 65m Weite für gestochen scharfe Baumkronen-, Monster-, Spieler- & Waffen-Bodenschatten
+          // PC Ultra: 4096-Schattenkarte und 56m Fokusbox für hochpräzise, weich gefilterte Charakter-, Rüstungs- & Fuß-Bodenschatten
           targetShadowMapSize = 4096;
-          d = 65;
+          d = 56;
           shadowFar = 520;
           shadowDistScale = 2.0;
           this._shadowUpdateStride = 2;
         } else {
           targetShadowMapSize = 2048;
-          d = 55;
+          d = 48;
           shadowFar = 420;
           shadowDistScale = 1.6;
           this._shadowUpdateStride = 2;
         }
       } else {
-        // Browser-Modus: Auf Ultra hochauflösende 2048-Schattenkarte für saubere, glatte Bodenschatten ohne Pixeln
+        // Browser-Modus: Auf Ultra hochauflösende 2048-Schattenkarte mit 48m Fokusbox für saubere, weiche Bodenschatten
         if (shadowTier === 2) {
           targetShadowMapSize = 2048;
-          d = 55;
+          d = 48;
           shadowFar = 320;
           shadowDistScale = 1.35;
           this._shadowUpdateStride = 2;
         } else {
           targetShadowMapSize = 1024;
-          d = 45;
+          d = 42;
           shadowFar = 220;
           shadowDistScale = 0.95;
           this._shadowUpdateStride = 3;
@@ -6009,9 +6397,9 @@ export class OpenWorld3DEngine {
       this.sunLight.shadow.camera.right = d;
       this.sunLight.shadow.camera.top = d;
       this.sunLight.shadow.camera.bottom = -d;
-      this.sunLight.shadow.bias = -0.00018;
-      this.sunLight.shadow.normalBias = 0.012;
-      this.sunLight.shadow.radius = 1.25;
+      this.sunLight.shadow.bias = -0.00011;
+      this.sunLight.shadow.normalBias = 0.0065;
+      this.sunLight.shadow.radius = 1.65;
       this.sunLight.shadow.camera.updateProjectionMatrix();
       if (this.sunLight.shadow.mapSize.width !== targetShadowMapSize && shadowsEnabled) {
         this.sunLight.shadow.mapSize.width = targetShadowMapSize;
@@ -6879,27 +7267,30 @@ export class OpenWorld3DEngine {
       this.env.shadowQualityTier = sqTier;
       const shadowsOn = sqTier > 0;
       this._shadowsActive = shadowsOn;
-      this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = THREE.PCFShadowMap; // scharfe Schattenkanten (statt weichem PCFSoft)
+      this.renderer.shadowMap.enabled = shadowsOn;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       this.renderer.shadowMap.needsUpdate = shadowsOn;
-      this.sunLight.castShadow = true;
+      this.sunLight.castShadow = shadowsOn;
       if (shadowsOn) {
         const tierMapSize = this._isPcProfile
           ? (sqTier === 4 ? 4096 : sqTier === 3 ? 2048 : sqTier === 2 ? 2048 : 1536)
-          : (sqTier >= 2 ? 1536 : 1024);
+          : (sqTier >= 2 ? 2048 : 1024);
         const tierSpan = this._isPcProfile
-          ? (sqTier === 4 ? 65 : sqTier === 3 ? 55 : sqTier === 2 ? 50 : 45)
-          : (sqTier >= 2 ? 55 : 45);
+          ? (sqTier === 4 ? 56 : sqTier === 3 ? 48 : sqTier === 2 ? 44 : 40)
+          : (sqTier >= 2 ? 48 : 42);
         this._targetShadowSpan = tierSpan;
         const tierFar = this._isPcProfile
           ? (sqTier === 4 ? 520 : sqTier === 3 ? 420 : sqTier === 2 ? 360 : 300)
-          : (sqTier >= 2 ? 300 : 220);
+          : (sqTier >= 2 ? 320 : 220);
         this._shadowUpdateStride = this._isPcProfile ? 2 : (sqTier >= 2 ? 2 : 3);
         this.sunLight.shadow.camera.left = -tierSpan;
         this.sunLight.shadow.camera.right = tierSpan;
         this.sunLight.shadow.camera.top = tierSpan;
         this.sunLight.shadow.camera.bottom = -tierSpan;
         this.sunLight.shadow.camera.far = tierFar;
+        this.sunLight.shadow.bias = -0.00011;
+        this.sunLight.shadow.normalBias = 0.0065;
+        this.sunLight.shadow.radius = 1.65;
         this.sunLight.shadow.camera.updateProjectionMatrix();
         if (this.sunLight.shadow.mapSize.width !== tierMapSize) {
           this.sunLight.shadow.mapSize.width = tierMapSize;
@@ -7615,6 +8006,7 @@ export class OpenWorld3DEngine {
       if (this._objectWeatherUniforms.uAmbientSkyColor) {
         this._objectWeatherUniforms.uAmbientSkyColor.value.copy(this.hemiLight.color);
       }
+      let sunDaylightVal = 0.0;
       if (this._objectWeatherUniforms.uSunDaylight) {
         const sunElevFactor = isNightNow
           ? 0.0
@@ -7626,7 +8018,99 @@ export class OpenWorld3DEngine {
           : ['cloudy', 'light_rain', 'light_snow', 'snow'].includes(this.env.weather)
           ? 0.48
           : 1.0;
-        this._objectWeatherUniforms.uSunDaylight.value = sunElevFactor * weatherSunMult;
+        sunDaylightVal = sunElevFactor * weatherSunMult;
+        this._objectWeatherUniforms.uSunDaylight.value = sunDaylightVal;
+      }
+
+      // Dynamisches Echtzeit-Global-Illumination (GI) Boden-Bounce-Licht (Kopfsteinpflaster, Sand, Wiese, Herbstboden, Schnee)
+      if (this._objectWeatherUniforms.uGiGroundColor) {
+        const pPos = this.localPlayerPos || this.camera?.position || { x: 0, z: 0 };
+        const px = Number(pPos.x || 0);
+        const pz = Number(pPos.z || 0);
+        let cobbleWeight = 0.0;
+        const mapTowns = this.getMapTowns ? this.getMapTowns(this.currentMapId) : [];
+        for (let ti = 0; ti < mapTowns.length; ti++) {
+          const t = mapTowns[ti];
+          const tr = Number(t.radius || 150);
+          const dist = Math.hypot(px - t.x, pz - t.z);
+          if (dist < tr * 1.18) {
+            const w = 1.0 - Math.max(0.0, Math.min(1.0, (dist - tr * 0.90) / Math.max(1.0, tr * 0.28)));
+            if (w > cobbleWeight) cobbleWeight = w;
+          }
+        }
+        if (this.currentMapId === 'morgenwacht') {
+          const wheolDist = Math.hypot(px, pz + 180.0);
+          if (wheolDist < 66.0) {
+            const ww = 1.0 - Math.max(0.0, Math.min(1.0, (wheolDist - 46.0) / 20.0));
+            if (ww > cobbleWeight) cobbleWeight = ww;
+          }
+        }
+        if (cobbleWeight < 1.0 && this.getBridgeHeightAt && this.getBridgeHeightAt(px, pz) !== null) {
+          cobbleWeight = 1.0;
+        }
+
+        let grR = 0.38;
+        let grG = 0.49;
+        let grB = 0.28;
+        if (this.currentMapId === 'eisland') {
+          grR = 0.84; grG = 0.90; grB = 0.96;
+        } else if (this.currentMapId === 'wueste' || (this.currentMapId === 'morgenwacht' && pz > 900.0)) {
+          grR = 0.78; grG = 0.70; grB = 0.54;
+        } else if (this.currentMapId === 'feuerland') {
+          grR = 0.48; grG = 0.32; grB = 0.24;
+        } else if (
+          this.currentMapId === 'grenzland' ||
+          this.currentMapId === 'roter_wald' ||
+          this.env.season === 'autumn' ||
+          (this.currentMapId === 'morgenwacht' && pz > 20.0)
+        ) {
+          grR = 0.58; grG = 0.46; grB = 0.30;
+        }
+
+        // Kopfsteinpflaster-Albedo (warmes Kalk-/Granitpflaster) einmischen
+        grR += (0.74 - grR) * cobbleWeight;
+        grG += (0.69 - grG) * cobbleWeight;
+        grB += (0.62 - grB) * cobbleWeight;
+
+        const snowCov = Math.max(0.0, Math.min(1.0, this._objectWeatherUniforms.uObjSnow?.value || 0.0));
+        if (snowCov > 0.001) {
+          grR += (0.86 - grR) * snowCov;
+          grG += (0.91 - grG) * snowCov;
+          grB += (0.97 - grB) * snowCov;
+        }
+        const wetCov = Math.max(0.0, Math.min(1.0, this._objectWeatherUniforms.uObjWetness?.value || 0.0));
+        const wetAlbedoDamp = 1.0 - wetCov * 0.18;
+
+        const sunCol = this.sunLight.color;
+        const hemiCol = this.hemiLight.color;
+        const sunIrr = 0.36 + sunDaylightVal * 0.72;
+        const hemiIrr = 0.42;
+        const irrR = Math.min(1.45, sunCol.r * sunIrr + hemiCol.r * hemiIrr);
+        const irrG = Math.min(1.42, sunCol.g * sunIrr + hemiCol.g * hemiIrr);
+        const irrB = Math.min(1.40, sunCol.b * sunIrr + hemiCol.b * hemiIrr);
+
+        if (!this._tmpGiGroundTarget) this._tmpGiGroundTarget = new THREE.Color();
+        this._tmpGiGroundTarget.setRGB(
+          grR * wetAlbedoDamp * irrR,
+          grG * wetAlbedoDamp * irrG,
+          grB * wetAlbedoDamp * irrB
+        );
+        if (snapNow) {
+          this._objectWeatherUniforms.uGiGroundColor.value.copy(this._tmpGiGroundTarget);
+        } else {
+          this._objectWeatherUniforms.uGiGroundColor.value.lerp(this._tmpGiGroundTarget, skyLerp);
+        }
+        if (this._objectWeatherUniforms.uGiSunColor) {
+          this._objectWeatherUniforms.uGiSunColor.value.copy(sunCol);
+        }
+        if (this._objectWeatherUniforms.uGiBounceStrength) {
+          const isGoldenGi = (h >= 5.5 && h <= 8.2) || (h >= 17.2 && h <= 20.4);
+          this._objectWeatherUniforms.uGiBounceStrength.value = isNightNow
+            ? 0.22
+            : isGoldenGi
+            ? 0.50 + cobbleWeight * 0.08
+            : 0.43 + cobbleWeight * 0.07;
+        }
       }
     }
     if (this._waterShaderUniforms) {
@@ -15576,11 +16060,10 @@ export class OpenWorld3DEngine {
           maneHex: 0x171717,
           saddleHex: 0x7f1d1d,
           matOpts: {
-            color: new THREE.Color(1.48, 1.44, 1.40),
-            emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: 0.28,
-            useMapAsEmissive: true,
-            roughness: 0.54,
+            color: new THREE.Color(1.16, 1.14, 1.12),
+            emissive: new THREE.Color(0x000000),
+            emissiveIntensity: 0.0,
+            roughness: 0.50,
             metalness: 0.08,
           },
           speed: 1.48,
@@ -15600,11 +16083,10 @@ export class OpenWorld3DEngine {
           maneHex: 0xf8fafc,
           saddleHex: 0x1e3a8a,
           matOpts: {
-            color: new THREE.Color(1.26, 1.22, 1.18),
-            emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: 0.22,
-            useMapAsEmissive: true,
-            roughness: 0.56,
+            color: new THREE.Color(1.06, 1.04, 1.02),
+            emissive: new THREE.Color(0x000000),
+            emissiveIntensity: 0.0,
+            roughness: 0.52,
             metalness: 0.05,
           },
           speed: 1.56,
@@ -15624,11 +16106,10 @@ export class OpenWorld3DEngine {
           maneHex: 0xfacc15,
           saddleHex: 0xb45309,
           matOpts: {
-            color: new THREE.Color(1.22, 1.20, 1.16),
-            emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: 0.22,
-            useMapAsEmissive: true,
-            roughness: 0.52,
+            color: new THREE.Color(1.04, 1.03, 1.01),
+            emissive: new THREE.Color(0x000000),
+            emissiveIntensity: 0.0,
+            roughness: 0.48,
             metalness: 0.06,
           },
           speed: 1.42,
@@ -15648,11 +16129,10 @@ export class OpenWorld3DEngine {
           maneHex: 0x451a03,
           saddleHex: 0x991b1b,
           matOpts: {
-            color: new THREE.Color(1.38, 0.84, 0.58),
-            emissive: new THREE.Color(0xd97706),
-            emissiveIntensity: 0.22,
-            useMapAsEmissive: true,
-            roughness: 0.55,
+            color: new THREE.Color(1.18, 0.74, 0.52),
+            emissive: new THREE.Color(0x000000),
+            emissiveIntensity: 0.0,
+            roughness: 0.51,
             metalness: 0.06,
           },
           speed: 1.52,
@@ -15672,11 +16152,10 @@ export class OpenWorld3DEngine {
           maneHex: 0xfef08a,
           saddleHex: 0x0369a1,
           matOpts: {
-            color: new THREE.Color(1.36, 1.15, 0.72),
-            emissive: new THREE.Color(0xf59e0b),
-            emissiveIntensity: 0.24,
-            useMapAsEmissive: true,
-            roughness: 0.52,
+            color: new THREE.Color(1.16, 0.98, 0.64),
+            emissive: new THREE.Color(0x000000),
+            emissiveIntensity: 0.0,
+            roughness: 0.48,
             metalness: 0.08,
           },
           speed: 1.60,
@@ -15774,6 +16253,13 @@ export class OpenWorld3DEngine {
           true,
           hcHorse.matOpts
         );
+        const hContactShadow = this.createActorContactShadowGroup({
+          radius: 1.05,
+          elongationZ: 1.62,
+          withFeet: false,
+          opacity: 0.38,
+        });
+        if (hContactShadow) hContainer.add(hContactShadow);
 
         // Klickbare Hitbox & Namensschild für jedes Pferd in der Koppel (öffnet ebenfalls den Stallburschen-Dialog)
         const hHitBox = new THREE.Mesh(
@@ -16409,6 +16895,7 @@ export class OpenWorld3DEngine {
           weaponVisual: n.weaponVisual,
           weaponPlus: 9,
           noMountAndPet: true,
+          noContactShadow: Boolean(n.glbModel),
           disableGlbHero: Boolean(n.glbModel),
         });
         npcContainer.add(fallbackRig.root);
@@ -16422,6 +16909,12 @@ export class OpenWorld3DEngine {
             fallbackRig.root,
             true
           );
+          const npcShadow = this.createActorContactShadowGroup({
+            radius: 0.80,
+            withFeet: false,
+            opacity: 0.40,
+          });
+          if (npcShadow) npcContainer.add(npcShadow);
         }
 
         const hitBox = new THREE.Mesh(
@@ -25330,10 +25823,10 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col2.png'],
         texFile: 'pewi_mount_horse_col2.png',
         height: 1.92,
-        color: new THREE.Color(1.26, 1.22, 1.18),
-        emissive: new THREE.Color(0xffffff),
-        emissiveIntensity: 0.20,
-        roughness: 0.56,
+        color: new THREE.Color(1.06, 1.04, 1.02),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.52,
         metalness: 0.05,
       },
       horse_lvl35: {
@@ -25344,10 +25837,10 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col1.png'],
         texFile: 'pewi_mount_horse_col1.png',
         height: 1.95,
-        color: new THREE.Color(1.48, 1.44, 1.40),
-        emissive: new THREE.Color(0x93c5fd),
-        emissiveIntensity: 0.28,
-        roughness: 0.48,
+        color: new THREE.Color(1.16, 1.14, 1.12),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.46,
         metalness: 0.12,
       },
       horse_lvl50: {
@@ -25358,9 +25851,9 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col3.png'],
         texFile: 'pewi_mount_horse_col3.png',
         height: 1.98,
-        color: new THREE.Color(1.45, 1.32, 0.98),
+        color: new THREE.Color(1.10, 1.04, 0.92),
         emissive: new THREE.Color(0xf59e0b),
-        emissiveIntensity: 0.34,
+        emissiveIntensity: 0.06,
         roughness: 0.44,
         metalness: 0.18,
       },
@@ -25372,9 +25865,9 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col3.png'],
         texFile: 'pewi_mount_horse_col3.png',
         height: 1.98,
-        color: new THREE.Color(1.18, 1.56, 1.48),
+        color: new THREE.Color(1.06, 1.28, 1.22),
         emissive: new THREE.Color(0x10b981),
-        emissiveIntensity: 0.38,
+        emissiveIntensity: 0.18,
         roughness: 0.42,
         metalness: 0.16,
       },
@@ -25386,9 +25879,9 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col2.png'],
         texFile: 'pewi_mount_horse_col2.png',
         height: 1.96,
-        color: new THREE.Color(1.12, 0.96, 1.48),
+        color: new THREE.Color(1.02, 0.90, 1.24),
         emissive: new THREE.Color(0x8b5cf6),
-        emissiveIntensity: 0.38,
+        emissiveIntensity: 0.18,
         roughness: 0.45,
         metalness: 0.14,
       },
@@ -25400,10 +25893,10 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col1.png'],
         texFile: 'pewi_mount_horse_col1.png',
         height: 1.92,
-        color: new THREE.Color(1.48, 1.44, 1.40),
-        emissive: new THREE.Color(0xffffff),
-        emissiveIntensity: 0.28,
-        roughness: 0.54,
+        color: new THREE.Color(1.16, 1.14, 1.12),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.50,
         metalness: 0.08,
       },
       col2: {
@@ -25414,10 +25907,10 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col2.png'],
         texFile: 'pewi_mount_horse_col2.png',
         height: 1.92,
-        color: new THREE.Color(1.26, 1.22, 1.18),
-        emissive: new THREE.Color(0xffffff),
-        emissiveIntensity: 0.22,
-        roughness: 0.56,
+        color: new THREE.Color(1.06, 1.04, 1.02),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.52,
         metalness: 0.05,
       },
       col3: {
@@ -25428,10 +25921,10 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col3.png'],
         texFile: 'pewi_mount_horse_col3.png',
         height: 1.92,
-        color: new THREE.Color(1.22, 1.20, 1.16),
-        emissive: new THREE.Color(0xffffff),
-        emissiveIntensity: 0.22,
-        roughness: 0.52,
+        color: new THREE.Color(1.04, 1.03, 1.01),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.48,
         metalness: 0.06,
       },
     };
@@ -26021,7 +26514,10 @@ export class OpenWorld3DEngine {
       }),
       { isCreature: true, snowStrength: 0.58, wetStrength: 0.8 }
     );
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xf1c27d, roughness: 0.55 });
+    const skinMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0xe8b48a, roughness: 0.44, metalness: 0.02 }),
+      { isCreature: true, snowStrength: 0.35, wetStrength: 0.65 }
+    );
     const darkMat = this.injectObjectWeatherShader(
       new THREE.MeshStandardMaterial({ color: 0x27201c, roughness: 0.7 }),
       { isCreature: true, snowStrength: 0.62, wetStrength: 0.8 }
@@ -26030,6 +26526,13 @@ export class OpenWorld3DEngine {
       new THREE.MeshStandardMaterial({ color: hairHex, roughness: 0.65 }),
       { isCreature: true, snowStrength: 0.68, wetStrength: 0.8 }
     );
+
+    const contactShadowGroup = !cfg.noContactShadow
+      ? this.createActorContactShadowGroup({ radius: 0.78, withFeet: true, opacity: 0.38 })
+      : null;
+    if (contactShadowGroup) {
+      root.add(contactShadowGroup);
+    }
 
     const bodyGroup = new THREE.Group();
     if (isFemale) {
@@ -26405,13 +26908,12 @@ export class OpenWorld3DEngine {
         bodyGroup,
         false,
         {
-          color: new THREE.Color(1.22, 1.20, 1.18),
-          roughness: 0.52,
-          metalness: 0.16,
+          color: new THREE.Color(1.02, 1.01, 1.00),
+          roughness: 0.54,
+          metalness: 0.08,
           normalMap: heroGlbCfg.normalMap || null,
-          emissive: new THREE.Color(plus >= 9 ? 0xf59e0b : plus >= 7 ? 0x38bdf8 : 0xffffff),
-          emissiveIntensity: plus >= 9 ? 0.24 : plus >= 7 ? 0.18 : 0.14,
-          useMapAsEmissive: true,
+          emissive: new THREE.Color(0x000000),
+          emissiveIntensity: 0.0,
         }
       );
 
@@ -26625,6 +27127,7 @@ export class OpenWorld3DEngine {
       mountGroup,
       petGroup,
       blockDome,
+      contactShadowGroup,
       classId: cfg.classId || 'warrior',
       weaponVisual,
       weaponPlus: plus,
@@ -26766,6 +27269,9 @@ export class OpenWorld3DEngine {
         }
       }
     }
+
+    // 1a. Dynamischen weichen Dual-Fuß- & Körper-Kontaktschatten unter dem Helden aktualisieren
+    this.updateActorContactShadow(actor, { isMounted, isJumping, isDead });
 
     // 1b. Aktive Metin2- & L-Skill-Waffen-/Körper-Buff-Loops (Tiers 1..5) & 3D-Knochen-Schwertschweif animieren
     this.updateActorMetinBuffLoop(actor, dt, elapsed);
@@ -28414,6 +28920,7 @@ export class OpenWorld3DEngine {
             weaponVisual: mob.isBoss ? 'rsb' : 'sword',
             weaponPlus: mob.isBoss ? 9 : 4,
             noMountAndPet: true,
+            noContactShadow: true,
             disableGlbHero: Boolean(mob.glbModel && glbUrl),
           });
           if (rig.petGroup) rig.petGroup.visible = false;
@@ -28448,6 +28955,14 @@ export class OpenWorld3DEngine {
           isRidackOrc ? { alphaTest: 0.25, roughness: 0.68, metalness: 0.14 } : null
         );
       }
+
+      // Weicher Boden-Kontaktschatten unter jedem Monster für realistische Bodenhaftung ohne Schweben
+      const mobShadow = this.createActorContactShadowGroup({
+        radius: Math.min(1.65, 0.74 * sc * (mob.isBoss ? 1.45 : 1.0)),
+        withFeet: false,
+        opacity: 0.38,
+      });
+      if (mobShadow) root.add(mobShadow);
 
       // Riss-Korruption für Monster (Leuchtende rote Augen, dunkle Äther-Aura & aufsteigende Glutpartikel bei Riss-Einfluss!)
       const corruptGroup = new THREE.Group();
@@ -36365,25 +36880,50 @@ export class CharacterShowcase3D {
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25;
+    this.renderer.toneMappingExposure = 1.12;
+    if ('outputColorSpace' in this.renderer && THREE.SRGBColorSpace) {
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
 
     this.container.innerHTML = '';
     this.container.appendChild(this.renderer.domElement);
 
-    const hemi = new THREE.HemisphereLight(0xfef08a, 0x1e293b, 1.25);
+    const hemi = new THREE.HemisphereLight(0xfff4d6, 0x3a3228, 1.10);
     this.scene.add(hemi);
 
-    const keyLight = new THREE.DirectionalLight(0xfffbeb, 1.95);
+    const keyLight = new THREE.DirectionalLight(0xfffbeb, 1.88);
     keyLight.position.set(3.5, 5.5, 4.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 18;
+    keyLight.shadow.camera.left = -2.6;
+    keyLight.shadow.camera.right = 2.6;
+    keyLight.shadow.camera.top = 2.8;
+    keyLight.shadow.camera.bottom = -2.2;
+    keyLight.shadow.bias = -0.0003;
+    keyLight.shadow.normalBias = 0.008;
+    keyLight.shadow.radius = 2.0;
     this.scene.add(keyLight);
 
-    const rimLight = new THREE.PointLight(0x38bdf8, 2.2, 10);
+    const rimLight = new THREE.PointLight(0x60a5fa, 1.85, 10);
     rimLight.position.set(-2.5, 2.4, -2.2);
     this.scene.add(rimLight);
 
-    // Transluzente goldene Runen-Ringe direkt auf dem Stein-Medaillon der Terrasse
+    // Transluzente goldene Runen-Ringe + Schatten-Empfängerscheibe direkt auf dem Stein-Medaillon der Terrasse
     this.pedestalGroup = new THREE.Group();
+
+    const shadowDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(2.15, 48),
+      new THREE.ShadowMaterial({ opacity: 0.30, depthWrite: false })
+    );
+    shadowDisc.rotation.x = -Math.PI / 2;
+    shadowDisc.position.y = 0.004;
+    shadowDisc.receiveShadow = true;
 
     this.runeRingOuter = new THREE.Mesh(
       new THREE.RingGeometry(0.92, 1.04, 48),
@@ -36414,18 +36954,49 @@ export class CharacterShowcase3D {
     this.summonAura.position.y = 0.98;
     this.summonAura.visible = false;
 
-    this.pedestalGroup.add(this.runeRingOuter, this.runeRingInner, this.summonAura);
+    this.pedestalGroup.add(shadowDisc, this.runeRingOuter, this.runeRingInner, this.summonAura);
     this.scene.add(this.pedestalGroup);
 
     this.helperEngine = Object.create(OpenWorld3DEngine.prototype);
+    this.helperEngine.renderer = this.renderer;
     this.helperEngine._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
     this.helperEngine._glbTemplateCache = GLOBAL_GLB_TEMPLATE_CACHE;
     this.helperEngine._glbResolvedTemplates = GLOBAL_GLB_RESOLVED_CACHE;
     this.helperEngine._sharedGlbMaterialCache = new Map();
+    this.helperEngine._grassShaderUniforms = {
+      uTime: { value: 0.0 },
+      uWindStrength: { value: 0.25 },
+      uWindDir: { value: new THREE.Vector2(0.82, 0.57) },
+      uRiftFactor: { value: 0.0 },
+      uRiftAwakened: { value: 0.0 },
+      uMonolithPosRad: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, -5000, 0, 0)) },
+      uMonolithColInt: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0.66, 0.33, 0.97, 0)) },
+      uFireflyPosRad: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -5000, 0, 0)) },
+      uFireflyColInt: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0.65, 0.95, 0.25, 0)) },
+    };
     this.helperEngine._objectWeatherUniforms = {
-      uSnowCoverage: { value: 0.0 },
-      uWetness: { value: 0.0 },
-      uSunDir: { value: new THREE.Vector3(0.4, 0.8, 0.3).normalize() },
+      uObjSnow: { value: 0.0 },
+      uObjWetness: { value: 0.0 },
+      uSunDir: { value: new THREE.Vector3(3.5, 5.5, 4.5).normalize() },
+      uCloudShadowEnabled: { value: 0.0 },
+      uCloudShadowStrength: { value: 0.0 },
+      uCloudCoverage: { value: 0.0 },
+      uCloudShadowOffset: { value: new THREE.Vector2(0, 0) },
+      uAmbientFloor: { value: 0.64 },
+      uAmbientSkyColor: { value: new THREE.Color(0x9ab4d6) },
+      uSunDaylight: { value: 0.92 },
+      uRiftFactor: { value: 0.0 },
+      uRiftAwakened: { value: 0.0 },
+      uVegLeafDensity: { value: 1.0 },
+      uVegLeafScale: { value: 1.0 },
+      uVegWindMult: { value: 1.0 },
+      uVegBranchSway: { value: 1.0 },
+      uFoliageSSS: { value: 1.0 },
+      uTreeColorVariation: { value: 1.0 },
+      uCamTargetPos: { value: new THREE.Vector3(0, 1.0, 0) },
+      uGiGroundColor: { value: new THREE.Color(0x8c7d68) },
+      uGiSunColor: { value: new THREE.Color(0xfff6e0) },
+      uGiBounceStrength: { value: 0.44 },
     };
     this.setCharacter(initialCfg);
     this.bindInteractions();
@@ -36590,6 +37161,9 @@ export class CharacterShowcase3D {
 
     const dt = Math.min(0.1, this.clock.getDelta());
     const t = this.clock.getElapsedTime();
+    if (this.helperEngine?._grassShaderUniforms?.uTime) {
+      this.helperEngine._grassShaderUniforms.uTime.value = t;
+    }
 
     this.currentRotY += (this.targetRotY - this.currentRotY) * Math.min(1.0, dt * 10.0);
     this.currentZoom += (this.targetZoom - this.currentZoom) * Math.min(1.0, dt * 10.0);
