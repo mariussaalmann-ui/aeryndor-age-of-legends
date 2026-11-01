@@ -832,7 +832,8 @@ def embed_to_markdown_content(emb: dict) -> str:
 
 def get_ki_panel_payload() -> dict:
     content = (
-        "# 🤖 AERYNDOR KI-CHRONIST & INTERAKTIVES SPIELER-PANEL\n\n"
+        "# 🤖 AERYNDOR KI-CHRONIST & INTERAKTIVES SPIELER-PANEL\n"
+        "🎮 **Game:** `Version Alpha v0.1 – v0.5` • 💎 **Interface:** `Liquid Horizons v1.0` • 🧬 **KI/AI System:** `Version Sysenery v1.0 – v5.0`\n\n"
         "Willkommen im interaktiven **KI- & Kommando-Zentrum von Aeryndor**! "
         "Wähle einfach unten eine Funktion per Button-Klick oder aus dem Auswahlmenü:\n\n"
         "### 🤖 KI-Chronist von Seiryu befragen\n"
@@ -1073,10 +1074,11 @@ def get_status_panel_payload(stats: dict = None) -> dict:
         "# 🟢 AERYNDOR LIVE-SERVERSTATUS & OFFIZIELLE PORTALE\n\n"
         "Unser 3D Open-World Gameserver, die Datenbank, das Userpanel und die Live-Rangliste sind rund um die Uhr (**24/7**) synchronisiert.\n\n"
         "## 🖥️ Live Server-Telemetrie\n\n"
-        "• **Server-Status:** 🟢 **ONLINE (24/7 Echtzeit-Welt • 144+ FPS Engine • Patch v5.0)**\n\n"
+        "• **Server-Status:** 🟢 **ONLINE (24/7 Echtzeit-Welt • 144+ FPS Engine)**\n\n"
+        "• **Aktive Patch-Versionen:** 🎮 **Game:** `Version Alpha v0.1 – v0.5` • 💎 **Interface:** `Liquid Horizons v1.0` • 🧬 **KI/AI System:** `Version Sysenery v1.0 – v5.0`\n\n"
         f"• **Spieler Online:** **{stats.get('onlinePlayers', 0)}**  •  **Registrierte Helden:** **{stats.get('registeredCharacters', 0)}**\n\n"
         f"• **Aktive Rissmonolithen:** **{stats.get('activeMonoliths', 18)} Stufen** (*Level 5 bis Level 90 — Schlafend, Instabil & Erweckt + Level-Elitebosse*)\n\n"
-        "• **Open-World, Bosse & KI v5.0:** **3 Gebietsbosse (`15 Min. Respawn`)** • **Map-2-Dungeonboss Malakor (`Lv. 35`)** • **12 Autonome KI-Helden (`KI v5.0 • NPC-Quests, Stadt-KI & Koop-Raids`)**\n\n"
+        "• **Open-World, Bosse & KI:** **3 Gebietsbosse (`15 Min. Respawn`)** • **Map-2-Dungeonboss Malakor (`Lv. 35`)** • **12 Autonome KI-Helden (`Sysenery v5.0`)** • **10 Pferde-Skins, 3 Mount-EQ-Stufen & Mitlauf-KI (`Alpha v0.5`)**\n\n"
         "## 🏆 Top-3 Helden der Ehrenhalle\n\n"
         f"{top3_str}\n\n"
         "## 🌐 Offizielle Webseiten-Links\n\n"
