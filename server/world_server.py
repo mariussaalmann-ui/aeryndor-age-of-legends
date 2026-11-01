@@ -1657,11 +1657,12 @@ class WorldAuthority:
             hp_pts = max(0, min(hp_pts, total_pts - dmg_pts))
         avail_pts = max(0, total_pts - (dmg_pts + hp_pts))
 
+        skin_explicit = bool(raw_mount.get("skinExplicit", False))
         eq_skin = str(raw_mount.get("equippedSkin") or "none")
         if eq_skin not in MOUNT_SKIN_MAP:
             eq_skin = "none"
-        # Falls im Kostüm-Inventar ein Mount-Skin ausgerüstet ist und eq_skin noch "none" ist
-        if eq_skin == "none" and p.get("equipment", {}).get("costume_mount_skin"):
+        # Falls noch nie aktiv ein Pferde-Skin gewählt wurde und im Kostüm-Inventar ein Mount-Skin ausgerüstet ist
+        if not skin_explicit and eq_skin == "none" and p.get("equipment", {}).get("costume_mount_skin"):
             eq_skin = "skin_rift_charger"
 
         # 3 Pferde-Ränge: Lv. 1–34 Pferd | Lv. 35–49 Kampfpferd | Lv. 50 Militärgaul (Ausbalanciert für Low- & Mid-Level)
@@ -1742,6 +1743,7 @@ class WorldAuthority:
             "dmgPoints": dmg_pts,
             "hpPoints": hp_pts,
             "equippedSkin": eq_skin,
+            "skinExplicit": skin_explicit,
             "visualSkin": visual_skin,
             "defaultVisual": default_visual,
             "skinName": skin_def.get("name", "Standard-Pferd"),
@@ -2375,8 +2377,16 @@ class WorldAuthority:
             "horseLevel": horse_level,
             "horseSkills": HORSE_SKILLS,
             "horseSkillsUnlocked": horse_level >= 50,
-            "mountVisualSkin": costume_mount_skin or mount_data.get("visualSkin", "horse_lvl1"),
-            "hasCostumeMountSkin": bool(costume_mount_skin),
+            "mountVisualSkin": (
+                mount_data.get("visualSkin", "horse_lvl1")
+                if (mount_data.get("equippedSkin", "none") != "none" or mount_data.get("skinExplicit"))
+                else (costume_mount_skin or mount_data.get("visualSkin", "horse_lvl1"))
+            ),
+            "hasCostumeMountSkin": bool(
+                costume_mount_skin
+                and mount_data.get("equippedSkin", "none") == "none"
+                and not mount_data.get("skinExplicit")
+            ),
             "mountData": mount_data,
             "petActive": bool(pet_id and pet_id in PETS),
             "petSkin": costume_pet_skin or pet_data.get("skinKey", "ridack_dragonpet"),
@@ -10332,6 +10342,7 @@ class WorldAuthority:
             sid = "none"
         raw_mount = p.setdefault("quests", {}).setdefault("__mount_profile__", {})
         raw_mount["equippedSkin"] = sid
+        raw_mount["skinExplicit"] = True
         p["mountData"] = raw_mount
         md = self._ensure_player_mount_data(p)
         self.compute_player_combat_stats(p)

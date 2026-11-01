@@ -4166,7 +4166,8 @@ export class OpenWorld3DEngine {
         let baseZ = Number.isFinite(minZ) ? minZ : 0;
         let centerX = Number.isFinite(minX) && Number.isFinite(maxX) ? (minX + maxX) * 0.5 : 0;
         let centerY = Number.isFinite(minY) && Number.isFinite(maxY) ? (minY + maxY) * 0.5 : 0;
-        if (geometries.length > 6) {
+        const isMonolithGlb = /\/monoliths\//i.test(url);
+        if (isMonolithGlb && geometries.length > 6) {
           isMultiShardMonolith = true;
           if (primMinZs.length > 0) {
             primMinZs.sort((a, b) => a - b);
@@ -4255,16 +4256,22 @@ export class OpenWorld3DEngine {
 
         // Referenz-Root-Positionen aus 'wait' (oder 1. Clip) ermitteln, damit beim Wechsel zwischen
         // wait <-> walk <-> run <-> attack keinerlei horizontaler/vertikaler 15–30cm Versatz entsteht!
-        const isRootPelvisBone = (nIdx, nName) =>
-          rootBoneSet.has(nIdx) ||
-          nName === 'bip01' ||
-          nName === 'bip001' ||
-          nName === 'b_root' ||
-          nName === 'dummy_root' ||
-          nName === 'root' ||
-          nName === 'c_ctrl' ||
-          nName === 'mommy' ||
-          nName === 'bip01 footsteps';
+        const cleanBoneName = (raw) =>
+          (raw || '').toLowerCase().replace(/^bone\d+_/, '').replace(/_/g, ' ');
+        const isRootPelvisBone = (nIdx, rawName) => {
+          const nName = cleanBoneName(rawName);
+          return (
+            rootBoneSet.has(nIdx) ||
+            nName === 'bip01' ||
+            nName === 'bip001' ||
+            nName === 'b root' ||
+            nName === 'dummy root' ||
+            nName === 'root' ||
+            nName === 'c ctrl' ||
+            nName === 'mommy' ||
+            nName === 'bip01 footsteps'
+          );
+        };
 
         const refRootPos = new Map();
         const waitAnimDef =
@@ -4274,7 +4281,7 @@ export class OpenWorld3DEngine {
           for (const ch of waitAnimDef.channels || []) {
             if (ch.target.path !== 'translation') continue;
             const nIdx = ch.target.node;
-            const nName = (gltf.nodes[nIdx]?.name || '').toLowerCase();
+            const nName = gltf.nodes[nIdx]?.name || '';
             if (isRootPelvisBone(nIdx, nName)) {
               const wVals = readAccessor(waitAnimDef.samplers[ch.sampler].output);
               if (wVals && wVals.length >= 3) {
@@ -4297,10 +4304,11 @@ export class OpenWorld3DEngine {
             const times = readAccessor(samp.input);
             const vals = readAccessor(samp.output);
             const boneName = `bone_${nodeIdx}`;
-            const nodeName = (gltf.nodes[nodeIdx]?.name || '').toLowerCase();
-            if (nodeName === 'main_root' || (path === 'translation' && nodeName === 'bip01 footsteps')) continue;
+            const rawNodeName = gltf.nodes[nodeIdx]?.name || '';
+            const nodeName = cleanBoneName(rawNodeName);
+            if (nodeName === 'main root' || (path === 'translation' && nodeName === 'bip01 footsteps')) continue;
             if (path === 'translation') {
-              if (isRootPelvisBone(nodeIdx, nodeName)) {
+              if (isRootPelvisBone(nodeIdx, rawNodeName)) {
                 // Horizontale & vertikale Root-Motion auf die 'wait'-Referenzposition verankern,
                 // damit beim Übergang wait <-> walk <-> run <-> attack keinerlei Modell-Sprünge auftreten!
                 const x0 = vals[0];
@@ -4310,7 +4318,7 @@ export class OpenWorld3DEngine {
                 const rx = ref[0];
                 const ry = ref[1];
                 const rz = ref[2];
-                if (Math.abs(x0) > 45 && Math.abs(z0) < 35) {
+                if (Math.abs(x0) > 45 && Math.abs(x0) > Math.abs(z0) * 1.4) {
                   // Plechito 000->Bip01 Hierarchie: X ist vertikal, Y/Z horizontal
                   for (let k = 0; k < vals.length; k += 3) {
                     if (!isDeathClip) {
@@ -5181,9 +5189,17 @@ export class OpenWorld3DEngine {
   attachGLBModelToGroup(parentGroup, glbUrl, textureUrls, targetHeight, fallbackGroup, isNpc = false, matOptions = null) {
     if (!parentGroup || !glbUrl) return;
     if (!parentGroup.userData) parentGroup.userData = {};
-    // Verhindere Mehrfach-Einreihung (z.B. durch 20Hz-Snapshot-Sync während das GLB-Modell noch lädt!)
+    const opts = matOptions || {};
+    const colorKey = opts.color?.isColor
+      ? `${opts.color.r.toFixed(3)},${opts.color.g.toFixed(3)},${opts.color.b.toFixed(3)}`
+      : (opts.color?.getHexString ? opts.color.getHexString() : String(opts.color || 0xffffff));
+    const emissiveKey = opts.emissive?.isColor
+      ? `${opts.emissive.r.toFixed(3)},${opts.emissive.g.toFixed(3)},${opts.emissive.b.toFixed(3)}`
+      : (opts.emissive?.getHexString ? opts.emissive.getHexString() : String(opts.emissive || 0));
+    const glbLoadSig = `${glbUrl}|${Array.isArray(textureUrls) ? textureUrls.join(',') : ''}|${colorKey}|${emissiveKey}|${opts.emissiveIntensity ?? 0}`;
+    // Verhindere Mehrfach-Einreihung (z.B. durch 20Hz-Snapshot-Sync während das identische GLB+Textur-Modell noch lädt!)
     if (
-      parentGroup.userData._glbLoadingUrl === glbUrl &&
+      parentGroup.userData._glbLoadingSig === glbLoadSig &&
       (parentGroup.userData._glbIsLoading || parentGroup.userData.glbActor)
     ) {
       return;
@@ -5191,9 +5207,9 @@ export class OpenWorld3DEngine {
     const reqSeq = (parentGroup.userData._glbLoadSeq || 0) + 1;
     parentGroup.userData._glbLoadSeq = reqSeq;
     parentGroup.userData._glbLoadingUrl = glbUrl;
+    parentGroup.userData._glbLoadingSig = glbLoadSig;
     parentGroup.userData._glbIsLoading = true;
 
-    const opts = matOptions || {};
     const weatherOpts = {
       isCreature: true,
       isDelitHero: Boolean(opts.isDelitHero),
@@ -5203,7 +5219,7 @@ export class OpenWorld3DEngine {
     if (!this._sharedGlbMaterialCache) this._sharedGlbMaterialCache = new Map();
     const getOrCreateSharedMat = (tUrl) => {
       const nScaleVal = opts.normalScale ?? 0.85;
-      const mKey = `${tUrl || 'notex'}|${opts.normalMap || ''}|${nScaleVal}|${weatherOpts.isDelitHero ? 1 : 0}|${opts.color?.getHexString ? opts.color.getHexString() : (opts.color || 0xffffff)}|${opts.roughness ?? 0.72}|${opts.metalness ?? 0.08}|${opts.alphaTest || 0}|${opts.emissive?.getHexString ? opts.emissive.getHexString() : (opts.emissive || 0)}|${opts.emissiveIntensity ?? 0}|${weatherOpts.snowStrength}|${weatherOpts.wetStrength}`;
+      const mKey = `${tUrl || 'notex'}|${opts.normalMap || ''}|${nScaleVal}|${weatherOpts.isDelitHero ? 1 : 0}|${colorKey}|${opts.roughness ?? 0.72}|${opts.metalness ?? 0.08}|${opts.alphaTest || 0}|${emissiveKey}|${opts.emissiveIntensity ?? 0}|${weatherOpts.snowStrength}|${weatherOpts.wetStrength}`;
       let cachedMat = this._sharedGlbMaterialCache.get(mKey);
       if (cachedMat) return cachedMat;
       const tex = tUrl ? this.loadModelTexture(tUrl) : null;
@@ -5260,17 +5276,21 @@ export class OpenWorld3DEngine {
       const bones = tpl.nodes.map((n, idx) => {
         const b = new THREE.Bone();
         b.name = `bone_${idx}`;
+        const cleanName = (n.name || '').toLowerCase().replace(/^bone\d+_/, '');
         if (n.translation) b.position.fromArray(n.translation);
+        if (n.scale) b.scale.fromArray(n.scale);
         if (n.rotation) {
           const [qx, qy, qz, qw] = n.rotation;
           const lenSq = qx * qx + qy * qy + qz * qz + qw * qw;
-          if (lenSq < 0.9 && Math.abs(qw) < 1e-5) {
+          if (cleanName === 'main_root' && lenSq < 0.9) {
+            b.scale.set(-1, 1, 1);
+            b.quaternion.set(Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+          } else if (lenSq < 0.9 && Math.abs(qw) < 1e-5) {
             b.quaternion.set(qx, qy, qz, -Math.sqrt(Math.max(0, 1 - lenSq)));
           } else {
             b.quaternion.fromArray(n.rotation).normalize();
           }
         }
-        if (n.scale) b.scale.fromArray(n.scale);
         return b;
       });
       tpl.nodes.forEach((n, idx) => {
@@ -5489,74 +5509,65 @@ export class OpenWorld3DEngine {
     const isSmith = npcId.includes('blacksmith') || npcId.includes('smith') || tpl.nodes?.some((n) => n?.name === 'HP_left_hand');
 
     if (isSmith) {
-      // 1. Suche den linken Handknochen HP_left_hand (oder b_LeftWeapon / Bip01-L-Hand)
-      let handBone = null;
-      for (let i = 0; i < tpl.nodes.length; i++) {
-        const nm = tpl.nodes[i]?.name || '';
-        if (nm === 'HP_left_hand' || nm === 'b_LeftWeapon') {
-          handBone = bones[i];
-          break;
-        }
-      }
-      if (!handBone) {
-        for (let i = 0; i < tpl.nodes.length; i++) {
-          const nm = tpl.nodes[i]?.name || '';
-          if (nm.includes('L-Hand')) {
-            handBone = bones[i];
-            break;
-          }
-        }
-      }
+      const haloTex = this.getLanternHaloTexture();
+      let forgeTongsGroup = null;
+      let whiteCoreSprite = null;
+      let orangeCoronaSprite = null;
+      let heatAuraSprite = null;
+      const sparks = [];
+
+      // 1. Exakter Knochen HP_left_hand (nur bei Dorfschmied Torvald / npc_pewi_kowal vorhanden;
+      //    NIEMALS b_LeftWeapon nehmen, da diesem die 173°-X-Rotation von HP_left_hand fehlt!)
+      const hpIdx = tpl.nodes ? tpl.nodes.findIndex((n) => n?.name === 'HP_left_hand') : -1;
+      const handBone = hpIdx !== -1 ? bones[hpIdx] : null;
 
       if (handBone) {
-        // Exakter Offset aus Metin2 kowalefekt.mse: [17.36, -2.96, 74.02]
-        const forgeTongsGroup = new THREE.Group();
-        forgeTongsGroup.position.set(17.36, -2.96, 74.02);
+        // Exakte Position auf dem rotglühenden Hufeisen vorne in der Zangenspitze (World [0.50, 1.21, 0.94])
+        forgeTongsGroup = new THREE.Group();
+        forgeTongsGroup.position.set(24.0, 2.5, 82.0);
         handBone.add(forgeTongsGroup);
 
-        const haloTex = this.getLanternHaloTexture();
-
-        // Weißglühender Kern der Schmiedezange
+        // Weißglühender Kern des geschmiedeten Eisens in der Zange
         const whiteCoreMat = new THREE.SpriteMaterial({
           map: haloTex,
           color: 0xfff6cf,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
           transparent: true,
-          opacity: 0.95,
+          opacity: 0.92,
         });
-        const whiteCoreSprite = new THREE.Sprite(whiteCoreMat);
-        whiteCoreSprite.scale.set(22.0, 22.0, 1.0);
+        whiteCoreSprite = new THREE.Sprite(whiteCoreMat);
+        whiteCoreSprite.scale.set(15.0, 15.0, 1.0);
         forgeTongsGroup.add(whiteCoreSprite);
 
-        // Kräftige feurig-orange Hitzeaura
+        // Feurig-orange Hitzeaura direkt um die glühende Zangenspitze
         const orangeCoronaMat = new THREE.SpriteMaterial({
           map: haloTex,
           color: 0xff6600,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
           transparent: true,
-          opacity: 0.88,
+          opacity: 0.82,
         });
-        const orangeCoronaSprite = new THREE.Sprite(orangeCoronaMat);
-        orangeCoronaSprite.scale.set(54.0, 54.0, 1.0);
+        orangeCoronaSprite = new THREE.Sprite(orangeCoronaMat);
+        orangeCoronaSprite.scale.set(34.0, 34.0, 1.0);
         forgeTongsGroup.add(orangeCoronaSprite);
 
-        // Äußerer rot-goldener Flammenschein
+        // Sanfter äußerer Glutschein an der Zangenspitze
         const heatAuraMat = new THREE.SpriteMaterial({
           map: haloTex,
           color: 0xff2a00,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
           transparent: true,
-          opacity: 0.55,
+          opacity: 0.45,
         });
-        const heatAuraSprite = new THREE.Sprite(heatAuraMat);
-        heatAuraSprite.scale.set(88.0, 88.0, 1.0);
+        heatAuraSprite = new THREE.Sprite(heatAuraMat);
+        heatAuraSprite.scale.set(54.0, 54.0, 1.0);
         forgeTongsGroup.add(heatAuraSprite);
 
-        // 16 Aufsteigende Funken & Glutpartikel (Metin2 kowalefekt.mse)
-        const sparks = [];
+        // Aufsteigende Funken & Glutpartikel direkt vom glühenden Eisen in der Zange
+        // (In HP_left_hand zeigt lokales -Y senkrecht nach oben in Welt-+Y!)
         const sparkMat = new THREE.SpriteMaterial({
           map: haloTex,
           color: 0xffca28,
@@ -5565,60 +5576,114 @@ export class OpenWorld3DEngine {
           transparent: true,
           opacity: 0.95,
         });
-        for (let s = 0; s < 16; s++) {
+        for (let s = 0; s < 14; s++) {
           const sp = new THREE.Sprite(sparkMat.clone());
-          const baseSz = 4.5 + Math.random() * 5.5;
+          const baseSz = 3.8 + Math.random() * 4.2;
           sp.scale.set(baseSz, baseSz, 1.0);
           sp.position.set(
-            (Math.random() - 0.5) * 8.0,
-            (Math.random() - 0.5) * 8.0,
-            (Math.random() - 0.5) * 8.0
+            (Math.random() - 0.5) * 6.0,
+            (Math.random() - 0.5) * 4.0,
+            (Math.random() - 0.5) * 6.0
           );
           forgeTongsGroup.add(sp);
           sparks.push({
             sprite: sp,
             baseSz,
-            vx: (Math.random() - 0.5) * 18.0,
-            vy: (Math.random() - 0.5) * 18.0,
-            vz: 25.0 + Math.random() * 45.0, // Z ist im Granny-Bone-Raum nach oben gerichtet
+            vx: (Math.random() - 0.5) * 14.0,
+            vy: -(22.0 + Math.random() * 36.0), // Lokales -Y = Welt +Y (nach oben aufsteigend!)
+            vz: (Math.random() - 0.5) * 14.0,
             life: Math.random() * 0.9,
             maxLife: 0.65 + Math.random() * 0.55,
           });
         }
+      }
 
-        // Dynamisches Echtzeit-PointLight & Boden-Lichtschein an Torvalds Zange:
-        const forgeLight = new THREE.PointLight(0xff6e14, 2.75, 9.2, 2.0);
-        forgeLight.position.set(-0.62, 1.15, 0.45);
-        parentGroup.add(forgeLight);
+      // 2. Schmiedefeuer-Beleuchtung & Glut direkt über der gemauerten Kohle-Esse (1.15, 0.44, -0.45)
+      //    statt unter dem hölzernen Ambossklotz (-1.18, *, 0.15) oder Torvalds Stiefeln!
+      const hearthX = 1.15;
+      const hearthZ = -0.45;
 
-        // Warmer orange-goldener Bodenkegel auf dem Kopfsteinpflaster
-        const poolMat = new THREE.MeshBasicMaterial({
-          map: haloTex,
-          color: 0xff5508,
-          transparent: true,
-          opacity: 0.68,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const poolMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 3.8), poolMat);
-        poolMesh.rotation.x = -Math.PI / 2;
-        poolMesh.position.set(-0.62, 0.05, 0.45);
-        parentGroup.add(poolMesh);
+      const forgeLight = new THREE.PointLight(0xff6e14, 2.45, 8.5, 2.0);
+      forgeLight.position.set(hearthX, 0.95, hearthZ);
+      parentGroup.add(forgeLight);
 
-        // Registriere für Frame-Loop Update & Flackern
-        if (!this._blacksmithForgeEffects) this._blacksmithForgeEffects = [];
-        this._blacksmithForgeEffects.push({
-          parentGroup,
-          forgeTongsGroup,
-          whiteCoreSprite,
-          orangeCoronaSprite,
-          heatAuraSprite,
-          forgeLight,
-          poolMesh,
-          sparks,
-          phase: Math.random() * 10.0,
+      // Dezenter warmer Bodenschein direkt rund um die gemauerte Stein-Esse
+      const poolMat = new THREE.MeshBasicMaterial({
+        map: haloTex,
+        color: 0xff5508,
+        transparent: true,
+        opacity: 0.46,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const poolMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), poolMat);
+      poolMesh.rotation.x = -Math.PI / 2;
+      poolMesh.position.set(hearthX, 0.04, hearthZ);
+      parentGroup.add(poolMesh);
+
+      // Flackernde Feuerglut & aufsteigende Funken direkt auf den glühenden Kohlen der Esse
+      const hearthFireGroup = new THREE.Group();
+      hearthFireGroup.position.set(hearthX, 0.54, hearthZ);
+      parentGroup.add(hearthFireGroup);
+
+      const hearthGlowMat = new THREE.SpriteMaterial({
+        map: haloTex,
+        color: 0xff5500,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.68,
+      });
+      const hearthGlowSprite = new THREE.Sprite(hearthGlowMat);
+      hearthGlowSprite.scale.set(0.82, 0.82, 1.0);
+      hearthFireGroup.add(hearthGlowSprite);
+
+      const hearthSparks = [];
+      const hearthSparkMat = new THREE.SpriteMaterial({
+        map: haloTex,
+        color: 0xffb300,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.9,
+      });
+      for (let s = 0; s < 10; s++) {
+        const sp = new THREE.Sprite(hearthSparkMat.clone());
+        const baseSz = 0.045 + Math.random() * 0.045;
+        sp.scale.set(baseSz, baseSz, 1.0);
+        sp.position.set(
+          (Math.random() - 0.5) * 0.38,
+          Math.random() * 0.12,
+          (Math.random() - 0.5) * 0.38
+        );
+        hearthFireGroup.add(sp);
+        hearthSparks.push({
+          sprite: sp,
+          baseSz,
+          vx: (Math.random() - 0.5) * 0.22,
+          vy: 0.32 + Math.random() * 0.48,
+          vz: (Math.random() - 0.5) * 0.22,
+          life: Math.random() * 0.9,
+          maxLife: 0.75 + Math.random() * 0.65,
         });
       }
+
+      // Registriere für Frame-Loop Update & Flackern
+      if (!this._blacksmithForgeEffects) this._blacksmithForgeEffects = [];
+      this._blacksmithForgeEffects.push({
+        parentGroup,
+        forgeTongsGroup,
+        whiteCoreSprite,
+        orangeCoronaSprite,
+        heatAuraSprite,
+        forgeLight,
+        poolMesh,
+        hearthFireGroup,
+        hearthGlowSprite,
+        sparks,
+        hearthSparks,
+        phase: Math.random() * 10.0,
+      });
     }
   }
 
@@ -5638,32 +5703,38 @@ export class OpenWorld3DEngine {
       if (dx * dx + dz * dz > maxDistSq) {
         if (fx.forgeLight) fx.forgeLight.visible = false;
         if (fx.poolMesh) fx.poolMesh.visible = false;
+        if (fx.hearthFireGroup) fx.hearthFireGroup.visible = false;
         continue;
       }
       if (fx.forgeLight) fx.forgeLight.visible = true;
       if (fx.poolMesh) fx.poolMesh.visible = true;
+      if (fx.hearthFireGroup) fx.hearthFireGroup.visible = true;
 
       const ph = elapsed * 8.5 + fx.phase;
       const flicker = 0.88 + Math.sin(ph) * 0.08 + Math.sin(ph * 1.7) * 0.04;
 
       if (fx.forgeLight) {
-        fx.forgeLight.intensity = 2.75 * flicker;
+        fx.forgeLight.intensity = 2.45 * flicker;
       }
       if (fx.poolMesh) {
-        fx.poolMesh.material.opacity = 0.68 * flicker;
-        const s = 1.0 + Math.sin(ph * 0.8) * 0.06;
+        fx.poolMesh.material.opacity = 0.46 * flicker;
+        const s = 1.0 + Math.sin(ph * 0.8) * 0.05;
         fx.poolMesh.scale.set(s, s, 1.0);
       }
+      if (fx.hearthGlowSprite) {
+        const hs = 0.82 * (0.90 + Math.sin(ph * 1.2) * 0.10);
+        fx.hearthGlowSprite.scale.set(hs, hs, 1.0);
+      }
       if (fx.whiteCoreSprite) {
-        const cs = 22.0 * (0.92 + Math.sin(ph * 1.3) * 0.08);
+        const cs = 15.0 * (0.92 + Math.sin(ph * 1.3) * 0.08);
         fx.whiteCoreSprite.scale.set(cs, cs, 1.0);
       }
       if (fx.orangeCoronaSprite) {
-        const os = 54.0 * (0.90 + Math.sin(ph * 1.1) * 0.10);
+        const os = 34.0 * (0.90 + Math.sin(ph * 1.1) * 0.10);
         fx.orangeCoronaSprite.scale.set(os, os, 1.0);
       }
 
-      // Funken bewegen & recyceln
+      // Funken an der Zangenspitze bewegen & recyceln (lokales -Y = Welt +Y oben)
       for (let s = 0; s < fx.sparks.length; s++) {
         const sp = fx.sparks[s];
         sp.life += dt;
@@ -5671,12 +5742,12 @@ export class OpenWorld3DEngine {
           sp.life = 0;
           sp.sprite.position.set(
             (Math.random() - 0.5) * 6.0,
-            (Math.random() - 0.5) * 6.0,
+            (Math.random() - 0.5) * 4.0,
             (Math.random() - 0.5) * 6.0
           );
-          sp.vx = (Math.random() - 0.5) * 16.0;
-          sp.vy = (Math.random() - 0.5) * 16.0;
-          sp.vz = 24.0 + Math.random() * 42.0;
+          sp.vx = (Math.random() - 0.5) * 14.0;
+          sp.vy = -(22.0 + Math.random() * 36.0);
+          sp.vz = (Math.random() - 0.5) * 14.0;
           sp.sprite.material.opacity = 0.95;
         } else {
           const t = sp.life / sp.maxLife;
@@ -5686,6 +5757,34 @@ export class OpenWorld3DEngine {
           sp.sprite.material.opacity = Math.max(0, 1.0 - t * t) * 0.95;
           const sz = sp.baseSz * (1.0 - t * 0.45);
           sp.sprite.scale.set(sz, sz, 1.0);
+        }
+      }
+
+      // Aufsteigende Glut-Funken über der Kohle-Esse bewegen & recyceln
+      if (fx.hearthSparks) {
+        for (let s = 0; s < fx.hearthSparks.length; s++) {
+          const sp = fx.hearthSparks[s];
+          sp.life += dt;
+          if (sp.life >= sp.maxLife) {
+            sp.life = 0;
+            sp.sprite.position.set(
+              (Math.random() - 0.5) * 0.38,
+              Math.random() * 0.08,
+              (Math.random() - 0.5) * 0.38
+            );
+            sp.vx = (Math.random() - 0.5) * 0.22;
+            sp.vy = 0.32 + Math.random() * 0.48;
+            sp.vz = (Math.random() - 0.5) * 0.22;
+            sp.sprite.material.opacity = 0.9;
+          } else {
+            const t = sp.life / sp.maxLife;
+            sp.sprite.position.x += sp.vx * dt;
+            sp.sprite.position.y += sp.vy * dt;
+            sp.sprite.position.z += sp.vz * dt;
+            sp.sprite.material.opacity = Math.max(0, 1.0 - t * t) * 0.9;
+            const sz = sp.baseSz * (1.0 - t * 0.45);
+            sp.sprite.scale.set(sz, sz, 1.0);
+          }
         }
       }
     }
@@ -18073,8 +18172,8 @@ export class OpenWorld3DEngine {
           armorColor: 0x3b4d63,
           accentColor: 0xfde047,
           weaponVisual: 'staff',
-          glbModel: 'plechi_noble_npc2',
-          glbTextures: ['noble_npc2_tex.png'],
+          glbModel: 'plechi_old_alchemist',
+          glbTextures: ['alchemist_body.png', 'alchemist_deco.png'],
           targetHeight: 2.16,
           canWalk: true,
           walkSpeed: 1.48,
@@ -18099,9 +18198,9 @@ export class OpenWorld3DEngine {
           armorColor: isKaeryu ? 0x991b1b : 0x1e40af,
           accentColor: 0xfacc15,
           weaponVisual: 'bell',
-          glbModel: 'plechi_ladynpc_3',
-          glbTextures: ['ladynpc_3_tex.png'],
-          targetHeight: 2.10,
+          glbModel: 'plechi_lady_npc11',
+          glbTextures: ['lady11_tex00.png', 'lady11_tex01.png'],
+          targetHeight: 2.12,
           canWalk: true,
           walkSpeed: 1.42,
           waypoints: [
@@ -28299,6 +28398,8 @@ export class OpenWorld3DEngine {
     mg.userData.glbActor = null;
     mg.userData._activeGlbRigGroup = null;
     mg.userData._glbIsLoading = false;
+    mg.userData._glbLoadingUrl = null;
+    mg.userData._glbLoadingSig = null;
     this.attachGLBModelToGroup(
       mg,
       targetGlb,
@@ -28460,6 +28561,10 @@ export class OpenWorld3DEngine {
         st.modelRoot.remove(st.modelRoot.children[i]);
       }
       st.modelRoot.userData.glbActor = null;
+      st.modelRoot.userData._activeGlbRigGroup = null;
+      st.modelRoot.userData._glbIsLoading = false;
+      st.modelRoot.userData._glbLoadingUrl = null;
+      st.modelRoot.userData._glbLoadingSig = null;
       st.modelRoot.position.y = mode === 'pet' ? (resolvedCfg.previewYOffset ?? 0) : 0;
       this.attachGLBModelToGroup(
         st.modelRoot,
