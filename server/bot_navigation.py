@@ -199,10 +199,16 @@ class BotNavigator:
         payload = {
             "version": 2,
             "savedAt": int(now),
-            "stats": self.stats,
-            "layout": self.memory_layout,
-            "blocked": self.memory,
-            "detours": self.detours,
+            "stats": dict(self.stats),
+            "layout": dict(self.memory_layout),
+            "blocked": {
+                mid: {ck: dict(cv) if isinstance(cv, dict) else cv for ck, cv in list(cells.items())}
+                for mid, cells in list(self.memory.items())
+            },
+            "detours": {
+                mid: {dk: dict(dv) if isinstance(dv, dict) else dv for dk, dv in list(dmap.items())}
+                for mid, dmap in list(self.detours.items())
+            },
         }
         tmp = self.memory_path + ".tmp"
         try:

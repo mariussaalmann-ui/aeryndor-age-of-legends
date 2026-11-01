@@ -226,6 +226,7 @@ class WorldAuthority:
                 "sender": "System",
                 "channel": "system",
                 "isBot": False,
+                "isSeed": True,
                 "text": "Willkommen in Aeryndor: Legacy of the Monoliths (Level 1–99)! Filter: Allgemein • Gruppe • Gilde • System • Handel • Beute • Bots.",
                 "time": now_hm,
             },
@@ -235,6 +236,7 @@ class WorldAuthority:
                 "channel": "global",
                 "isGM": True,
                 "isBot": False,
+                "isSeed": True,
                 "text": "👑 Das GM-Team ist online! Bei Fragen oder Support erreicht ihr uns direkt über die Freundes- & GM-Liste unten rechts 😊✨",
                 "time": now_hm,
             },
@@ -243,6 +245,7 @@ class WorldAuthority:
                 "sender": "[Bot]Veyron",
                 "channel": "trade",
                 "isBot": True,
+                "isSeed": True,
                 "text": "💰 Verkaufe Vollmondschwert +6 (+15% Rissmonolithen) & Segensschriftrollen am Marktplatz! 🔥⚔️",
                 "time": now_hm,
             },
@@ -251,6 +254,7 @@ class WorldAuthority:
                 "sender": "[Bot]Nachtklinge",
                 "channel": "normal",
                 "isBot": True,
+                "isSeed": True,
                 "text": "Die neuen Rissmonolithen im Norden droppen richtig gut! Gerade Fertigkeitsbuch & Ausrüstung gedroppt 🎉💎",
                 "time": now_hm,
             },
@@ -259,6 +263,7 @@ class WorldAuthority:
                 "sender": "Beute",
                 "channel": "drops",
                 "isBot": False,
+                "isSeed": True,
                 "text": "💎 Beute-Protokoll aktiv: Alle gedroppten & erhaltenen Gegenstände (Ausrüstung, Upp-Items, Bücher, Truhen) werden ausschließlich hier im Filter [Beute] aufgelistet.",
                 "time": now_hm,
             },
@@ -267,6 +272,7 @@ class WorldAuthority:
                 "sender": "[Bot]Aurelia",
                 "channel": "global",
                 "isBot": True,
+                "isSeed": True,
                 "text": "Suche nette Mitspieler für Map 2 Grenzland-Gruppe (Lv. 15–30) – schreibt mir gern im Messenger ❤️✨",
                 "time": now_hm,
             },
@@ -2814,7 +2820,7 @@ class WorldAuthority:
         self._active_rift_metins_by_map = {}
         self._metins_by_map = {}
         online_players_by_map = {}
-        for p in self.players.values():
+        for p in list(self.players.values()):
             if p.get("online"):
                 online_players_by_map.setdefault(p["map_id"], []).append((p["pos_x"], p["pos_z"]))
 
@@ -3012,14 +3018,14 @@ class WorldAuthority:
 
         # 4b. Prüfe Erkundungs-, Spur- & Lieferziele für aktive Quests (alle 0.5s)
         if self._tick_counter % 10 == 0:
-            for p in self.players.values():
+            for p in list(self.players.values()):
                 if p.get("online"):
                     self._check_player_exploration_quests(p)
 
         # 5. Periodisches Speichern alle 10 Sekunden
         if now - self.last_save_time >= 10.0:
             self.last_save_time = now
-            for p in self.players.values():
+            for p in list(self.players.values()):
                 if p.get("online"):
                     self.db.save_player_state(p)
 
@@ -9240,7 +9246,7 @@ class WorldAuthority:
             if active_rift is not None:
                 best_p = None
                 best_pd = 32.0
-                for p_cand in self.players.values():
+                for p_cand in list(self.players.values()):
                     if not p_cand.get("online") or p_cand["map_id"] != mob["mapId"] or p_cand.get("isDead") or float(p_cand.get("hp", 1)) <= 0:
                         continue
                     if is_in_safe_zone(p_cand["map_id"], p_cand["pos_x"], p_cand["pos_z"]):
@@ -9279,7 +9285,7 @@ class WorldAuthority:
         aggro_radius = 16.0 if is_boss else (11.5 if is_eid else (float(mob.get("aggroRadius", 0.0)) if mob.get("isAggressive", False) else 0.0))
 
         if not target and is_aggressive and aggro_radius > 0:
-            for p in self.players.values():
+            for p in list(self.players.values()):
                 if not p.get("online") or p["map_id"] != mob["mapId"] or p.get("isDead") or float(p.get("hp", 1)) <= 0:
                     continue
                 if is_in_safe_zone(p["map_id"], p["pos_x"], p["pos_z"]):
@@ -9693,7 +9699,7 @@ class WorldAuthority:
                     mob_scale_p = max(0.85, float(mob.get("scale", 1.0)))
                     min_p_clearance = 2.45 + max(0.0, (mob_scale_p - 1.0) * 0.85)
                     blocked_by_player = False
-                    for p_near in self.players.values():
+                    for p_near in list(self.players.values()):
                         if not p_near.get("online") or p_near.get("map_id") != mob["mapId"] or p_near.get("isDead"):
                             continue
                         dp_near = dist2d(nx, raw_nz, p_near["pos_x"], p_near["pos_z"])
@@ -9768,7 +9774,7 @@ class WorldAuthority:
             },
         )
         boss_mob = self.monsters.get(tel.get("bossId")) if tel.get("bossId") else None
-        for p in self.players.values():
+        for p in list(self.players.values()):
             if not p.get("online") or p["map_id"] != tel["mapId"]:
                 continue
             if dist2d(p["pos_x"], p["pos_z"], tel["x"], tel["z"]) <= tel["radius"]:

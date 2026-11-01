@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v641';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v642';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -13858,6 +13858,7 @@ class AeryndorMMOApp {
   }
 
   getUnifiedMountSkinsCatalog() {
+    // Sortiert von HELL nach DUNKEL (Licht-Schimmel -> Gold-Palomino -> Kupfer-Schecke -> Apfelschimmel -> Pinto -> Steppen-Zebra -> Kastanie -> Nachtschatten -> Schwarzer Rappe)
     const canonical = [
       {
         id: 'none',
@@ -13866,28 +13867,8 @@ class AeryndorMMOApp {
         emoji: '🐎',
         swatch: '#94a3b8',
         badge: '🐎 STUFEN-RANG',
-        desc: 'Zeigt automatisch das Rang-Aussehen deines Pferdes passend zur Stufe: Pferd (Lv. 1), Kampfpferd (Lv. 35) oder Militärgaul (Lv. 50).',
-        bonusSummary: 'Automatisches Rang-Aussehen (Lv. 1 / Lv. 35 / Lv. 50)',
-      },
-      {
-        id: 'col1',
-        mountId: 'mount_war_boar',
-        name: 'Schwarzer Rappe',
-        emoji: '🖤',
-        swatch: '#1e293b',
-        badge: '🖤 SCHWARZER RAPPE',
-        desc: 'Edler tiefschwarzer Rappe mit dunklem Glanzfell, schwarzer Mähne und rotem Reichssattel – läuft links in der großen Pferdekoppel.',
-        bonusSummary: '+10% Stark gg. Monster • +5% Kritischer Treffer',
-      },
-      {
-        id: 'col2',
-        mountId: 'mount_war_boar',
-        name: 'Braun-Weißer Königs-Schecke',
-        emoji: '👑',
-        swatch: '#b45309',
-        badge: '👑 KÖNIGS-SCHECKE',
-        desc: 'Kräftiger braun-weiß gefleckter Schecke mit silberweißer Mähne und edlem Zaumzeug – läuft rechts vorne in der Koppel.',
-        bonusSummary: '+10% Stark gg. Rissmonolithen • +5% Durchbohrender Treffer',
+        desc: 'Zeigt automatisch das Rang-Aussehen & Mount-EQ deines Pferdes (von hell nach dunkel): Pferd Lv. 1 (Schimmel) → Kampfpferd Lv. 35 (Kastanie mit Zaumzeug) → Militärgaul Lv. 50 (Rappe mit vollem Sattel-EQ).',
+        bonusSummary: 'Automatisches Rang-Aussehen & Mount-EQ (Lv. 1 / Lv. 35 / Lv. 50)',
       },
       {
         id: 'col3',
@@ -13896,48 +13877,88 @@ class AeryndorMMOApp {
         emoji: '✨',
         swatch: '#f8fafc',
         badge: '✨ LICHT-SCHIMMEL',
-        desc: 'Strahlend weißer Schimmel mit goldblonder Mähne und Prunksattel – läuft im Zentrum des Pferdestalls.',
+        desc: 'Strahlend weißer Schimmel mit goldblonder Mähne und vollem Prunksattel-EQ – das hellste Reittier im Reichs-Gestüt.',
         bonusSummary: '+350 Max. TP • +15 Verteidigung im Sattel',
       },
       {
-        id: 'col4',
+        id: 'col2',
         mountId: 'mount_war_boar',
-        name: 'Rotbraunes Kastanien-Streitross',
-        emoji: '🔥',
-        swatch: '#9a3412',
-        badge: '🔥 KASTANIEN-ROSS',
-        desc: 'Kräftiger Vollblut-Kastanienfuchs mit goldblonder Mähne und dunkler Satteldecke – läuft an der rechten Stallseite.',
-        bonusSummary: '+25 Angriffswert • +6% Durchschnittsschaden (DSS)',
+        name: 'Gold-Palomino Königs-Schecke',
+        emoji: '☀️',
+        swatch: '#eab308',
+        badge: '☀️ GOLD-PALOMINO',
+        desc: 'Heller goldgelb-weiß gefleckter Palomino-Schecke mit platinweißer Mähne und vollem Reichs-Sattelzeug.',
+        bonusSummary: '+10% Stark gg. Rissmonolithen • +5% Durchbohrender Treffer',
+      },
+      {
+        id: 'col8',
+        mountId: 'mount_war_boar',
+        name: 'Rotbrauner Kupfer-Schecke',
+        emoji: '👑',
+        swatch: '#c2410c',
+        badge: '👑 KUPFER-SCHECKE',
+        desc: 'Warmes rotbraun-weiß geflecktes Schecken-Streitross mit kastanienbrauner Mähne und edlem Sattelzeug.',
+        bonusSummary: '+10% Stark gg. Bosse • +250 Max. TP',
       },
       {
         id: 'col5',
         mountId: 'mount_war_boar',
-        name: 'Gold-Palomino der Sonnenwache',
-        emoji: '☀️',
-        swatch: '#eab308',
-        badge: '☀️ GOLD-PALOMINO',
-        desc: 'Goldschimmerndes Palomino-Streitross mit platinweißer Mähne – läuft vorne am Koppelgatter neben Stallbursche Konrad.',
+        name: 'Silbergrauer Apfelschimmel',
+        emoji: '🌫️',
+        swatch: '#94a3b8',
+        badge: '🌫️ APFELSCHIMMEL',
+        desc: 'Silbergrau getupfter Apfelschimmel mit dunkler Mähne und vollständigem Reichs-Sattelgeschirr.',
         bonusSummary: '+10% Stark gg. Bosse • +250 Max. TP',
+      },
+      {
+        id: 'col7',
+        mountId: 'mount_war_boar',
+        name: 'Schwarz-Weißer Pinto-Schecke',
+        emoji: '⚪',
+        swatch: '#64748b',
+        badge: '⚪ PINTO-SCHECKE',
+        desc: 'Kontrastreicher schwarz-weißer Pinto-Schecke mit dunkler Mähne und vollem Sattel-EQ.',
+        bonusSummary: '+12% Stark gg. Monster • +200 Max. TP',
       },
       {
         id: 'skin_rift_charger',
         mountId: 'mount_war_boar',
-        name: 'Rissbrecher-Schlachtross',
-        emoji: '💠',
-        swatch: '#22d3ee',
-        badge: '💠 ÄTHER-AURA',
-        desc: 'Mystisches Äther-Schlachtross mit smaragd-türkisfarbener Riss-Aura für erfahrene Monolithen-Bezwinger.',
+        name: 'Steppen-Zebra Streitross',
+        emoji: '🦓',
+        swatch: '#38bdf8',
+        badge: '🦓 STEPPEN-ZEBRA',
+        desc: 'Exotisches schwarz-weiß gestreiftes Steppen-Zebra mit vollständigem Reichs-Sattelgeschirr für erfahrene Monolithen-Bezwinger.',
         bonusSummary: '+15% Stark gg. Rissmonolithen • +8% Durchschnittsschaden (DSS)',
+      },
+      {
+        id: 'col4',
+        mountId: 'mount_war_boar',
+        name: 'Dunkelbraunes Kastanien-Streitross',
+        emoji: '🔥',
+        swatch: '#7c2d12',
+        badge: '🔥 KASTANIEN-ROSS',
+        desc: 'Kräftiger dunkelbrauner Vollblut-Kastanienhengst mit goldblonder Mähne und schwerem Sattelgeschirr.',
+        bonusSummary: '+25 Angriffswert • +6% Durchschnittsschaden (DSS)',
       },
       {
         id: 'skin_shadow_steed',
         mountId: 'mount_war_boar',
         name: 'Nachtschatten-Streitross',
         emoji: '🌑',
-        swatch: '#9333ea',
-        badge: '🌑 SCHATTEN-AURA',
-        desc: 'Dunkler Nachtschatten-Rappe mit violetter Amethyst-Aura für kompromisslose Monsterjagd.',
+        swatch: '#7c3aed',
+        badge: '🌑 NACHTSCHATTEN',
+        desc: 'Mystisches smaragd-violett geädertes Nachtschatten-Streitross mit grün glühenden Augen und vollem Sattel-EQ.',
         bonusSummary: '+15% Stark gg. Monster • +10% Kritischer Treffer',
+      },
+      {
+        id: 'col1',
+        mountId: 'mount_war_boar',
+        name: 'Schwarzer Rappe',
+        emoji: '🖤',
+        swatch: '#0f172a',
+        badge: '🖤 SCHWARZER RAPPE',
+        desc: 'Tiefschwarzer Rappe mit dunklem Glanzfell, schwarzer Mähne und rotem Reichssattel – das dunkelste Reittier.',
+        bonusSummary: '+10% Stark gg. Monster • +5% Kritischer Treffer',
       },
     ];
 

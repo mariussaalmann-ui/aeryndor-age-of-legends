@@ -816,7 +816,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                 p["rot_y"] = float(payload["rotY"])
         WORLD.compute_player_combat_stats(p)
         DB.save_player_state(p)
-        if is_sa_join and in_world_flag:
+        if is_sa_join and in_world_flag and not bool(payload.get("isReconnect")):
             now_join = time.time()
             last_ann = float(p.get("_lastSaOnlineAnnounceAt", 0.0) or 0.0)
             if (not was_in_world and now_join - last_ann > 15.0) or (now_join - last_ann > 180.0):
@@ -844,7 +844,7 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                 )
                 # Ein aktiver Bot begrüßt den SA respektvoll im Weltchat
                 online_bots = [
-                    b for bid, b in WORLD.players.items()
+                    b for bid, b in list(WORLD.players.items())
                     if str(bid).startswith("bot_") and b.get("online") and b.get("inWorld")
                 ]
                 if online_bots:
@@ -853,6 +853,8 @@ def handle_client_action(player_id: str, payload: dict) -> dict:
                         greeter["name"],
                         f"Willkommen auf dem Server, {p['name']}! 👑🔥 Ehre der Serverleitung!",
                         "normal",
+                        sender_player_id=greeter.get("player_id"),
+                        is_bot=True,
                     )
         return {"ok": True, "name": p["name"], "isSA": is_sa_join, "message": f"Verbunden als {p['name']} ({CHARACTER_CLASSES[p['class_id']]['name']})"}
 
@@ -4583,6 +4585,29 @@ if __name__ == "__main__":
 
     lan_ip = get_lan_ip()
     with ThreadedMMOServer(("0.0.0.0", PORT), AeryndorMMOHandler) as httpd:
+        import signal as _signal
+
+        def _flush_world_on_shutdown(_signum=None, _frame=None):
+            try:
+                for _p in list(WORLD.players.values()):
+                    if _p.get("online") or _p.get("inWorld"):
+                        DB.save_player_state(_p)
+            except Exception:
+                pass
+            try:
+                WORLD.nav.save_memory(force=True)
+            except Exception:
+                pass
+            threading.Thread(target=httpd.shutdown, daemon=True).start()
+
+        for _sig_name in ("SIGTERM", "SIGINT"):
+            _sig = getattr(_signal, _sig_name, None)
+            if _sig is not None:
+                try:
+                    _signal.signal(_sig, _flush_world_on_shutdown)
+                except Exception:
+                    pass
+
         print("=" * 72)
         print("  AERYNDOR: LEGACY OF THE MONOLITHS - 3D OPEN-WORLD AUTO-MMORPG SERVER AKTIV")
         print("=" * 72)
