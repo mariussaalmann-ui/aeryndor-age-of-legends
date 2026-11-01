@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261031_v630';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v637';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -16,7 +16,7 @@ import {
   fadeOutIslandContent,
   popIsland,
   shakeElement,
-} from './iosUi.js?v=20261031_v611';
+} from './iosUi.js?v=v20261101_v636';
 
 const CLASS_PORTRAITS = {
   warrior: './assets/client_ui/charackter/klingenwaechter_m.png',
@@ -4153,15 +4153,22 @@ class AeryndorMMOApp {
 
     try {
       this.disposeShowcase3D();
+      CharacterShowcase3D.releaseSharedRenderer?.();
       this.resetCharacterSwitchHudState();
       const loader = this.renderWorldLoadingPortal(activeChar);
 
       // Kurz warten, damit der Ladebildschirm + Funken-Animation sofort sichtbar gerendert werden
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await Promise.race([
+        new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+        new Promise((r) => setTimeout(r, 120)),
+      ]);
       await new Promise((r) => setTimeout(r, 120));
 
       loader?.setProgress(38, 'Errichte 3D-Terrain, Städte Kaeryu & Seiryu sowie Rissmonolithen…');
-      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 80)));
+      await Promise.race([
+        new Promise((r) => requestAnimationFrame(() => setTimeout(r, 80))),
+        new Promise((r) => setTimeout(r, 140)),
+      ]);
 
       this.playerId = activeChar.playerId;
       this.playerName = activeChar.name;
@@ -4177,6 +4184,7 @@ class AeryndorMMOApp {
       localStorage.setItem('aeryndor_mmo_player_name', this.playerName);
 
       if (this.engine) {
+        this.engine.recoverIfContextLost?.();
         if (!this.engine._mapEnvironmentBuilt) {
           this.engine.buildMapEnvironment(this.selfState?.map_id || 'morgenwacht');
         }
@@ -4432,7 +4440,7 @@ class AeryndorMMOApp {
           this.selectedShopId = shopId;
           this.openWindow('market');
         } else if (windowId) {
-          if (windowId === 'character' && (npcId === 'npc_captain' || npcId === 'npc_biologist')) {
+          if (windowId === 'character' && (npcId === 'npc_captain' || npcId === 'npc_biologist' || npcId === 'npc_uriel' || npcId === 'npc_hunter' || npcId === 'npc_musician')) {
             this.charWindowTab = 'quests';
           }
           this.openWindow(windowId);
@@ -5253,6 +5261,26 @@ class AeryndorMMOApp {
       Number(this.selfState.level) > Number(prevSelf.level)
     ) {
       this.onLocalLevelUp(Number(prevSelf.level), Number(this.selfState.level));
+    }
+    // Skill-Stufenaufstieg (M1 / G1 / P1 / L1 Durchbruch) erkennen & mit Aufstiegs-Energiewelle feiern
+    if (
+      prevSelf &&
+      prevSelf.name === this.selfState.name &&
+      prevSelf.skills &&
+      this.selfState.skills
+    ) {
+      const calcTier = (lv) => (lv >= 50 ? 5 : lv >= 40 ? 4 : lv >= 30 ? 3 : lv >= 20 ? 2 : 1);
+      for (const [skId, rawNewLv] of Object.entries(this.selfState.skills)) {
+        const oldLv = Number(prevSelf.skills[skId] || 0);
+        const newLv = Number(rawNewLv || 0);
+        if (newLv > oldLv) {
+          const oldTier = calcTier(oldLv);
+          const newTier = calcTier(newLv);
+          if (newTier > oldTier && newTier >= 2) {
+            this.onLocalSkillTierUp(skId, oldLv, newLv, newTier);
+          }
+        }
+      }
     }
     if (!prevSelf || prevSelf.map_id !== this.selfState.map_id || prevSelf.level !== this.selfState.level) {
       const wmWin = document.getElementById('win-worldmap');
@@ -6340,6 +6368,12 @@ class AeryndorMMOApp {
       this.sendAction('select_target', { targetId: null, autoAttack: false, stopMove: true });
     }
     this.showTargetDrops = false;
+    this._lastDropRenderSig = '';
+    const dropPopupEl = document.getElementById('target-drop-popup');
+    if (dropPopupEl && !dropPopupEl.classList.contains('player-eq-drawer')) {
+      this.forceHideTargetDropPopup(dropPopupEl);
+      dropPopupEl.innerHTML = '';
+    }
     this.updateTopCenterTargetHUD();
   }
 
@@ -6889,14 +6923,17 @@ class AeryndorMMOApp {
       const fromStyle = frameWasVisible && shell && !reduced ? captureIslandStyle(shell) : null;
 
       // 1. Ziel-Insel: Inhalt kurz ausblenden, Kapsel übernimmt der Morph-Hintergrund
+      this.showTargetDrops = false;
+      this._lastDropRenderSig = '';
       if (frameWasVisible) {
         cancelAnim(frame);
+        const dropPopup = frame.querySelector('#target-drop-popup');
         if (reduced || !fromStyle) {
+          if (dropPopup) this.forceHideTargetDropPopup(dropPopup);
           frame.classList.add('hidden');
           frame.classList.remove('ui-target-closing', 'di-morph-src');
         } else {
           frame.classList.add('hidden', 'ui-target-closing', 'di-morph-src');
-          const dropPopup = frame.querySelector('#target-drop-popup');
           const fadeAnim = fadeOutIslandContent(
             [...shellContent, dropPopup && !dropPopup.classList.contains('hidden') ? dropPopup : null],
             130
@@ -6905,7 +6942,10 @@ class AeryndorMMOApp {
             if (this._topCenterHudMode !== 'compass') return;
             frame.classList.remove('ui-target-closing', 'di-morph-src');
             shellContent.forEach((el) => el.getAnimations?.().forEach((a) => a.cancel()));
-            if (dropPopup) dropPopup.getAnimations?.().forEach((a) => a.cancel());
+            if (dropPopup) {
+              dropPopup.getAnimations?.().forEach((a) => a.cancel());
+              this.forceHideTargetDropPopup(dropPopup);
+            }
           };
           if (fadeAnim) {
             frame._uiAnim = fadeAnim;
@@ -6915,6 +6955,9 @@ class AeryndorMMOApp {
             cleanup();
           }
         }
+      } else if (frame) {
+        const dropPopup = frame.querySelector('#target-drop-popup');
+        if (dropPopup) this.forceHideTargetDropPopup(dropPopup);
       }
 
       // 2. Kompass-Kapsel: aus der Ziel-Insel herausmorphen oder frisch aufploppen
@@ -7007,9 +7050,35 @@ class AeryndorMMOApp {
     }
   }
 
+  forceHideTargetDropPopup(dropPopup) {
+    if (!dropPopup) return;
+    if (dropPopup._closeFallbackTimer) {
+      clearTimeout(dropPopup._closeFallbackTimer);
+      dropPopup._closeFallbackTimer = null;
+    }
+    if (dropPopup._diDone) {
+      dropPopup._diDone = null;
+    }
+    if (dropPopup._diAnim) {
+      const prev = dropPopup._diAnim;
+      dropPopup._diAnim = null;
+      try {
+        prev.onfinish = null;
+        prev.oncancel = null;
+        prev.cancel();
+      } catch (_) {}
+    }
+    dropPopup.classList.remove('ui-win-closing', 'player-eq-drawer', 'has-multi-drop-rows');
+    dropPopup.classList.add('hidden');
+  }
+
   toggleTargetDropPopupAnimated(dropPopup, show) {
     if (!dropPopup) return;
     if (show) {
+      if (dropPopup._closeFallbackTimer) {
+        clearTimeout(dropPopup._closeFallbackTimer);
+        dropPopup._closeFallbackTimer = null;
+      }
       const wasHidden = dropPopup.classList.contains('hidden') || dropPopup.classList.contains('ui-win-closing');
       if (!wasHidden) return; // Bereits offen -> niemals neu animieren / flackern!
       dropPopup.classList.remove('hidden', 'ui-win-closing');
@@ -7017,16 +7086,35 @@ class AeryndorMMOApp {
         this.islandPop(dropPopup, true);
       }
     } else {
-      const isAlreadyHidden = dropPopup.classList.contains('hidden') || dropPopup.classList.contains('ui-win-closing');
-      if (isAlreadyHidden) return;
-      if (this.islandPop) {
-        dropPopup.classList.add('ui-win-closing');
-        this.islandPop(dropPopup, false, () => {
-          dropPopup.classList.remove('ui-win-closing');
+      const hasHidden = dropPopup.classList.contains('hidden');
+      const hasClosing = dropPopup.classList.contains('ui-win-closing');
+      if (hasHidden && !hasClosing) return;
+      // Selbstheilung falls ui-win-closing jemals ohne hidden verwaist sein sollte
+      if (hasClosing && !hasHidden) {
+        this.forceHideTargetDropPopup(dropPopup);
+        return;
+      }
+      if (hasHidden && hasClosing) return;
+
+      dropPopup.classList.add('hidden', 'ui-win-closing');
+      let finished = false;
+      const finishClose = () => {
+        if (finished) return;
+        finished = true;
+        if (dropPopup._closeFallbackTimer) {
+          clearTimeout(dropPopup._closeFallbackTimer);
+          dropPopup._closeFallbackTimer = null;
+        }
+        dropPopup.classList.remove('ui-win-closing');
+        if (!this.showTargetDrops) {
           dropPopup.classList.add('hidden');
-        });
+        }
+      };
+      dropPopup._closeFallbackTimer = setTimeout(finishClose, 380);
+      if (this.islandPop) {
+        this.islandPop(dropPopup, false, finishClose);
       } else {
-        dropPopup.classList.add('hidden');
+        finishClose();
       }
     }
   }
@@ -7349,7 +7437,12 @@ class AeryndorMMOApp {
         if (this.showTargetDrops) {
           this.renderTargetPlayerEqPopup(op, dropPopup, clsLbl, rankLbl, rankCol);
         } else {
-          this.toggleTargetDropPopupAnimated(dropPopup, false);
+          if (!dropPopup.classList.contains('player-eq-drawer')) {
+            this.forceHideTargetDropPopup(dropPopup);
+            dropPopup.innerHTML = '';
+          } else {
+            this.toggleTargetDropPopupAnimated(dropPopup, false);
+          }
           this._lastDropRenderSig = '';
         }
       }
@@ -7794,7 +7887,13 @@ class AeryndorMMOApp {
 
     if (!dropPopup) return;
     if (!this.showTargetDrops) {
-      this.toggleTargetDropPopupAnimated(dropPopup, false);
+      if (dropPopup.classList.contains('player-eq-drawer')) {
+        this.forceHideTargetDropPopup(dropPopup);
+        dropPopup.innerHTML = '';
+        this._lastDropRenderSig = '';
+      } else {
+        this.toggleTargetDropPopupAnimated(dropPopup, false);
+      }
       return;
     }
 
@@ -7811,62 +7910,107 @@ class AeryndorMMOApp {
     const tpl = this.config?.monsters?.[mob.templateId] || { drops: [] };
     const rawDrops = Array.isArray(tpl.drops) ? tpl.drops : [];
 
+    // Dedupliziert Drops anhand der Item-ID und behält die höchste Drop-Chance
+    const dedupDrops = (list) => {
+      const byId = new Map();
+      for (const entry of list) {
+        if (!entry || !entry.item) continue;
+        const key = String(entry.item.id || entry.item.templateId || entry.item.name || '');
+        if (!key) continue;
+        const prev = byId.get(key);
+        if (!prev || Number(entry.chance || 0) > Number(prev.chance || 0)) {
+          byId.set(key, entry);
+        }
+      }
+      return Array.from(byId.values());
+    };
+
+    const isSkillDrop = (it) => /book|soul_stone|soul_fragment|skill/i.test(it?.id || '') || Number(it?.category) === 2;
+    const isChestDrop = (it) => /chest|truhe/i.test(it?.id || '');
+    const isSpecialDrop = (it) => /bonus_changer|bonus_adder|aether_seal|awakened_rift_core|essence/i.test(it?.id || '');
+    const isUppDrop = (it) =>
+      (Number(it?.category) === 1 ||
+        /mat_|scroll_blessing|pearl|ore|claw|resin|shard|fang|pelt|fur|tooth|bone|venom|silk|herb|crystal|dust/i.test(
+          it?.id || ''
+        )) &&
+      !isSkillDrop(it) &&
+      !isChestDrop(it) &&
+      !isSpecialDrop(it);
+
+    const isLowLevelMetin = mob.kind === 'metin' && Number(mob.level || 1) < 60;
+
     // Kategorisiere Drops für die 5 Reiter (Items, Uppitems, Fertigkeiten, Truhen, Spezial)
+    // Ohne 10er-Limit: Ab > 8 Drops bricht das Raster automatisch in die nächste Reihe um!
     const getCatDrops = (cat) => {
       const allResolved = rawDrops.map((d) => {
-        const it = this.config?.items?.[d.itemId] || { id: d.itemId, name: d.itemId, category: 0 };
+        const it = this.config?.items?.[d.itemId] || { id: d.itemId, name: d.itemId };
         return { item: it, chance: d.chance || 0.25 };
       });
 
       if (cat === 'items') {
-        const eqs = allResolved.filter((x) => x.item.type === 'equipment' || Number(x.item.category || 0) === 0);
+        const eqs = dedupDrops(
+          allResolved.filter(
+            (x) =>
+              x.item.type === 'equipment' ||
+              (!isUppDrop(x.item) && !isSkillDrop(x.item) && !isChestDrop(x.item) && !isSpecialDrop(x.item))
+          )
+        );
         if (eqs.length > 0) return eqs;
-        return allResolved;
+        return dedupDrops(allResolved);
       }
       if (cat === 'uppitems') {
-        let upps = allResolved.filter((x) => Number(x.item.category) === 1 || /mat_|scroll_blessing|pearl|ore|claw|resin|shard/i.test(x.item.id || ''));
+        let upps = allResolved.filter((x) => isUppDrop(x.item));
         if (mob.kind === 'metin' && this.config?.items?.mat_monolith_shard) {
           const shardItem = this.config.items.mat_monolith_shard;
           upps = [{ item: shardItem, chance: 1.0 }, ...upps.filter((x) => x.item?.id !== 'mat_monolith_shard')];
         }
-        const extra = ['mat_wolf_claw', 'mat_bloodleaf_resin', 'mat_cursed_iron', 'scroll_blessing']
+        const extraIds = isLowLevelMetin
+          ? ['mat_wolf_claw', 'mat_bloodleaf_resin', 'mat_cursed_iron']
+          : ['mat_wolf_claw', 'mat_bloodleaf_resin', 'mat_cursed_iron', 'scroll_blessing'];
+        const extra = extraIds
           .map((id) => this.config?.items?.[id])
           .filter(Boolean)
           .map((it) => ({ item: it, chance: 0.35 }));
-        return [...upps, ...extra].slice(0, 10);
+        return dedupDrops([...upps, ...extra]);
       }
       if (cat === 'skills') {
-        const books = allResolved.filter((x) => /book|soul|skill/i.test(x.item.id || '') || Number(x.item.category) === 2);
+        const books = allResolved.filter((x) => isSkillDrop(x.item));
         const extra = ['item_skill_book', 'item_soul_fragment']
           .map((id) => this.config?.items?.[id])
           .filter(Boolean)
           .map((it) => ({ item: it, chance: 0.3 }));
-        return [...books, ...extra].slice(0, 10);
+        return dedupDrops([...books, ...extra]);
       }
       if (cat === 'chests') {
-        const chests = allResolved.filter((x) => /chest/i.test(x.item.id || ''));
+        const chests = allResolved.filter((x) => isChestDrop(x.item));
         const extra = ['chest_borderlands', 'chest_bloodleaf', 'chest_monolith_legend']
           .map((id) => this.config?.items?.[id])
           .filter(Boolean)
           .map((it) => ({ item: it, chance: 0.25 }));
-        return [...chests, ...extra].slice(0, 10);
+        return dedupDrops([...chests, ...extra]);
       }
       // 'special'
-      const specs = allResolved.filter((x) => /bonus|seal|essence|core|shard/i.test(x.item.id || ''));
-      const extra = ['mat_monolith_shard', 'mat_awakened_rift_core', 'item_bonus_changer', 'item_bonus_adder', 'item_aether_seal']
+      const specs = allResolved.filter((x) => isSpecialDrop(x.item) || /shard/i.test(x.item.id || ''));
+      const extraIds = isLowLevelMetin
+        ? ['mat_monolith_shard', 'mat_awakened_rift_core', 'item_aether_seal']
+        : ['mat_monolith_shard', 'mat_awakened_rift_core', 'item_bonus_changer', 'item_bonus_adder', 'item_aether_seal'];
+      const extra = extraIds
         .map((id) => this.config?.items?.[id])
         .filter(Boolean)
         .map((it) => ({ item: it, chance: 0.25 }));
-      return [...specs, ...extra].slice(0, 10);
+      return dedupDrops([...specs, ...extra]);
     };
 
-    const activeDrops = getCatDrops(this.targetDropCategory).slice(0, 10);
+    const COLS_PER_ROW = 8;
+    const activeDrops = getCatDrops(this.targetDropCategory);
+    const totalRows = Math.max(1, Math.ceil(activeDrops.length / COLS_PER_ROW));
+    const totalSlots = totalRows * COLS_PER_ROW;
     const lootMult = mob.kind === 'metin' ? Number(mob.lootMultiplier || 1.0) : 1.0;
     const rateScale =
       (mob.kind === 'metin' ? Math.min(0.45, 0.18 * lootMult) : mob.isBoss ? 0.25 : mob.isElite ? 0.14 : 0.08) *
       lvlRewardFactor;
     let slotsHtml = '';
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < totalSlots; i++) {
       const entry = activeDrops[i];
       if (entry && entry.item) {
         const it = entry.item;
@@ -7900,7 +8044,9 @@ class AeryndorMMOApp {
         ? `<div class="drop-lvl-warn-banner is-warn">⚠️ Level-Abstand aktiv: ${Math.round(lvlRewardFactor * 100)}% EXP &amp; Drop-Ausbeute</div>`
         : '';
 
+    dropPopup.classList.remove('player-eq-drawer');
     dropPopup.classList.add('nw-royal-frame');
+    dropPopup.classList.toggle('has-multi-drop-rows', totalRows > 1);
     dropPopup.innerHTML = `
       <span class="nw-frame-corner tl" aria-hidden="true">✦</span>
       <span class="nw-frame-corner tr" aria-hidden="true">✦</span>
@@ -7928,7 +8074,7 @@ class AeryndorMMOApp {
             )
             .join('')}
         </div>
-        <div class="drop-slots-row">
+        <div class="drop-slots-row" data-drop-rows="${totalRows}">
           ${slotsHtml}
         </div>
       </div>
@@ -7948,14 +8094,20 @@ class AeryndorMMOApp {
       } catch (_) {}
     }
 
-    dropPopup.querySelector('#btn-close-drop-win')?.addEventListener('click', () => {
+    dropPopup.querySelector('#btn-close-drop-win')?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
       this.showTargetDrops = false;
       this._lastDropRenderSig = '';
-      this.updateTopCenterTargetHUD();
+      this.hideItemTooltip?.();
+      this.toggleTargetDropPopupAnimated(dropPopup, false);
+      if (qBtn) qBtn.classList.remove('active');
     });
 
     dropPopup.querySelectorAll('[data-drop-cat]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
         this.targetDropCategory = btn.getAttribute('data-drop-cat') || 'items';
         this._lastDropRenderSig = '';
         this.updateTopCenterTargetHUD();
@@ -8194,6 +8346,7 @@ class AeryndorMMOApp {
     const empLabel = empRaw.includes('kaeryu') || empRaw.includes('pyungmoo') ? '🏰 Kaeryu' : '🏛️ Seiryu';
     const repPts = Number(op.reputation ?? 1500).toLocaleString('de-DE');
 
+    dropPopup.classList.remove('has-multi-drop-rows');
     dropPopup.classList.add('nw-royal-frame', 'player-eq-drawer');
     dropPopup.innerHTML = `
       <span class="nw-frame-corner tl" aria-hidden="true">✦</span>
@@ -9894,10 +10047,42 @@ class AeryndorMMOApp {
       this.openWindow('options');
     });
 
-    document.getElementById('btn-target-dropinfo')?.addEventListener('click', () => {
-      this.showTargetDrops = !this.showTargetDrops;
+    document.getElementById('btn-target-dropinfo')?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const dropPopupEl = document.getElementById('target-drop-popup');
+      const isVisiblyOpen =
+        dropPopupEl && !dropPopupEl.classList.contains('hidden') && !dropPopupEl.classList.contains('ui-win-closing');
+      this.showTargetDrops = !(this.showTargetDrops || isVisiblyOpen);
       this._lastDropRenderSig = '';
+      if (!this.showTargetDrops) {
+        this.hideItemTooltip?.();
+      }
       this.updateTopCenterTargetHUD();
+    });
+
+    // Permanenter delegierter Sicherheits-Listener auf #target-drop-popup (Schließen & Reiter-Wechsel selbst während Re-Renders)
+    document.getElementById('target-drop-popup')?.addEventListener('click', (ev) => {
+      const closeBtn = ev.target?.closest?.('#btn-close-drop-win');
+      if (closeBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.showTargetDrops = false;
+        this._lastDropRenderSig = '';
+        this.hideItemTooltip?.();
+        const dropPopupEl = document.getElementById('target-drop-popup');
+        if (dropPopupEl) this.toggleTargetDropPopupAnimated(dropPopupEl, false);
+        document.getElementById('btn-target-dropinfo')?.classList.remove('active');
+        return;
+      }
+      const catBtn = ev.target?.closest?.('[data-drop-cat]');
+      if (catBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.targetDropCategory = catBtn.getAttribute('data-drop-cat') || 'items';
+        this._lastDropRenderSig = '';
+        this.updateTopCenterTargetHUD();
+      }
     });
 
     document.getElementById('btn-target-focus')?.addEventListener('click', (ev) => {
@@ -10764,9 +10949,18 @@ class AeryndorMMOApp {
         ev.preventDefault();
         this.toggleFullscreen();
       } else if (ev.key === 'Escape') {
-        // ESC: Zuerst alle offenen Fenster schließen (wie CloseAllWindows in Projekt 1), sonst ESC-Hauptmenü umschalten
+        // ESC: Zuerst offene Drop-Info & alle offenen Fenster schließen (wie CloseAllWindows in Projekt 1), sonst ESC-Hauptmenü umschalten
         const winKeys = ['character', 'inventory', 'pet', 'generalstore', 'blacksmith', 'runeweaver', 'friends', 'autofarm', 'market', 'worldmap', 'options', 'events'];
         let closedAny = false;
+        const dropPopupEl = document.getElementById('target-drop-popup');
+        if (this.showTargetDrops || (dropPopupEl && !dropPopupEl.classList.contains('hidden'))) {
+          this.showTargetDrops = false;
+          this._lastDropRenderSig = '';
+          this.hideItemTooltip?.();
+          if (dropPopupEl) this.toggleTargetDropPopupAnimated(dropPopupEl, false);
+          document.getElementById('btn-target-dropinfo')?.classList.remove('active');
+          closedAny = true;
+        }
         for (const wk of winKeys) {
           const el = document.getElementById(`win-${wk}`);
           if (el && !el.classList.contains('hidden')) {
@@ -13216,6 +13410,16 @@ class AeryndorMMOApp {
       npc_generalstore: 'Quartiermeisterin & Gemischtwarenhändlerin',
       npc_market: 'Karawanenmeister & Freier Handel mit Bakra',
       npc_teleporter: 'Reisemeisterin der Äther-Leylinien',
+      npc_uriel: 'Gelehrter der alten Chroniken & Reichs-Schriften',
+      npc_fisherman_bakra: 'Meeresangler & Ködermeister am Hafen Bakra',
+      npc_fisherman_river: 'Flussangler & Gewässerkundiger am Silberstrom',
+      npc_fisherman_kaeryu: 'Seenangler & Fischereimeister',
+      npc_bakra_merchant: 'Großkaufmann des Orient-Basars',
+      npc_bakra_dancer: 'Hafentänzerin der Oase Bakra',
+      npc_legend_smith: 'Meisterschmied der alten Legenden',
+      npc_innkeeper: 'Gastwirt der Seefahrer-Taverne',
+      npc_hunter: 'Jäger der Wildlande & Großwild-Felle',
+      npc_musician: 'Barde & Sänger der Ahnen',
     };
 
     const npcGreetings = {
@@ -13241,6 +13445,26 @@ class AeryndorMMOApp {
         '„Unsere Karawanen verbinden das Nordtal mit Bakra, dem Hafen der freien Händler.“',
       npc_teleporter:
         '„Die Ley-Linien der alten Wächter tragen dich sicher bis in die fernsten Regionen von Aeryndor.“',
+      npc_uriel:
+        '„Die alten Pergamente bergen das uralte Wissen über die Monolithen, die Katastrophe des Ersten Bruchs und das Schicksal der Reiche. Suche stets nach Weisheit, Wanderer!“',
+      npc_fisherman_bakra:
+        '„Die Wellen des Südmeers bringen heute reichen Fang! Frische Köder, feste Schnüre und ein wachsamer Blick auf die Pose – so fängt man die Schätze der Tiefe.“',
+      npc_fisherman_river:
+        '„Am Silberstrom beißen die Forellen und Karpfen besonders gut. Brauchst du Angelköder oder möchtest du deine Fänge verkaufen?“',
+      npc_fisherman_kaeryu:
+        '„Still ruht der See, doch unter der spiegelnden Oberfläche verbergen sich seltene Fische. Geduld ist die größte Tugend eines Meisters.“',
+      npc_bakra_merchant:
+        '„Willkommen im Juwel der Seidenstraße! Seide aus dem fernen Osten, duftende Gewürze und edle Metalle – Al-Rashid hat die feinsten Waren von ganz Bakra!“',
+      npc_bakra_dancer:
+        '„Möge der Klang der Zymbeln und der Duft von Jasmin deine müden Glieder nach langer Reise beleben. Willkommen in der Oase von Bakra!“',
+      npc_legend_smith:
+        '„Gewöhnlicher Stahl zerschellt an Monolithen-Erz. Nur uralte Schmiedekunst entfesselt das wahre Potenzial legendärer Klingen!“',
+      npc_innkeeper:
+        '„Tritt ein, Fremder! Nach einer stürmischen Überfahrt gibt es nichts Besseres als warmen Gewürzmet und ein kräftiges Mahl am Kamin.“',
+      npc_hunter:
+        '„Die Raubtiere im Umland streifen unruhig durchs Dickicht. Halte deine Bogensehne trocken und deinen Schritt leise!“',
+      npc_musician:
+        '„Hörst du die Melodie im Wind? Sie erzählt von gefallenen Helden, stolzen Dynastien und dem Glanz vergessener Zeitalter.“',
     };
 
     // NPC erinnert sich an bereits abgeschlossene Quests (Kap. 11)
@@ -27298,6 +27522,7 @@ class AeryndorMMOApp {
     const gained = Math.max(1, newLevel - oldLevel);
     audioSystem?.duckMusic?.(0.6, 1800);
     audioSystem?.playLevelUp?.();
+    this.engine?.triggerLevelUpBurst?.(newLevel);
     this.showToast(
       gained > 1
         ? `✨ Aufgestiegen! Stufe ${oldLevel} → ${newLevel} (+${gained})`
@@ -27307,6 +27532,43 @@ class AeryndorMMOApp {
     if (statPts > 0) {
       setTimeout(() => this.showToast(`📈 ${statPts} Statuspunkt(e) verfügbar – Charakterfenster [C]`), 1400);
     }
+  }
+
+  onLocalSkillTierUp(skillId, oldLv, newLv, newTier) {
+    const s = this.selfState;
+    const classId = s?.class_id || this.playerClassId || 'warrior';
+    const activeChar = this.getActiveCharacter?.();
+    const meta = CLASS_META[classId] || CLASS_META.warrior;
+    const docIdx = Number(activeChar?.doctrineIdx || 0);
+    const docObj = meta?.doctrines?.[docIdx] || meta?.doctrines?.[0];
+    const srvSkills = this.config?.classes?.[classId]?.skills || [];
+    const srvIdx = srvSkills.findIndex((sk) => sk.id === skillId);
+    const skillName =
+      (srvIdx >= 0 && docObj?.skills?.[srvIdx]?.name) ||
+      (srvIdx >= 0 && srvSkills[srvIdx]?.name) ||
+      skillId;
+
+    audioSystem?.duckMusic?.(0.6, 1600);
+    audioSystem?.playLevelUp?.();
+    this.engine?.triggerSkillTierUpBurst?.({
+      skillId,
+      skillName,
+      skillLevel: newLv,
+      tier: newTier,
+      classId,
+      doctrine: s?.doctrine || docObj?.id || '',
+      gender: s?.gender || activeChar?.gender || 'm',
+    });
+
+    const tierLabel =
+      newTier >= 5
+        ? '👑 Legendärer Skill (L1)'
+        : newTier === 4
+        ? '🌟 Perfekter Meister (P1)'
+        : newTier === 3
+        ? '⚡ Großmeister (G1)'
+        : '🔥 Meister (M1)';
+    this.showToast(`${tierLabel} erreicht: ${skillName}!`);
   }
 
   showToast(text) {

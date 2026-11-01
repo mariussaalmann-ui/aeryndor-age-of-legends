@@ -832,11 +832,21 @@ export function initIslandToasts(app) {
 
   app.islandPop = (target, open, done) => {
     if (!target) return done?.();
-    if (target._diAnim) {
+    if (target._diDone) {
+      const prevDone = target._diDone;
+      target._diDone = null;
       try {
-        target._diAnim.cancel();
+        prevDone();
       } catch (_) {}
+    }
+    if (target._diAnim) {
+      const prevAnim = target._diAnim;
       target._diAnim = null;
+      try {
+        prevAnim.onfinish = null;
+        prevAnim.oncancel = null;
+        prevAnim.cancel();
+      } catch (_) {}
     }
     if (app.isReducedMotion?.() || typeof target.animate !== 'function') return done?.();
     const { dy, sx } = islandOffset(target);
@@ -865,13 +875,24 @@ export function initIslandToasts(app) {
     });
     pulseIsland(open, open ? 0 : 220);
     target._diAnim = anim;
-    anim.onfinish = () => {
-      done?.();
+    target._diDone = done || null;
+    let settled = false;
+    const settleAnim = () => {
+      if (settled) return;
+      settled = true;
+      if (target._diDone === done) target._diDone = null;
       if (target._diAnim === anim) {
-        anim.cancel();
         target._diAnim = null;
+        try {
+          anim.onfinish = null;
+          anim.oncancel = null;
+          anim.cancel();
+        } catch (_) {}
       }
+      done?.();
     };
+    anim.onfinish = settleAnim;
+    anim.oncancel = settleAnim;
   };
 
   const drainToastQueue = () => {

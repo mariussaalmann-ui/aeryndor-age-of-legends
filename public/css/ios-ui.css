@@ -3457,6 +3457,9 @@ body:has(#hud-target-frame:not(.hidden)) #toast-banner.di-toast {
 body:has(#hud-target-frame:not(.hidden) #target-drop-popup:not(.hidden)) #toast-banner.di-toast {
   top: 288px !important;
 }
+body:has(#hud-target-frame:not(.hidden) #target-drop-popup.has-multi-drop-rows:not(.hidden)) #toast-banner.di-toast {
+  top: 350px !important;
+}
 
 /* MÖGLICHE DROPS (#target-drop-popup): Modernes iOS Liquid Glass statt dunklem Navy-Kasten */
 #hud-target-frame #target-drop-popup,
@@ -3489,8 +3492,11 @@ body:has(#hud-target-frame:not(.hidden) #target-drop-popup:not(.hidden)) #toast-
 
 #hud-target-frame #target-drop-popup .drop-win-title,
 #hud-target-frame #target-drop-popup .drop-win-title.win-title {
-  font-size: 12.5px !important;
-  letter-spacing: 0.05em !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  padding-right: 8px !important;
+  font-size: 11.8px !important;
+  letter-spacing: 0.035em !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;

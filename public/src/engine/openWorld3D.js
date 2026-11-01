@@ -11,7 +11,7 @@
 // ============================================================================
 
 import * as THREE from '../../vendor/three.module.js';
-import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261031_v630';
+import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261101_v637';
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
 import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
@@ -44,6 +44,11 @@ function isPcClientRuntime(engineInstance = null) {
   return false;
 }
 
+function isFemaleGender(gender) {
+  const g = String(gender || '').trim().toLowerCase();
+  return g === 'f' || g === 'w' || g === 'female' || g === 'weiblich';
+}
+
 const HERO_GLB_BY_CLASS = {
   warrior: {
     glb: '/assets/models/heroes/klingenwaechter_male.glb?v=20261031_kw4',
@@ -52,14 +57,52 @@ const HERO_GLB_BY_CLASS = {
     normalMap: '/assets/models/heroes/klingenwaechter_male_normal.png?v=20261031_kw4',
     height: 1.88,
     useMeshyHandSocket: true,
-    // Sobald klingenwaechter_female.glb vorhanden ist, hier als { glb, glbLow, tex, normalMap } eintragen:
-    female: null,
+    weaponSocketPos: [-0.0177, -0.0118, 0.0389],
+    weaponSocketQuat: [0.04521, 0.66362, 0.67493, -0.31941],
+    mountOffsetY: 0.74,
+    mountOffsetZ: -0.16,
+    female: {
+      glb: '/assets/models/heroes/klingenwaechter_female.glb?v=20261031_kwf5',
+      glbLow: '/assets/models/heroes/klingenwaechter_female_low.glb?v=20261031_kwf5',
+      tex: ['/assets/models/heroes/klingenwaechter_female.png?v=20261031_kwf5'],
+      normalMap: '/assets/models/heroes/klingenwaechter_female_normal.png?v=20261031_kwf5',
+      height: 1.80,
+      useMeshyHandSocket: true,
+      weaponSocketPos: [-0.01778, 0.09437, -0.00145],
+      weaponSocketQuat: [0.37008, 0.37008, -0.60253, -0.60253],
+      leftWeaponSocketPos: [0.0147, 0.08482, -0.00363],
+      leftWeaponSocketQuat: [0.33887, 0.33887, 0.62062, 0.62062],
+      mountOffsetY: 0.79,
+      mountOffsetZ: -0.22,
+    },
   },
   ninja: {
-    glb: '/assets/models/npcs/plechi_old_warrior1.glb',
-    tex: ['/assets/models/npcs/old_warrior1_tex.png'],
-    height: 1.78,
-    female: null,
+    glb: '/assets/models/heroes/schattenjaeger_male.glb?v=20261031_sjm5',
+    glbLow: '/assets/models/heroes/schattenjaeger_male_low.glb?v=20261031_sjm5',
+    tex: ['/assets/models/heroes/schattenjaeger_male.png?v=20261031_sjm5'],
+    normalMap: '/assets/models/heroes/schattenjaeger_male_normal.png?v=20261031_sjm5',
+    height: 1.84,
+    useMeshyHandSocket: true,
+    weaponSocketPos: [-0.01183, 0.08451, -0.00408],
+    weaponSocketQuat: [0.34177, 0.37665, -0.60186, -0.61571],
+    leftWeaponSocketPos: [0.01218, 0.08693, -0.00456],
+    leftWeaponSocketQuat: [0.37954, 0.34296, 0.60979, 0.60538],
+    mountOffsetY: 0.69,
+    mountOffsetZ: -0.18,
+    female: {
+      glb: '/assets/models/heroes/schattenjaeger_female.glb?v=20261031_sjf5',
+      glbLow: '/assets/models/heroes/schattenjaeger_female_low.glb?v=20261031_sjf5',
+      tex: ['/assets/models/heroes/schattenjaeger_female.png?v=20261031_sjf5'],
+      normalMap: '/assets/models/heroes/schattenjaeger_female_normal.png?v=20261031_sjf5',
+      height: 1.79,
+      useMeshyHandSocket: true,
+      weaponSocketPos: [-0.03351, 0.08425, -0.0095],
+      weaponSocketQuat: [0.24517, 0.248, -0.77053, -0.53354],
+      leftWeaponSocketPos: [0.03408, 0.08397, -0.00978],
+      leftWeaponSocketQuat: [0.24843, 0.24484, 0.53555, 0.7691],
+      mountOffsetY: 0.66,
+      mountOffsetZ: -0.19,
+    },
   },
   sura: {
     glb: '/assets/models/npcs/pewi_guan.glb',
@@ -77,8 +120,9 @@ const HERO_GLB_BY_CLASS = {
 };
 
 function resolveHeroGlbEntry(classId = 'warrior', gender = 'male') {
-  const base = HERO_GLB_BY_CLASS[classId] || HERO_GLB_BY_CLASS.warrior;
-  const isFem = gender === 'f' || gender === 'female';
+  const normClass = classId === 'assassin' ? 'ninja' : classId;
+  const base = HERO_GLB_BY_CLASS[normClass] || HERO_GLB_BY_CLASS.warrior;
+  const isFem = isFemaleGender(gender);
   if (isFem && base.female && base.female.glb) {
     return { ...base, ...base.female };
   }
@@ -646,11 +690,50 @@ export class OpenWorld3DEngine {
 
   loadTerrainLayerTexture(fileName, repeatCount = 48, isNormal = false) {
     const key = `${fileName}_${repeatCount}`;
+    const url = `/assets/terrain/${fileName}?v=20261024_orktal_fix2`;
+    if (!this._inflightTerrainImages) this._inflightTerrainImages = new Set();
     if (this._terrainTexCache.has(key)) {
-      return this._terrainTexCache.get(key);
+      const existing = this._terrainTexCache.get(key);
+      if (existing && !existing.image && existing.userData?._loadFailed && typeof Image !== 'undefined') {
+        existing.userData._loadFailed = false;
+        const retryImg = new Image();
+        retryImg.crossOrigin = 'anonymous';
+        this._inflightTerrainImages.add(retryImg);
+        const unpin = () => this._inflightTerrainImages.delete(retryImg);
+        retryImg.onload = () => {
+          unpin();
+          existing.image = retryImg;
+          existing.needsUpdate = true;
+        };
+        retryImg.onerror = () => {
+          unpin();
+          existing.userData._loadFailed = true;
+        };
+        retryImg.src = this._resolveDirectServerAssetUrl?.(url) || url;
+      }
+      return existing;
     }
     const loader = new THREE.TextureLoader();
-    const tex = loader.load(`/assets/terrain/${fileName}?v=20261024_orktal_fix2`);
+    loader.setCrossOrigin?.('anonymous');
+    const tex = loader.load(url, undefined, undefined, () => {
+      const directUrl = this._resolveDirectServerAssetUrl?.(url);
+      if (typeof Image !== 'undefined') {
+        const fallbackImg = new Image();
+        fallbackImg.crossOrigin = 'anonymous';
+        this._inflightTerrainImages.add(fallbackImg);
+        const unpin = () => this._inflightTerrainImages.delete(fallbackImg);
+        fallbackImg.onload = () => {
+          unpin();
+          tex.image = fallbackImg;
+          tex.needsUpdate = true;
+        };
+        fallbackImg.onerror = () => {
+          unpin();
+          tex.userData = { ...(tex.userData || {}), _loadFailed: true };
+        };
+        fallbackImg.src = directUrl || `${url}&_retry=1`;
+      }
+    });
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(repeatCount, repeatCount);
@@ -2520,6 +2603,7 @@ export class OpenWorld3DEngine {
     const isFoliage = Boolean(opts.isFoliage);
     const isTreeTrunk = Boolean(opts.isTreeTrunk);
     const isCreature = Boolean(opts.isCreature);
+    const isDelitHero = Boolean(opts.isDelitHero) && isCreature;
     const isRock = Boolean(opts.isRock);
     const snowStrength = opts.snowStrength ?? 0.88;
     const wetStrength = opts.wetStrength ?? 0.85;
@@ -2536,7 +2620,7 @@ export class OpenWorld3DEngine {
       }
     }
 
-    const progCacheKey = `ow_v7_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isRock ? 1 : 0}_${mat.envMap ? 1 : 0}`;
+    const progCacheKey = `ow_v9_${isFoliage ? 1 : 0}_${isTreeTrunk ? 1 : 0}_${isCreature ? 1 : 0}_${isDelitHero ? 1 : 0}_${isRock ? 1 : 0}_${mat.envMap ? 1 : 0}`;
     mat.customProgramCacheKey = () => progCacheKey;
 
     mat.onBeforeCompile = (shader) => {
@@ -2564,6 +2648,8 @@ export class OpenWorld3DEngine {
         varying float vLocalPosY;
         varying float vTreeSeed;
         varying vec3 vTreeOrigin;
+        ${isCreature ? 'varying vec3 vCharRestPos;' : ''}
+        ${isDelitHero ? 'attribute float aHeroOcclusion;\nvarying float vHeroAO;' : ''}
         uniform float uTime;
         uniform float uWindStrength;
         uniform vec2 uWindDir;
@@ -2576,6 +2662,8 @@ export class OpenWorld3DEngine {
             '#include <begin_vertex>',
             `#include <begin_vertex>
             vLocalPosY = transformed.y;
+            ${isCreature ? 'vCharRestPos = position * max(0.0001, length(modelMatrix[0].xyz));' : ''}
+            ${isDelitHero ? 'vHeroAO = clamp(1.0 - aHeroOcclusion, 0.22, 1.04);' : ''}
             vec3 instOrigin = vec3(modelMatrix[3].xyz);
             #ifdef USE_INSTANCING
               instOrigin = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -2649,6 +2737,8 @@ export class OpenWorld3DEngine {
         varying vec3 vObjWorldNormal;
         varying float vLocalPosY;
         varying float vTreeSeed;
+        ${isCreature ? 'varying vec3 vCharRestPos;' : ''}
+        ${isDelitHero ? 'varying float vHeroAO;' : ''}
         uniform float uObjSnow;
         uniform float uObjWetness;
         uniform float uSnowStrength;
@@ -2764,14 +2854,14 @@ export class OpenWorld3DEngine {
             float charRgRatio = charSrgbAlb.r / max(0.003, charSrgbAlb.g);
             float charGbDiff = charSrgbAlb.g - charSrgbAlb.b;
             float charRgDiff = charSrgbAlb.r - charSrgbAlb.g;
-            float charSkinMask = smoothstep(1.12, 1.24, charRgRatio)
-                               * (1.0 - smoothstep(1.56, 1.78, charRgRatio))
-                               * smoothstep(0.015, 0.055, charGbDiff)
-                               * (1.0 - smoothstep(1.35, 1.85, charGbDiff / max(0.01, charRgDiff)))
-                               * smoothstep(0.16, 0.25, charAlbSat)
-                               * (1.0 - smoothstep(0.50, 0.62, charAlbSat))
+            float charSkinMask = smoothstep(1.11, 1.23, charRgRatio)
+                               * (1.0 - smoothstep(1.58, 1.80, charRgRatio))
+                               * smoothstep(0.014, 0.052, charGbDiff)
+                               * (1.0 - smoothstep(1.38, 1.88, charGbDiff / max(0.01, charRgDiff)))
+                               * smoothstep(0.13, 0.23, charAlbSat)
+                               * (1.0 - smoothstep(0.52, 0.64, charAlbSat))
                                * smoothstep(0.24, 0.36, charSrgbLum)
-                               * (1.0 - smoothstep(0.88, 0.97, charSrgbLum));
+                               * (1.0 - smoothstep(0.90, 0.98, charSrgbLum));
             float charSteelMask = (1.0 - smoothstep(0.05, 0.16, charAlbSat))
                                 * smoothstep(0.24, 0.46, charSrgbLum);
             float charGoldMask = smoothstep(0.48, 0.66, charAlbSat)
@@ -2781,6 +2871,43 @@ export class OpenWorld3DEngine {
                                * (1.0 - charSkinMask);
             float charMetalMask = clamp((charSteelMask * 0.78 + charGoldMask * 0.92) * (1.0 - charSkinMask), 0.0, 1.0);
             float charFabricMask = clamp(1.0 - charSkinMask - charMetalMask, 0.0, 1.0);
+            float restGrainA = sin(vCharRestPos.x * 165.0 + vCharRestPos.y * 158.0) * cos(vCharRestPos.z * 165.0 - vCharRestPos.y * 142.0);
+            float restGrainB = sin(vCharRestPos.x * 340.0 - vCharRestPos.z * 310.0 + vCharRestPos.y * 280.0);
+            float restMicroTex = restGrainA * 0.65 + restGrainB * 0.35;
+            ${
+              isDelitHero
+                ? `
+            // PBR-Tonwert- & 3D-Vertex-AO-Kalibrierung für delit Heldentexturen (angleichend an handtexturierte NPCs)
+            float rawHeroAO = clamp(vHeroAO, 0.24, 1.03);
+            float cleanHeroAO = clamp(smoothstep(0.18, 0.86, rawHeroAO) * 0.74 + rawHeroAO * 0.28, 0.26, 1.03);
+            vec3 calibSrgb = charSrgbAlb;
+            if (charSkinMask > 0.005) {
+              float targetSkinLum = charSrgbLum > 0.43
+                ? 0.43 + (charSrgbLum - 0.43) * 0.34
+                : charSrgbLum;
+              float skinLumRatio = targetSkinLum / max(0.01, charSrgbLum);
+              vec3 warmHeroSkin = clamp(charSrgbAlb * skinLumRatio * vec3(1.02, 0.955, 0.895), 0.0, 1.0);
+              calibSrgb = mix(calibSrgb, warmHeroSkin, charSkinMask);
+            }
+            float nonSkinWeight = clamp(1.0 - charSkinMask, 0.0, 1.0);
+            if (nonSkinWeight > 0.005) {
+              float clothHighlightComp = charSrgbLum > 0.54
+                ? (0.54 + (charSrgbLum - 0.54) * 0.50) / max(0.01, charSrgbLum)
+                : 1.0;
+              float inkDeepen = mix(0.76, 1.0, smoothstep(0.08, 0.34, charSrgbLum));
+              vec3 groundedCloth = clamp(charSrgbAlb * clothHighlightComp * inkDeepen, 0.0, 1.0);
+              calibSrgb = mix(calibSrgb, groundedCloth, nonSkinWeight);
+            }
+            diffuseColor.rgb = calibSrgb * calibSrgb;
+            diffuseColor.rgb *= 1.0 + restMicroTex * mix(0.036, 0.015, charSkinMask) * mix(1.0, 0.35, charMetalMask);
+            float safeHeroAO = clamp(cleanHeroAO, 0.06, 1.03);
+            vec3 skinAoRgb = vec3(pow(safeHeroAO, 0.74), pow(safeHeroAO, 1.02), pow(safeHeroAO, 1.22));
+            vec3 clothAoRgb = vec3(pow(safeHeroAO, 1.02), pow(safeHeroAO, 1.04), pow(safeHeroAO, 0.95));
+            vec3 heroAoTint = mix(clothAoRgb, skinAoRgb, charSkinMask);
+            diffuseColor.rgb *= mix(vec3(1.0), heroAoTint, 0.58);
+            `
+                : ''
+            }
             `
                 : isFoliage
                 ? `
@@ -2865,10 +2992,11 @@ export class OpenWorld3DEngine {
             `
                 : isCreature
                 ? `
-            // Materialspezifische PBR-Mikrostruktur: feines Gewebe auf Stoff, glatt-natürliche Poren auf Haut, dezente Maserung auf Rüstung
-            float weaveMicro = sin(vObjWorldPos.x * 46.0 + vObjWorldPos.y * 42.0) * cos(vObjWorldPos.z * 46.0 - vObjWorldPos.y * 38.0);
-            float microAmp = mix(0.036, 0.011, charSkinMask) * mix(1.0, 0.55, charMetalMask);
-            normal = normalize(normal + vec3(weaveMicro * microAmp, weaveMicro * microAmp * 0.55, -weaveMicro * microAmp));
+            // Animationsfeste (Bind-Pose), UV-nahtfreie PBR-Mikrostruktur: feines Gewebe auf Stoff, natürliche Poren auf Haut
+            float weaveMicroX = sin(vCharRestPos.x * 165.0 + vCharRestPos.y * 152.0) * cos(vCharRestPos.z * 165.0 - vCharRestPos.y * 138.0);
+            float weaveMicroZ = cos(vCharRestPos.x * 158.0 - vCharRestPos.z * 168.0 + vCharRestPos.y * 144.0);
+            float microAmp = mix(0.042, 0.015, charSkinMask) * mix(1.0, 0.50, charMetalMask);
+            normal = normalize(normal + vec3(weaveMicroX * microAmp, (weaveMicroX + weaveMicroZ) * microAmp * 0.35, weaveMicroZ * microAmp));
             `
                 : ''
             }`
@@ -2881,10 +3009,10 @@ export class OpenWorld3DEngine {
                 ? 'roughnessFactor = clamp(roughnessFactor * (0.82 + 0.26 * objNoise), 0.32, 0.92);'
                 : isCreature
                 ? `
-            // Dynamische PBR-Roughness je Materialzone: lebendiger Hautglanz (0.43), griffiger Stoff (0.67), polierte Rüstungsdetails (0.24)
-            float targetCharRough = charSkinMask * 0.43 + charFabricMask * 0.67 + charMetalMask * 0.24;
-            float detailRoughVar = 0.88 + 0.24 * (1.0 - charSrgbLum);
-            roughnessFactor = clamp(mix(roughnessFactor, targetCharRough, 0.76) * detailRoughVar, 0.16, 0.88);
+            // Dynamische PBR-Roughness je Materialzone: natürlicher Hautglanz (0.50), griffiger Stoff (0.72), polierte Rüstungsdetails (0.25)
+            float targetCharRough = charSkinMask * 0.50 + charFabricMask * 0.72 + charMetalMask * 0.25;
+            float detailRoughVar = (0.90 + 0.20 * (1.0 - charSrgbLum)) ${isDelitHero ? '* mix(1.16, 0.96, cleanHeroAO)' : ''};
+            roughnessFactor = clamp(mix(roughnessFactor, targetCharRough, 0.78) * detailRoughVar, 0.18, 0.90);
             `
                 : ''
             }
@@ -2899,6 +3027,45 @@ export class OpenWorld3DEngine {
                 ? `
             // Dielektrische Haut & Stoff (Metalness -> ~0.02) vs. echte metallische Rüstungsplatten & Goldbeschläge (Metalness -> 0.76)
             metalnessFactor = clamp(mix(metalnessFactor * (1.0 - charSkinMask * 0.94) * (1.0 - charFabricMask * 0.65), max(metalnessFactor, 0.76), charMetalMask), 0.0, 0.92);
+            `
+                : ''
+            }`
+          )
+          .replace(
+            '#include <lights_fragment_maps>',
+            `#include <lights_fragment_maps>
+            ${
+              isCreature
+                ? `
+            #ifdef STANDARD
+            {
+              // Tageszeit-synchrone Charakter-IBL (nachts plastisch lesbares Mond-/Stadt-Ambient wie bei NPCs statt statischem 24/7-Mittagssonnen-EnvMap!) + echtes 3D-Vertex-AO
+              vec3 nightMoonIbl = mix(vec3(0.68, 0.77, 0.96), clamp(uAmbientSkyColor * 1.45, vec3(0.38), vec3(1.14)), 0.42);
+              float dayIblBlend = smoothstep(0.0, 0.85, uSunDaylight);
+              vec3 todDiffIbl = mix(nightMoonIbl * 0.46, vec3(0.84), dayIblBlend);
+              vec3 todSpecIbl = mix(nightMoonIbl * 0.54, vec3(0.90), dayIblBlend);
+              #if defined( RE_IndirectDiffuse )
+                iblIrradiance *= todDiffIbl;
+                ${
+                  isDelitHero
+                    ? `
+                vec3 indHeroAo = mix(vec3(1.0), heroAoTint, 0.72);
+                irradiance *= indHeroAo;
+                iblIrradiance *= indHeroAo;
+                `
+                    : ''
+                }
+              #endif
+              #if defined( RE_IndirectSpecular )
+                radiance *= todSpecIbl;
+                ${
+                  isDelitHero
+                    ? 'radiance *= computeSpecularOcclusion(saturate(dot(geometryNormal, geometryViewDir)), cleanHeroAO, material.roughness);'
+                    : ''
+                }
+              #endif
+            }
+            #endif
             `
                 : ''
             }`
@@ -2962,7 +3129,7 @@ export class OpenWorld3DEngine {
             float NdotV_c = clamp(dot(N_char, V_char), 0.0, 1.0);
             float NdotL_c = dot(N_char, L_char);
             float NdotH_c = clamp(dot(N_char, H_char), 0.0, 1.0);
-            float sunEnergyC = mix(0.24, 1.0, uSunDaylight);
+            float sunEnergyC = mix(0.06, 0.84, uSunDaylight);
 
             // 1. Zoom-invariante 3D-Krümmungs- & Vertiefungs-Mikro-Occlusion (Muskelrillen, Rüstungsfugen, Kleidungsfalten)
             vec3 dNdxC = dFdx(normal);
@@ -2972,8 +3139,8 @@ export class OpenWorld3DEngine {
             float invPixC = inversesqrt(max(1e-7, dot(dPdxC, dPdxC) + dot(dPdyC, dPdyC)));
             float surfCurvC = clamp((dot(dNdxC, dPdxC) + dot(dNdyC, dPdyC)) * invPixC * 1.15, -0.34, 0.26);
             float creviceLumAO = mix(0.84, 1.0, smoothstep(0.10, 0.42, charSrgbLum));
-            float cavityAO = clamp(1.0 + surfCurvC * 0.62, 0.72, 1.05) * creviceLumAO;
-            outgoingLight *= mix(cavityAO, mix(0.84, 1.03, clamp(cavityAO, 0.0, 1.0)), charSkinMask * 0.40);
+            float cavityAO = clamp(1.0 + surfCurvC * 0.62, 0.72, 1.05) * creviceLumAO ${isDelitHero ? '* mix(0.76, 1.02, cleanHeroAO)' : ''};
+            outgoingLight *= cavityAO;
 
             // 2. Physikalisches Subsurface Scattering (SSS) & Dual-Lobe Epidermis-Glanz auf Hautpartien
             if (charSkinMask > 0.01) {
@@ -2981,15 +3148,15 @@ export class OpenWorld3DEngine {
               float terminatorSSS = exp(-abs(NdotL_c + 0.06) * 3.4) * smoothstep(-0.58, 0.48, NdotL_c);
               float backTranslucency = pow(clamp(dot(V_char, -L_char), 0.0, 1.0), 2.3) * pow(1.0 - NdotV_c, 1.5);
               vec3 dermisColor = vec3(0.96, 0.31, 0.16);
-              vec3 sssLight = diffuseColor.rgb * dermisColor * (terminatorSSS * 0.46 + wrapNdotL * 0.15 + backTranslucency * 0.30) * uGiSunColor * sunEnergyC;
-              float skinSpecLobe = (pow(NdotH_c, 32.0) * 0.14 + pow(NdotH_c, 7.0) * 0.05) * clamp(NdotL_c * 1.5 + 0.1, 0.0, 1.0);
-              outgoingLight += (sssLight + uGiSunColor * skinSpecLobe * sunEnergyC * 0.55) * charSkinMask;
+              vec3 sssLight = diffuseColor.rgb * dermisColor * (terminatorSSS * 0.42 + wrapNdotL * 0.12 + backTranslucency * 0.26) * uGiSunColor * sunEnergyC;
+              float skinSpecLobe = (pow(NdotH_c, 28.0) * 0.11 + pow(NdotH_c, 7.0) * 0.04) * clamp(NdotL_c * 1.5 + 0.1, 0.0, 1.0);
+              outgoingLight += (sssLight + uGiSunColor * skinSpecLobe * sunEnergyC * 0.48) * charSkinMask * clamp(cavityAO, 0.45, 1.04);
             }
 
             // 3. Dynamische Glanzlichter auf Stoffen (Charlie/Velvet Grazing-Sheen) & Metalldetails (GGX Glint)
             float fresnelGrazing = pow(1.0 - NdotV_c, 3.1);
             float sunSideWeight = clamp(NdotL_c * 0.55 + 0.45, 0.0, 1.0);
-            vec3 fabricSheen = mix(diffuseColor.rgb, vec3(1.0), 0.36) * uGiSunColor * (fresnelGrazing * sunSideWeight * mix(0.08, 0.22, uSunDaylight) * cavityAO);
+            vec3 fabricSheen = mix(diffuseColor.rgb, vec3(1.0), 0.32) * uGiSunColor * (fresnelGrazing * sunSideWeight * mix(0.05, 0.18, uSunDaylight) * cavityAO);
             float metalGlint = pow(NdotH_c, 68.0) * clamp(NdotL_c * 1.7, 0.0, 1.0) * mix(0.18, 0.62, uSunDaylight);
             vec3 metalSpecTint = mix(vec3(1.0), diffuseColor.rgb * 1.35 + vec3(0.12), charGoldMask);
             vec3 metalHighlight = metalSpecTint * (uGiSunColor * metalGlint + skyTint * fresnelGrazing * 0.16) * clamp(cavityAO, 0.55, 1.08);
@@ -2999,7 +3166,7 @@ export class OpenWorld3DEngine {
             float hAboveFeet = clamp(vObjWorldPos.y - vTreeOrigin.y, 0.0, 2.4);
             float giBounceFacing = clamp(-N_char.y * 0.56 + 0.44, 0.0, 1.0);
             float giBounceHeight = exp(-hAboveFeet * 1.02);
-            vec3 giGroundBounce = diffuseColor.rgb * uGiGroundColor * (giBounceFacing * giBounceHeight * uGiBounceStrength) * cavityAO;
+            vec3 giGroundBounce = diffuseColor.rgb * uGiGroundColor * (giBounceFacing * giBounceHeight * uGiBounceStrength * mix(0.55, 1.0, uSunDaylight)) * cavityAO;
             outgoingLight += giGroundBounce;
 
             float footContactZone = 1.0 - smoothstep(0.015, 0.36, hAboveFeet);
@@ -3010,8 +3177,8 @@ export class OpenWorld3DEngine {
             // 5. Saubere Konturentrennung (Rim) & tiefer natürlicher Schattenboden (erhält vollen 3D-Kontrast statt flachem 0.56-Clamp!)
             float cleanRim = pow(1.0 - NdotV_c, 3.4) * clamp(N_char.y * 0.35 + 0.65, 0.0, 1.0);
             float backSunC = pow(clamp(dot(V_char, -L_char), 0.0, 1.0), 2.0) * smoothstep(0.0, 0.25, L_char.y) * uSunDaylight;
-            outgoingLight += (diffuseColor.rgb * 0.55 + vec3(0.45)) * (skyTint * 0.11 + uGiSunColor * backSunC * 0.22) * cleanRim * verticalGroundAO;
-            vec3 deepCreviceFloor = diffuseColor.rgb * mix(uGiGroundColor * 0.55, skyTint, clamp(N_char.y * 0.5 + 0.5, 0.0, 1.0)) * mix(0.11, 0.18, uSunDaylight) * cavityAO * verticalGroundAO;
+            outgoingLight += (diffuseColor.rgb * 0.62 + vec3(0.32)) * (skyTint * mix(0.065, 0.10, uSunDaylight) + uGiSunColor * backSunC * 0.20) * cleanRim * clamp(cavityAO, 0.45, 1.04) * verticalGroundAO;
+            vec3 deepCreviceFloor = diffuseColor.rgb * mix(uGiGroundColor * 0.55, skyTint, clamp(N_char.y * 0.5 + 0.5, 0.0, 1.0)) * mix(0.085, 0.14, uSunDaylight) * cavityAO * verticalGroundAO;
             outgoingLight = max(outgoingLight, deepCreviceFloor);
             `
                 : `
@@ -3100,14 +3267,18 @@ export class OpenWorld3DEngine {
                     ${
                       isCreature
                         ? `
-                    // Anwesende Charaktere: Haut-SSS Color Bleeding, Metallrüstungs-Glanzlichter & Stoff-Rim-Sheen im Magielicht
-                    float ndlCharS = clamp(rawNdlS * 0.72 + 0.28, 0.0, 1.0);
-                    float wrapSkinS = clamp((rawNdlS + 0.48) / 1.48, 0.0, 1.0);
-                    vec3 charDiffBleed = mix(diffuseColor.rgb * 1.75 + vec3(0.08), vec3(objLumS * 1.40 + 0.10), 0.30) * sCI.rgb * ndlCharS;
-                    vec3 skinSssBleed = (diffuseColor.rgb * 1.35 + vec3(0.14, 0.05, 0.04)) * sCI.rgb * (wrapSkinS * 0.42 + pow(ndhS, 26.0) * 0.22) * charSkinMask;
-                    vec3 armorMetalSpec = mix(sCI.rgb, vec3(1.0), 0.26) * pow(ndhS, 58.0) * clamp(rawNdlS * 1.6 + 0.15, 0.0, 1.0) * (0.35 + 0.85 * charMetalMask);
-                    vec3 clothSheenS = mix(sCI.rgb, diffuseColor.rgb * sCI.rgb * 1.8, 0.35) * (rimS * 0.48) * (0.35 + 0.65 * charFabricMask);
-                    outgoingLight += (charDiffBleed + skinSssBleed + armorMetalSpec + clothSheenS) * (attenS * sCI.w * nightBleedO * clamp(cavityAO, 0.65, 1.05));
+                    // Anwesende Charaktere: Nahfeld-gedämpftes, energieerhaltendes Magielicht (kein Überstrahlen durch eigene Waffenaura!)
+                    float effCharDS = max(dS, 1.38);
+                    float invSqCharS = 1.0 / (1.0 + 0.34 * effCharDS + 0.26 * effCharDS * effCharDS);
+                    float attenCharS = invSqCharS * winS * winS;
+                    float ndlCharS = clamp(rawNdlS * 0.76 + 0.22, 0.0, 1.0);
+                    float wrapSkinS = clamp((rawNdlS + 0.42) / 1.42, 0.0, 1.0);
+                    vec3 charDiffBleed = (diffuseColor.rgb * 0.84 + vec3(0.025)) * sCI.rgb * ndlCharS;
+                    vec3 skinSssBleed = (diffuseColor.rgb * 0.62 + vec3(0.05, 0.018, 0.014)) * sCI.rgb * (wrapSkinS * 0.28 + pow(ndhS, 26.0) * 0.14) * charSkinMask;
+                    vec3 armorMetalSpec = mix(sCI.rgb, vec3(1.0), 0.24) * pow(ndhS, 58.0) * clamp(rawNdlS * 1.6 + 0.15, 0.0, 1.0) * (0.24 + 0.72 * charMetalMask);
+                    vec3 clothSheenS = mix(sCI.rgb, diffuseColor.rgb * sCI.rgb * 1.35, 0.38) * (rimS * 0.34) * (0.30 + 0.60 * charFabricMask);
+                    vec3 rawCharSkillAdd = (charDiffBleed + skinSssBleed + armorMetalSpec + clothSheenS) * (attenCharS * sCI.w * mix(0.42, 1.05, clamp(uSkillNightFactor, 0.0, 1.0)) * clamp(cavityAO, 0.42, 1.04));
+                    outgoingLight += rawCharSkillAdd / (vec3(1.0) + rawCharSkillAdd * 0.95);
                     `
                         : isFoliage
                         ? `
@@ -3505,10 +3676,18 @@ export class OpenWorld3DEngine {
 
   loadModelTexture(url, isDataTex = false) {
     if (!this._modelTextureCache) this._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
+    const maxAniso = Math.min(16, Math.max(4, this.renderer?.capabilities?.getMaxAnisotropy?.() || 8));
     if (this._modelTextureCache.has(url)) {
       const existing = this._modelTextureCache.get(url);
-      if (isDataTex && existing && existing.colorSpace !== THREE.NoColorSpace) {
-        existing.colorSpace = THREE.NoColorSpace;
+      if (existing) {
+        if (isDataTex && existing.colorSpace !== THREE.NoColorSpace) {
+          existing.colorSpace = THREE.NoColorSpace;
+          existing.needsUpdate = true;
+        }
+        if ((existing.anisotropy || 1) < maxAniso) {
+          existing.anisotropy = maxAniso;
+          existing.needsUpdate = true;
+        }
       }
       return existing;
     }
@@ -3529,10 +3708,306 @@ export class OpenWorld3DEngine {
     tex.flipY = false; // GLTF 2.0 UV-Konvention
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = maxAniso;
     tex.colorSpace = isDataTex ? THREE.NoColorSpace : THREE.SRGBColorSpace;
     tex.userData = { ...(tex.userData || {}), isCached: true, isShared: true };
     this._modelTextureCache.set(url, tex);
     return tex;
+  }
+
+  _enhanceCharacterGeometry(geo, computeDelitAO = false) {
+    if (!geo) return;
+    const posAttr = geo.getAttribute('position');
+    const normAttr = geo.getAttribute('normal');
+    if (!posAttr || !normAttr) return;
+    const pos = posAttr.array;
+    const norm = normAttr.array;
+    const vCount = posAttr.count | 0;
+    if (vCount < 3) return;
+
+    const uvAttr = geo.getAttribute('uv');
+    const uv = uvAttr ? uvAttr.array : null;
+    const needTangents = !geo.getAttribute('tangent') && Boolean(uv && uv.length >= vCount * 2);
+    const needAO = Boolean(computeDelitAO) && !geo.getAttribute('aHeroOcclusion');
+    if (!needTangents && !needAO) return;
+
+    const idxAttr = geo.getIndex();
+    const idx = idxAttr ? idxAttr.array : null;
+    const triCount = idx ? (idx.length / 3) | 0 : (vCount / 3) | 0;
+
+    const edgeConcav = needAO ? new Float32Array(vCount) : null;
+    const edgeDegree = needAO ? new Uint16Array(vCount) : null;
+    const tan1 = needTangents ? new Float32Array(vCount * 3) : null;
+    const tan2 = needTangents ? new Float32Array(vCount * 3) : null;
+
+    for (let t = 0; t < triCount; t++) {
+      const i0 = idx ? idx[t * 3] : t * 3;
+      const i1 = idx ? idx[t * 3 + 1] : t * 3 + 1;
+      const i2 = idx ? idx[t * 3 + 2] : t * 3 + 2;
+
+      const p0x = pos[i0 * 3], p0y = pos[i0 * 3 + 1], p0z = pos[i0 * 3 + 2];
+      const p1x = pos[i1 * 3], p1y = pos[i1 * 3 + 1], p1z = pos[i1 * 3 + 2];
+      const p2x = pos[i2 * 3], p2y = pos[i2 * 3 + 1], p2z = pos[i2 * 3 + 2];
+
+      const e10x = p1x - p0x, e10y = p1y - p0y, e10z = p1z - p0z;
+      const e20x = p2x - p0x, e20y = p2y - p0y, e20z = p2z - p0z;
+
+      if (needAO) {
+        const e21x = p2x - p1x, e21y = p2y - p1y, e21z = p2z - p1z;
+        const l10 = Math.sqrt(e10x * e10x + e10y * e10y + e10z * e10z) + 1e-6;
+        const l20 = Math.sqrt(e20x * e20x + e20y * e20y + e20z * e20z) + 1e-6;
+        const l21 = Math.sqrt(e21x * e21x + e21y * e21y + e21z * e21z) + 1e-6;
+        const n0x = norm[i0 * 3], n0y = norm[i0 * 3 + 1], n0z = norm[i0 * 3 + 2];
+        const n1x = norm[i1 * 3], n1y = norm[i1 * 3 + 1], n1z = norm[i1 * 3 + 2];
+        const n2x = norm[i2 * 3], n2y = norm[i2 * 3 + 1], n2z = norm[i2 * 3 + 2];
+        edgeConcav[i0] += (e10x * n0x + e10y * n0y + e10z * n0z) / l10 + (e20x * n0x + e20y * n0y + e20z * n0z) / l20;
+        edgeConcav[i1] += (-e10x * n1x - e10y * n1y - e10z * n1z) / l10 + (e21x * n1x + e21y * n1y + e21z * n1z) / l21;
+        edgeConcav[i2] += (-e20x * n2x - e20y * n2y - e20z * n2z) / l20 + (-e21x * n2x - e21y * n2y - e21z * n2z) / l21;
+        edgeDegree[i0] += 2;
+        edgeDegree[i1] += 2;
+        edgeDegree[i2] += 2;
+      }
+
+      if (needTangents) {
+        const u10 = uv[i1 * 2] - uv[i0 * 2], v10 = uv[i1 * 2 + 1] - uv[i0 * 2 + 1];
+        const u20 = uv[i2 * 2] - uv[i0 * 2], v20 = uv[i2 * 2 + 1] - uv[i0 * 2 + 1];
+        const det = u10 * v20 - u20 * v10;
+        if (Math.abs(det) > 1e-10) {
+          const r = 1.0 / det;
+          const sx = (v20 * e10x - v10 * e20x) * r;
+          const sy = (v20 * e10y - v10 * e20y) * r;
+          const sz = (v20 * e10z - v10 * e20z) * r;
+          const tx = (u10 * e20x - u20 * e10x) * r;
+          const ty = (u10 * e20y - u20 * e10y) * r;
+          const tz = (u10 * e20z - u20 * e10z) * r;
+          tan1[i0 * 3] += sx; tan1[i0 * 3 + 1] += sy; tan1[i0 * 3 + 2] += sz;
+          tan1[i1 * 3] += sx; tan1[i1 * 3 + 1] += sy; tan1[i1 * 3 + 2] += sz;
+          tan1[i2 * 3] += sx; tan1[i2 * 3 + 1] += sy; tan1[i2 * 3 + 2] += sz;
+          tan2[i0 * 3] += tx; tan2[i0 * 3 + 1] += ty; tan2[i0 * 3 + 2] += tz;
+          tan2[i1 * 3] += tx; tan2[i1 * 3 + 1] += ty; tan2[i1 * 3 + 2] += tz;
+          tan2[i2 * 3] += tx; tan2[i2 * 3 + 1] += ty; tan2[i2 * 3 + 2] += tz;
+        }
+      }
+    }
+
+    if (needTangents) {
+      const tangents = new Float32Array(vCount * 4);
+      for (let i = 0; i < vCount; i++) {
+        const nx = norm[i * 3], ny = norm[i * 3 + 1], nz = norm[i * 3 + 2];
+        let tx = tan1[i * 3], ty = tan1[i * 3 + 1], tz = tan1[i * 3 + 2];
+        const ndott = nx * tx + ny * ty + nz * tz;
+        tx -= nx * ndott; ty -= ny * ndott; tz -= nz * ndott;
+        const tlen = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        if (tlen > 1e-6) {
+          tx /= tlen; ty /= tlen; tz /= tlen;
+        } else {
+          if (Math.abs(ny) < 0.9) { tx = -nz; ty = 0; tz = nx; }
+          else { tx = 1; ty = 0; tz = 0; }
+          const fl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1.0;
+          tx /= fl; ty /= fl; tz /= fl;
+        }
+        const cx = ny * tz - nz * ty, cy = nz * tx - nx * tz, cz = nx * ty - ny * tx;
+        const w = (cx * tan2[i * 3] + cy * tan2[i * 3 + 1] + cz * tan2[i * 3 + 2]) < 0.0 ? -1.0 : 1.0;
+        tangents[i * 4] = tx;
+        tangents[i * 4 + 1] = ty;
+        tangents[i * 4 + 2] = tz;
+        tangents[i * 4 + 3] = w;
+      }
+      geo.setAttribute('tangent', new THREE.BufferAttribute(tangents, 4));
+    }
+
+    if (!needAO) return;
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (let i = 0; i < vCount; i++) {
+      const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    const spanX = Math.max(1e-4, maxX - minX);
+    const spanY = Math.max(1e-4, maxY - minY);
+    const spanZ = Math.max(1e-4, maxZ - minZ);
+    const H = Math.max(spanX, spanY, spanZ);
+
+    const evalAmbientCubeAO = (cellSize, radiusCells, outOcc, cosBias) => {
+      const pad = cellSize * 1.5;
+      const ox = minX - pad, oy = minY - pad, oz = minZ - pad;
+      const invC = 1.0 / cellSize;
+      const gxMax = Math.max(4, Math.min(104, Math.ceil((spanX + pad * 2) * invC) + 2));
+      const gyMax = Math.max(4, Math.min(104, Math.ceil((spanY + pad * 2) * invC) + 2));
+      const gzMax = Math.max(4, Math.min(104, Math.ceil((spanZ + pad * 2) * invC) + 2));
+      const totalCells = gxMax * gyMax * gzMax;
+      const strideY = gxMax;
+      const strideZ = gxMax * gyMax;
+
+      const cellCnt = new Uint32Array(totalCells);
+      const cellPx = new Float32Array(totalCells);
+      const cellPy = new Float32Array(totalCells);
+      const cellPz = new Float32Array(totalCells);
+      const cellNx = new Float32Array(totalCells);
+      const cellNy = new Float32Array(totalCells);
+      const cellNz = new Float32Array(totalCells);
+
+      for (let i = 0; i < vCount; i++) {
+        const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+        const ix = Math.max(0, Math.min(gxMax - 1, ((x - ox) * invC) | 0));
+        const iy = Math.max(0, Math.min(gyMax - 1, ((y - oy) * invC) | 0));
+        const iz = Math.max(0, Math.min(gzMax - 1, ((z - oz) * invC) | 0));
+        const cIdx = ix + iy * strideY + iz * strideZ;
+        cellCnt[cIdx]++;
+        cellPx[cIdx] += x; cellPy[cIdx] += y; cellPz[cIdx] += z;
+        cellNx[cIdx] += norm[i * 3]; cellNy[cIdx] += norm[i * 3 + 1]; cellNz[cIdx] += norm[i * 3 + 2];
+      }
+
+      const occList = [];
+      let totalOccVerts = 0;
+      for (let c = 0; c < totalCells; c++) {
+        const cnt = cellCnt[c];
+        if (cnt > 0) {
+          const inv = 1.0 / cnt;
+          cellPx[c] *= inv; cellPy[c] *= inv; cellPz[c] *= inv;
+          const nl = Math.sqrt(cellNx[c] * cellNx[c] + cellNy[c] * cellNy[c] + cellNz[c] * cellNz[c]) || 1.0;
+          cellNx[c] /= nl; cellNy[c] /= nl; cellNz[c] /= nl;
+          occList.push(c);
+          totalOccVerts += cnt;
+        }
+      }
+      const invAvgCnt = occList.length > 0 ? occList.length / Math.max(1, totalOccVerts) : 1.0;
+      const cellWeight = new Float32Array(totalCells);
+      for (let k = 0; k < occList.length; k++) {
+        const c = occList[k];
+        cellWeight[c] = Math.min(1.65, Math.sqrt(cellCnt[c] * invAvgCnt));
+      }
+
+      const cubeOcc = new Float32Array(totalCells * 6);
+      const minDist = cellSize * 0.25;
+      const maxDist2 = (cellSize * (radiusCells + 0.35)) * (cellSize * (radiusCells + 0.35));
+      const softEps2 = (cellSize * 0.68) * (cellSize * 0.68);
+      const cArea = cellSize * cellSize;
+
+      for (let k = 0; k < occList.length; k++) {
+        const c0 = occList[k];
+        const iz0 = (c0 / strideZ) | 0;
+        const rem = c0 - iz0 * strideZ;
+        const iy0 = (rem / strideY) | 0;
+        const ix0 = rem - iy0 * strideY;
+
+        const px = cellPx[c0], py = cellPy[c0], pz = cellPz[c0];
+        const n0x = cellNx[c0], n0y = cellNy[c0], n0z = cellNz[c0];
+
+        const xLo = ix0 > radiusCells ? ix0 - radiusCells : 0;
+        const xHi = ix0 + radiusCells < gxMax ? ix0 + radiusCells : gxMax - 1;
+        const yLo = iy0 > radiusCells ? iy0 - radiusCells : 0;
+        const yHi = iy0 + radiusCells < gyMax ? iy0 + radiusCells : gyMax - 1;
+        const zLo = iz0 > radiusCells ? iz0 - radiusCells : 0;
+        const zHi = iz0 + radiusCells < gzMax ? iz0 + radiusCells : gzMax - 1;
+
+        let oXP = 0, oXN = 0, oYP = 0, oYN = 0, oZP = 0, oZN = 0;
+        for (let iz = zLo; iz <= zHi; iz++) {
+          const zOff = iz * strideZ;
+          for (let iy = yLo; iy <= yHi; iy++) {
+            const yzOff = zOff + iy * strideY;
+            for (let ix = xLo; ix <= xHi; ix++) {
+              const c = yzOff + ix;
+              if (cellCnt[c] === 0 || c === c0) continue;
+              const dx = cellPx[c] - px, dy = cellPy[c] - py, dz = cellPz[c] - pz;
+              const d2 = dx * dx + dy * dy + dz * dz;
+              if (d2 > maxDist2) continue;
+              const d = Math.sqrt(d2);
+              if (d < minDist) continue;
+              const invD = 1.0 / d;
+              const dirX = dx * invD, dirY = dy * invD, dirZ = dz * invD;
+              const occFacing = -(dirX * cellNx[c] + dirY * cellNy[c] + dirZ * cellNz[c]);
+              const nDot = n0x * cellNx[c] + n0y * cellNy[c] + n0z * cellNz[c];
+              if (nDot < -0.50 && occFacing < -0.15) continue;
+              const w = (cArea / (d2 + softEps2)) * cellWeight[c] * (0.78 + 0.50 * Math.max(0.0, 1.0 - nDot));
+              if (dirX > cosBias) oXP += (dirX - cosBias) * w;
+              else if (-dirX > cosBias) oXN += (-dirX - cosBias) * w;
+              if (dirY > cosBias) oYP += (dirY - cosBias) * w;
+              else if (-dirY > cosBias) oYN += (-dirY - cosBias) * w;
+              if (dirZ > cosBias) oZP += (dirZ - cosBias) * w;
+              else if (-dirZ > cosBias) oZN += (-dirZ - cosBias) * w;
+            }
+          }
+        }
+        const b6 = c0 * 6;
+        cubeOcc[b6] = oXP; cubeOcc[b6 + 1] = oXN;
+        cubeOcc[b6 + 2] = oYP; cubeOcc[b6 + 3] = oYN;
+        cubeOcc[b6 + 4] = oZP; cubeOcc[b6 + 5] = oZN;
+      }
+
+      for (let i = 0; i < vCount; i++) {
+        const fx = (pos[i * 3] - ox) * invC - 0.5;
+        const fy = (pos[i * 3 + 1] - oy) * invC - 0.5;
+        const fz = (pos[i * 3 + 2] - oz) * invC - 0.5;
+        const ix0 = Math.max(0, Math.min(gxMax - 2, fx | 0));
+        const iy0 = Math.max(0, Math.min(gyMax - 2, fy | 0));
+        const iz0 = Math.max(0, Math.min(gzMax - 2, fz | 0));
+        const tx = Math.max(0, Math.min(1, fx - ix0));
+        const ty = Math.max(0, Math.min(1, fy - iy0));
+        const tz = Math.max(0, Math.min(1, fz - iz0));
+
+        const nx = norm[i * 3], ny = norm[i * 3 + 1], nz = norm[i * 3 + 2];
+        const wx = nx * nx, wy = ny * ny, wz = nz * nz;
+        const sx = nx >= 0 ? 0 : 1, sy = ny >= 0 ? 2 : 3, sz = nz >= 0 ? 4 : 5;
+
+        let sumVal = 0.0, sumW = 0.0;
+        for (let dz = 0; dz <= 1; dz++) {
+          const wzT = dz === 0 ? 1 - tz : tz;
+          const zOff = (iz0 + dz) * strideZ;
+          for (let dy = 0; dy <= 1; dy++) {
+            const wyzT = wzT * (dy === 0 ? 1 - ty : ty);
+            const yzOff = zOff + (iy0 + dy) * strideY;
+            for (let dx = 0; dx <= 1; dx++) {
+              const c = yzOff + ix0 + dx;
+              if (cellCnt[c] === 0) continue;
+              const wt = wyzT * (dx === 0 ? 1 - tx : tx) + 0.02;
+              const b6 = c * 6;
+              const v = wx * cubeOcc[b6 + sx] + wy * cubeOcc[b6 + sy] + wz * cubeOcc[b6 + sz];
+              sumVal += v * wt;
+              sumW += wt;
+            }
+          }
+        }
+        outOcc[i] += sumW > 0 ? sumVal / sumW : 0.0;
+      }
+    };
+
+    const fineOcc = new Float32Array(vCount);
+    const macroOcc = new Float32Array(vCount);
+    evalAmbientCubeAO(H / 80.0, 2, fineOcc, 0.08);
+    evalAmbientCubeAO(H / 28.0, 2, macroOcc, 0.10);
+
+    const smoothConcav = new Float32Array(vCount);
+    for (let i = 0; i < vCount; i++) {
+      smoothConcav[i] = edgeConcav[i] / (edgeDegree[i] || 1);
+    }
+    const smoothAcc = new Float32Array(vCount);
+    for (let t = 0; t < triCount; t++) {
+      const i0 = idx ? idx[t * 3] : t * 3;
+      const i1 = idx ? idx[t * 3 + 1] : t * 3 + 1;
+      const i2 = idx ? idx[t * 3 + 2] : t * 3 + 2;
+      smoothAcc[i0] += smoothConcav[i1] + smoothConcav[i2];
+      smoothAcc[i1] += smoothConcav[i0] + smoothConcav[i2];
+      smoothAcc[i2] += smoothConcav[i0] + smoothConcav[i1];
+    }
+
+    // aHeroOcclusion = 1.0 - ao (0.0 = unverschattet / sicherer WebGL-Default)
+    const heroOcclusion = new Float32Array(vCount);
+    for (let i = 0; i < vCount; i++) {
+      const deg = edgeDegree[i] || 1;
+      const meanConcav = 0.55 * smoothConcav[i] + 0.45 * (smoothAcc[i] / deg);
+      const microOcc = Math.max(0.0, meanConcav * 2.35);
+      const totalOcc = microOcc * 0.44 + fineOcc[i] * 0.30 + macroOcc[i] * 0.24;
+      const ridgeLift = meanConcav < -0.018
+        ? Math.min(0.035, (-meanConcav - 0.018) * 0.24) * Math.max(0.0, 1.0 - totalOcc * 3.5)
+        : 0.0;
+      const ao = Math.max(0.24, Math.min(1.035, Math.exp(-totalOcc * 0.46) + ridgeLift));
+      heroOcclusion[i] = 1.0 - ao;
+    }
+    geo.setAttribute('aHeroOcclusion', new THREE.BufferAttribute(heroOcclusion, 1));
   }
 
   loadGLBTemplate(url) {
@@ -3667,6 +4142,9 @@ export class OpenWorld3DEngine {
             if (attrs.NORMAL !== undefined) {
               geo.setAttribute('normal', new THREE.BufferAttribute(readAccessor(attrs.NORMAL), 3));
             }
+            if (attrs.TANGENT !== undefined) {
+              geo.setAttribute('tangent', new THREE.BufferAttribute(readAccessor(attrs.TANGENT), 4));
+            }
             if (attrs.TEXCOORD_0 !== undefined) {
               geo.setAttribute('uv', new THREE.BufferAttribute(readAccessor(attrs.TEXCOORD_0), 2));
             }
@@ -3751,6 +4229,12 @@ export class OpenWorld3DEngine {
             mergedGeo.setIndex(new THREE.BufferAttribute(mergedIdx, 1));
             geometries.length = 0;
             geometries.push(mergedGeo);
+          }
+        }
+        const isDelitHeroGlb = /\/models\/heroes\//i.test(url);
+        if (!isMultiShardMonolith) {
+          for (let gIdx = 0; gIdx < geometries.length; gIdx++) {
+            this._enhanceCharacterGeometry?.(geometries[gIdx], isDelitHeroGlb);
           }
         }
         const isYUp =
@@ -4712,12 +5196,14 @@ export class OpenWorld3DEngine {
     const opts = matOptions || {};
     const weatherOpts = {
       isCreature: true,
+      isDelitHero: Boolean(opts.isDelitHero),
       snowStrength: opts.snowStrength ?? (isNpc ? 0.46 : 0.78),
       wetStrength: opts.wetStrength ?? 0.82,
     };
     if (!this._sharedGlbMaterialCache) this._sharedGlbMaterialCache = new Map();
     const getOrCreateSharedMat = (tUrl) => {
-      const mKey = `${tUrl || 'notex'}|${opts.normalMap || ''}|${opts.color || 0xffffff}|${opts.roughness ?? 0.72}|${opts.metalness ?? 0.08}|${opts.alphaTest || 0}|${opts.emissive || 0}|${opts.emissiveIntensity ?? 0}|${weatherOpts.snowStrength}|${weatherOpts.wetStrength}`;
+      const nScaleVal = opts.normalScale ?? 0.85;
+      const mKey = `${tUrl || 'notex'}|${opts.normalMap || ''}|${nScaleVal}|${weatherOpts.isDelitHero ? 1 : 0}|${opts.color?.getHexString ? opts.color.getHexString() : (opts.color || 0xffffff)}|${opts.roughness ?? 0.72}|${opts.metalness ?? 0.08}|${opts.alphaTest || 0}|${opts.emissive?.getHexString ? opts.emissive.getHexString() : (opts.emissive || 0)}|${opts.emissiveIntensity ?? 0}|${weatherOpts.snowStrength}|${weatherOpts.wetStrength}`;
       let cachedMat = this._sharedGlbMaterialCache.get(mKey);
       if (cachedMat) return cachedMat;
       const tex = tUrl ? this.loadModelTexture(tUrl) : null;
@@ -4728,11 +5214,11 @@ export class OpenWorld3DEngine {
         side: THREE.DoubleSide,
       };
       if (opts.normalMap) {
-        const nTex = this.loadModelTexture(opts.normalMap);
+        const nTex = this.loadModelTexture(opts.normalMap, true);
         if (nTex) {
           nTex.colorSpace = THREE.NoColorSpace;
           matCfg.normalMap = nTex;
-          matCfg.normalScale = new THREE.Vector2(0.85, 0.85);
+          matCfg.normalScale = new THREE.Vector2(nScaleVal, nScaleVal);
         }
       }
       if (tex) {
@@ -4813,14 +5299,14 @@ export class OpenWorld3DEngine {
         if (skeleton && geo.attributes.skinIndex) {
           mesh = new THREE.SkinnedMesh(geo, mat);
           mesh.castShadow = true;
-          mesh.receiveShadow = true;
+          mesh.receiveShadow = !opts.noSelfShadow;
           mesh.frustumCulled = false;
           rigGroup.add(mesh);
           mesh.bind(skeleton, identityMat);
         } else {
           mesh = new THREE.Mesh(geo, mat);
           mesh.castShadow = true;
-          mesh.receiveShadow = true;
+          mesh.receiveShadow = !opts.noSelfShadow;
           rigGroup.add(mesh);
         }
         createdMeshes.push(mesh);
@@ -4973,6 +5459,7 @@ export class OpenWorld3DEngine {
       if (isNpc) {
         if (!this.npcActors) this.npcActors = [];
         this.npcActors.push(actorCtrl);
+        this._attachSpecialNpcEffects?.(parentGroup, rigGroup, bones, tpl);
       }
     };
 
@@ -4994,6 +5481,466 @@ export class OpenWorld3DEngine {
         }
         console.warn(`GLB-Ladefehler für ${glbUrl}:`, err);
       });
+  }
+
+  _attachSpecialNpcEffects(parentGroup, rigGroup, bones, tpl) {
+    if (!parentGroup || !bones || !tpl) return;
+    const npcId = String(parentGroup.userData?.npcId || parentGroup.userData?.baseNpcId || '');
+    const isSmith = npcId.includes('blacksmith') || npcId.includes('smith') || tpl.nodes?.some((n) => n?.name === 'HP_left_hand');
+
+    if (isSmith) {
+      // 1. Suche den linken Handknochen HP_left_hand (oder b_LeftWeapon / Bip01-L-Hand)
+      let handBone = null;
+      for (let i = 0; i < tpl.nodes.length; i++) {
+        const nm = tpl.nodes[i]?.name || '';
+        if (nm === 'HP_left_hand' || nm === 'b_LeftWeapon') {
+          handBone = bones[i];
+          break;
+        }
+      }
+      if (!handBone) {
+        for (let i = 0; i < tpl.nodes.length; i++) {
+          const nm = tpl.nodes[i]?.name || '';
+          if (nm.includes('L-Hand')) {
+            handBone = bones[i];
+            break;
+          }
+        }
+      }
+
+      if (handBone) {
+        // Exakter Offset aus Metin2 kowalefekt.mse: [17.36, -2.96, 74.02]
+        const forgeTongsGroup = new THREE.Group();
+        forgeTongsGroup.position.set(17.36, -2.96, 74.02);
+        handBone.add(forgeTongsGroup);
+
+        const haloTex = this.getLanternHaloTexture();
+
+        // Weißglühender Kern der Schmiedezange
+        const whiteCoreMat = new THREE.SpriteMaterial({
+          map: haloTex,
+          color: 0xfff6cf,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          transparent: true,
+          opacity: 0.95,
+        });
+        const whiteCoreSprite = new THREE.Sprite(whiteCoreMat);
+        whiteCoreSprite.scale.set(22.0, 22.0, 1.0);
+        forgeTongsGroup.add(whiteCoreSprite);
+
+        // Kräftige feurig-orange Hitzeaura
+        const orangeCoronaMat = new THREE.SpriteMaterial({
+          map: haloTex,
+          color: 0xff6600,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          transparent: true,
+          opacity: 0.88,
+        });
+        const orangeCoronaSprite = new THREE.Sprite(orangeCoronaMat);
+        orangeCoronaSprite.scale.set(54.0, 54.0, 1.0);
+        forgeTongsGroup.add(orangeCoronaSprite);
+
+        // Äußerer rot-goldener Flammenschein
+        const heatAuraMat = new THREE.SpriteMaterial({
+          map: haloTex,
+          color: 0xff2a00,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          transparent: true,
+          opacity: 0.55,
+        });
+        const heatAuraSprite = new THREE.Sprite(heatAuraMat);
+        heatAuraSprite.scale.set(88.0, 88.0, 1.0);
+        forgeTongsGroup.add(heatAuraSprite);
+
+        // 16 Aufsteigende Funken & Glutpartikel (Metin2 kowalefekt.mse)
+        const sparks = [];
+        const sparkMat = new THREE.SpriteMaterial({
+          map: haloTex,
+          color: 0xffca28,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          transparent: true,
+          opacity: 0.95,
+        });
+        for (let s = 0; s < 16; s++) {
+          const sp = new THREE.Sprite(sparkMat.clone());
+          const baseSz = 4.5 + Math.random() * 5.5;
+          sp.scale.set(baseSz, baseSz, 1.0);
+          sp.position.set(
+            (Math.random() - 0.5) * 8.0,
+            (Math.random() - 0.5) * 8.0,
+            (Math.random() - 0.5) * 8.0
+          );
+          forgeTongsGroup.add(sp);
+          sparks.push({
+            sprite: sp,
+            baseSz,
+            vx: (Math.random() - 0.5) * 18.0,
+            vy: (Math.random() - 0.5) * 18.0,
+            vz: 25.0 + Math.random() * 45.0, // Z ist im Granny-Bone-Raum nach oben gerichtet
+            life: Math.random() * 0.9,
+            maxLife: 0.65 + Math.random() * 0.55,
+          });
+        }
+
+        // Dynamisches Echtzeit-PointLight & Boden-Lichtschein an Torvalds Zange:
+        const forgeLight = new THREE.PointLight(0xff6e14, 2.75, 9.2, 2.0);
+        forgeLight.position.set(-0.62, 1.15, 0.45);
+        parentGroup.add(forgeLight);
+
+        // Warmer orange-goldener Bodenkegel auf dem Kopfsteinpflaster
+        const poolMat = new THREE.MeshBasicMaterial({
+          map: haloTex,
+          color: 0xff5508,
+          transparent: true,
+          opacity: 0.68,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const poolMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 3.8), poolMat);
+        poolMesh.rotation.x = -Math.PI / 2;
+        poolMesh.position.set(-0.62, 0.05, 0.45);
+        parentGroup.add(poolMesh);
+
+        // Registriere für Frame-Loop Update & Flackern
+        if (!this._blacksmithForgeEffects) this._blacksmithForgeEffects = [];
+        this._blacksmithForgeEffects.push({
+          parentGroup,
+          forgeTongsGroup,
+          whiteCoreSprite,
+          orangeCoronaSprite,
+          heatAuraSprite,
+          forgeLight,
+          poolMesh,
+          sparks,
+          phase: Math.random() * 10.0,
+        });
+      }
+    }
+  }
+
+  _updateSpecialNpcEffects(dt, elapsed) {
+    if (!this._blacksmithForgeEffects || this._blacksmithForgeEffects.length === 0) return;
+    const px = this.localPlayerPos ? this.localPlayerPos.x : 0;
+    const pz = this.localPlayerPos ? this.localPlayerPos.z : 0;
+    const maxDistSq = 95.0 * 95.0;
+
+    for (let i = 0; i < this._blacksmithForgeEffects.length; i++) {
+      const fx = this._blacksmithForgeEffects[i];
+      const pg = fx.parentGroup;
+      if (!pg || !pg.parent) continue;
+
+      const dx = pg.position.x - px;
+      const dz = pg.position.z - pz;
+      if (dx * dx + dz * dz > maxDistSq) {
+        if (fx.forgeLight) fx.forgeLight.visible = false;
+        if (fx.poolMesh) fx.poolMesh.visible = false;
+        continue;
+      }
+      if (fx.forgeLight) fx.forgeLight.visible = true;
+      if (fx.poolMesh) fx.poolMesh.visible = true;
+
+      const ph = elapsed * 8.5 + fx.phase;
+      const flicker = 0.88 + Math.sin(ph) * 0.08 + Math.sin(ph * 1.7) * 0.04;
+
+      if (fx.forgeLight) {
+        fx.forgeLight.intensity = 2.75 * flicker;
+      }
+      if (fx.poolMesh) {
+        fx.poolMesh.material.opacity = 0.68 * flicker;
+        const s = 1.0 + Math.sin(ph * 0.8) * 0.06;
+        fx.poolMesh.scale.set(s, s, 1.0);
+      }
+      if (fx.whiteCoreSprite) {
+        const cs = 22.0 * (0.92 + Math.sin(ph * 1.3) * 0.08);
+        fx.whiteCoreSprite.scale.set(cs, cs, 1.0);
+      }
+      if (fx.orangeCoronaSprite) {
+        const os = 54.0 * (0.90 + Math.sin(ph * 1.1) * 0.10);
+        fx.orangeCoronaSprite.scale.set(os, os, 1.0);
+      }
+
+      // Funken bewegen & recyceln
+      for (let s = 0; s < fx.sparks.length; s++) {
+        const sp = fx.sparks[s];
+        sp.life += dt;
+        if (sp.life >= sp.maxLife) {
+          sp.life = 0;
+          sp.sprite.position.set(
+            (Math.random() - 0.5) * 6.0,
+            (Math.random() - 0.5) * 6.0,
+            (Math.random() - 0.5) * 6.0
+          );
+          sp.vx = (Math.random() - 0.5) * 16.0;
+          sp.vy = (Math.random() - 0.5) * 16.0;
+          sp.vz = 24.0 + Math.random() * 42.0;
+          sp.sprite.material.opacity = 0.95;
+        } else {
+          const t = sp.life / sp.maxLife;
+          sp.sprite.position.x += sp.vx * dt;
+          sp.sprite.position.y += sp.vy * dt;
+          sp.sprite.position.z += sp.vz * dt;
+          sp.sprite.material.opacity = Math.max(0, 1.0 - t * t) * 0.95;
+          const sz = sp.baseSz * (1.0 - t * 0.45);
+          sp.sprite.scale.set(sz, sz, 1.0);
+        }
+      }
+    }
+  }
+
+  _createBlacksmithProps(parentGroup) {
+    if (!parentGroup) return;
+    const forgeGroup = new THREE.Group();
+
+    // 1. Eichenholz-Ambossklotz
+    const woodMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.88 })
+    );
+    const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.44, 0.65, 12), woodMat);
+    stump.position.set(-1.18, 0.325, 0.15);
+    stump.castShadow = true;
+    stump.receiveShadow = true;
+    forgeGroup.add(stump);
+
+    // 2. Schmiede-Amboss (Dunkler Werkzeugstahl mit Horn und Bahn)
+    const anvilMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x222428, roughness: 0.38, metalness: 0.85 })
+    );
+    const anvilBody = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.26, 0.26), anvilMat);
+    anvilBody.position.set(-1.18, 0.78, 0.15);
+    anvilBody.castShadow = true;
+
+    const anvilHorn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.34, 10), anvilMat);
+    anvilHorn.rotation.z = Math.PI / 2;
+    anvilHorn.position.set(-1.18 - 0.42, 0.82, 0.15);
+    anvilHorn.castShadow = true;
+
+    const anvilBase = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.14, 0.32), anvilMat);
+    anvilBase.position.set(-1.18, 0.68, 0.15);
+    anvilBase.castShadow = true;
+    forgeGroup.add(anvilBody, anvilHorn, anvilBase);
+
+    // 3. Gemauerte Stein-Esse / Holzkohle-Feuerstelle mit glühenden Kohlen
+    const stoneMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.90 })
+    );
+    const hearthRim = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.45, 0.92), stoneMat);
+    hearthRim.position.set(1.15, 0.225, -0.45);
+    hearthRim.castShadow = true;
+
+    // Glühende Kohlen (Emissive)
+    const coalMat = new THREE.MeshStandardMaterial({
+      color: 0x1f1108,
+      emissive: new THREE.Color(0xff4400),
+      emissiveIntensity: 0.85,
+      roughness: 0.92,
+    });
+    const coals = new THREE.Mesh(new THREE.DodecahedronGeometry(0.38, 1), coalMat);
+    coals.position.set(1.15, 0.44, -0.45);
+    coals.scale.set(1.0, 0.45, 1.0);
+    forgeGroup.add(hearthRim, coals);
+
+    // 4. Wasserbottich zum Abschrecken von Klingen
+    const tubMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x422a1b, roughness: 0.85 })
+    );
+    const tub = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.26, 0.65, 10), tubMat);
+    tub.position.set(-1.22, 0.325, -0.68);
+    tub.castShadow = true;
+
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x1e3a5f,
+      roughness: 0.12,
+      metalness: 0.1,
+    });
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.05, 10), waterMat);
+    water.position.set(-1.22, 0.60, -0.68);
+    forgeGroup.add(tub, water);
+
+    parentGroup.add(forgeGroup);
+  }
+
+  createFishermanHut(parentGroup, x, z, rotY = 0, npcCfg = {}) {
+    const hutGroup = new THREE.Group();
+    const hy = this.getGroundTerrainHeight(x, z, this.currentMapId);
+    hutGroup.position.set(x, hy, z);
+    hutGroup.rotation.y = rotY;
+
+    // 1. Wetterfeste Materialien
+    const timberMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.85, metalness: 0.05 })
+    );
+    const darkWoodMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x331e10, roughness: 0.90 })
+    );
+    const roofMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x6e4726, roughness: 0.88 })
+    );
+    const crateMat = this.injectObjectWeatherShader(
+      new THREE.MeshStandardMaterial({ color: 0x784722, roughness: 0.82 })
+    );
+
+    // 2. Holzsteg / Holzplattform auf Pfählen über dem Wasser/Ufer
+    const deckW = 6.2;
+    const deckD = 5.6;
+    const deckH = 0.32;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(deckW, deckH, deckD), timberMat);
+    deck.position.set(0, 0.22, 0);
+    deck.receiveShadow = true;
+    deck.castShadow = true;
+    hutGroup.add(deck);
+
+    // Stützpfähle im Boden/Wasser
+    for (const px of [-deckW * 0.45, 0, deckW * 0.45]) {
+      for (const pz of [-deckD * 0.45, 0, deckD * 0.45]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 2.2, 8), darkWoodMat);
+        post.position.set(px, -0.85, pz);
+        post.castShadow = true;
+        hutGroup.add(post);
+      }
+    }
+
+    // Steg-Geländer an den Seiten
+    for (const side of [-1, 1]) {
+      const railPost1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.05, 6), darkWoodMat);
+      railPost1.position.set(side * (deckW * 0.48), 0.72, deckD * 0.35);
+      const railPost2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.05, 6), darkWoodMat);
+      railPost2.position.set(side * (deckW * 0.48), 0.72, -deckD * 0.15);
+      const railBeam = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, deckD * 0.52), darkWoodMat);
+      railBeam.position.set(side * (deckW * 0.48), 1.15, deckD * 0.10);
+      hutGroup.add(railPost1, railPost2, railBeam);
+    }
+
+    // 3. Fischerhütte (hinterer Teil der Plattform)
+    const hutW = 3.6;
+    const hutD = 2.8;
+    const hutH = 2.4;
+    const hutBody = new THREE.Mesh(new THREE.BoxGeometry(hutW, hutH, hutD), timberMat);
+    hutBody.position.set(-0.6, 0.22 + hutH * 0.5, -deckD * 0.22);
+    hutBody.castShadow = true;
+    hutBody.receiveShadow = true;
+    hutGroup.add(hutBody);
+
+    // Satteldach
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.55, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(-0.6, 0.22 + hutH + 0.72, -deckD * 0.22);
+    roof.scale.set(1.22, 1.0, 0.98);
+    roof.castShadow = true;
+    hutGroup.add(roof);
+
+    // Offenes Vordach über dem Dock-Tresen
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(hutW + 0.4, 0.12, 1.4), darkWoodMat);
+    canopy.position.set(-0.6, 0.22 + hutH - 0.15, -deckD * 0.22 + hutD * 0.5 + 0.65);
+    canopy.rotation.x = 0.15;
+    canopy.castShadow = true;
+    hutGroup.add(canopy);
+
+    // 4. Fischer-Atmosphäre & Deko-Requisiten:
+    // Trocknungsgestell mit Fischernetzen
+    const netFrame1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.85, 6), darkWoodMat);
+    netFrame1.position.set(deckW * 0.38, 1.1, -1.2);
+    const netFrame2 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.85, 6), darkWoodMat);
+    netFrame2.position.set(deckW * 0.38, 1.1, 0.8);
+    const netBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.05, 6), darkWoodMat);
+    netBeam.rotation.x = Math.PI / 2;
+    netBeam.position.set(deckW * 0.38, 1.95, -0.2);
+    const netCloth = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.05, 1.4),
+      new THREE.MeshStandardMaterial({ color: 0x857564, roughness: 0.95, transparent: true, opacity: 0.75, side: THREE.DoubleSide })
+    );
+    netCloth.rotation.y = Math.PI / 2;
+    netCloth.position.set(deckW * 0.38, 1.25, -0.2);
+    hutGroup.add(netFrame1, netFrame2, netBeam, netCloth);
+
+    // Fischfässer & Kisten auf dem Steg
+    for (let b = 0; b < 2; b++) {
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.72, 8), darkWoodMat);
+      barrel.position.set(-deckW * 0.36 + b * 0.52, 0.58, deckD * 0.28);
+      barrel.castShadow = true;
+      hutGroup.add(barrel);
+    }
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.55, 0.65), crateMat);
+    crate.position.set(deckW * 0.28, 0.50, deckD * 0.22);
+    crate.castShadow = true;
+    hutGroup.add(crate);
+
+    // Warme Fischer-Laterne
+    this.addNightLanternLightEffect(hutGroup, -0.6 + hutW * 0.45, 0.22 + hutH - 0.25, -deckD * 0.22 + hutD * 0.5 + 0.95, {
+      color: 0xffa726,
+      haloScale: 2.65,
+      baseOpacity: 0.85,
+      poolRadius: 4.2,
+      poolOpacity: 0.55,
+      groundY: 0.22,
+      isPointLightCandidate: true,
+      minDayFactor: 0.65,
+    });
+
+    // 5. Fischer-NPC direkt auf dem Bootssteg
+    if (npcCfg && npcCfg.id) {
+      const fNpcContainer = new THREE.Group();
+      fNpcContainer.position.set(1.4, 0.22, 1.35); // Vorne am Steg
+      fNpcContainer.rotation.y = Math.PI * 0.15;
+      fNpcContainer.userData.npcId = npcCfg.id;
+      fNpcContainer.userData.baseNpcId = npcCfg.id;
+      fNpcContainer.userData.windowId = npcCfg.windowId || 'generalstore';
+      fNpcContainer.userData.npcName = npcCfg.name;
+
+      const fallbackRig = this.createCharacterRig({
+        classId: 'warrior',
+        customColors: { armorColor: 0x1e3a8a, accentColor: 0x38bdf8 },
+        weaponVisual: 'staff',
+        weaponPlus: 0,
+        noMountAndPet: true,
+        noContactShadow: true,
+        disableGlbHero: true,
+      });
+      fNpcContainer.add(fallbackRig.root);
+
+      this.attachGLBModelToGroup(
+        fNpcContainer,
+        '/assets/models/npcs/sailor.glb',
+        ['/assets/models/npcs/sailor.png'],
+        2.15,
+        fallbackRig.root,
+        true
+      );
+
+      // Angelrute in der Hand
+      const rodGroup = new THREE.Group();
+      rodGroup.position.set(0.35, 1.15, 0.35);
+      rodGroup.rotation.set(-0.35, 0.2, -0.4);
+      const rodPole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, 3.4, 6), darkWoodMat);
+      rodPole.position.y = 1.6;
+      rodGroup.add(rodPole);
+      fNpcContainer.add(rodGroup);
+
+      const hitBox = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.4, 1.4, 3.0, 12),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false })
+      );
+      hitBox.position.y = 1.5;
+      hitBox.userData = { interactType: 'npc', npcId: npcCfg.id, windowId: npcCfg.windowId || 'generalstore', name: npcCfg.name };
+      fNpcContainer.add(hitBox);
+      this.npcInteractiveMeshes.push(hitBox);
+
+      const label = this.createTextSprite(npcCfg.name, '#fde047', 0.42);
+      label.position.set(0, 2.95, 0);
+      fNpcContainer.add(label);
+
+      this.npcContainersById.set(npcCfg.id, fNpcContainer);
+      hutGroup.add(fNpcContainer);
+    }
+
+    if (this._worldObstacleCircles) {
+      this._worldObstacleCircles.push([x - 0.6, z - deckD * 0.22, 2.4]);
+    }
+    parentGroup.add(hutGroup);
+    return hutGroup;
   }
 
   // ==========================================================================
@@ -6122,6 +7069,7 @@ export class OpenWorld3DEngine {
 
     this.container.innerHTML = '';
     this.container.appendChild(this.renderer.domElement);
+    this._attachRendererContextHandlers();
 
     // Atmosphärisches Hemisphärenlicht
     this.hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x365314, 1.12);
@@ -16762,15 +17710,29 @@ export class OpenWorld3DEngine {
         {
           id: 'npc_biologist',
           windowId: 'character',
-          name: '🔬 Äther-Biologe Aurelius (Forschung)',
+          name: '🔬 Biologe Chaegirab (Forschung & Elixiere)',
           x: cx - 22.0 * nMult,
           z: cz + 46.0 * nMult,
           armorColor: 0x78350f,
           accentColor: 0xfde047,
           weaponVisual: 'bell',
-          glbModel: 'plechi_old_alchemist',
-          glbTextures: ['alchemist_body.png', 'alchemist_deco.png'],
+          glbModel: 'chagirap',
+          glbTextures: ['chagirap.png', 'chagirap_01.png'],
           targetHeight: 2.14,
+          canWalk: false,
+        },
+        {
+          id: 'npc_uriel',
+          windowId: 'character',
+          name: '📜 Gelehrter Uriel (Alte Schriften & Reichs-Chroniken)',
+          x: cx - 14.0 * nMult,
+          z: cz - 26.0 * nMult,
+          armorColor: 0x4c1d95,
+          accentColor: 0xfde047,
+          weaponVisual: 'staff',
+          glbModel: 'bookworm',
+          glbTextures: ['bookworm.png'],
+          targetHeight: 2.12,
           canWalk: false,
         },
         {
@@ -16804,17 +17766,125 @@ export class OpenWorld3DEngine {
         {
           id: 'npc_stablemaster',
           windowId: 'mount',
-          name: '🐎 Stallbursche Konrad (Stall & 5 Pferde-Varianten)',
+          name: '🐎 Stallbursche Konrad (Reittiere & Gestüt)',
           x: stablemasterPos.x,
           z: stablemasterPos.z,
           armorColor: 0x78350f,
           accentColor: 0xf59e0b,
-          weaponVisual: 'staff',
-          glbModel: 'plechi_tribe_npc1',
-          glbTextures: ['tribe_npc_body.png', 'tribe_npc_staff.png'],
-          targetHeight: 2.18,
+          weaponVisual: 'sword',
+          glbModel: 'plechi_horse_guard',
+          glbTextures: [
+            'horse_guard_tex00.png',
+            'horse_guard_tex01.png',
+            'horse_guard_tex02.png',
+            'horse_guard_tex03.png',
+            'horse_guard_tex04.png',
+            'horse_guard_tex05.png',
+            'horse_guard_tex06.png',
+          ],
+          targetHeight: 3.42,
           canWalk: false,
         },
+        ...(town.isHarborCity
+          ? [
+              {
+                id: 'npc_bakra_merchant',
+                windowId: 'market',
+                name: '🪙 Großkaufmann Al-Rashid (Orient-Basar & Seidenstraße)',
+                x: cx - 18.0,
+                z: cz + 18.0,
+                armorColor: 0xb45309,
+                accentColor: 0xfacc15,
+                weaponVisual: 'bell',
+                glbModel: 'plechi_merchant_npc1',
+                glbTextures: ['merchant_tex00.png', 'merchant_tex01.png', 'merchant_tex02.png'],
+                targetHeight: 2.20,
+                canWalk: false,
+              },
+              {
+                id: 'npc_bakra_dancer',
+                windowId: 'character',
+                name: '💃 Hafentänzerin Leila (Bakra-Oase)',
+                x: cx + 14.0,
+                z: cz + 34.0,
+                armorColor: 0xdb2777,
+                accentColor: 0xf472b6,
+                weaponVisual: 'bell',
+                glbModel: 'plechi_lady_npc10',
+                glbTextures: ['lady10_tex00.png', 'lady10_tex01.png'],
+                targetHeight: 2.10,
+                canWalk: true,
+                walkSpeed: 1.35,
+                waypoints: [
+                  { x: cx + 14.0, z: cz + 34.0, pause: 2.5 },
+                  { x: cx + 24.0, z: cz + 18.0, pause: 2.8 },
+                  { x: cx + 6.0, z: cz + 12.0, pause: 2.5 },
+                ],
+              },
+              {
+                id: 'npc_legend_smith',
+                windowId: 'blacksmith',
+                name: '✨ Legenden-Schmied Haedrig (Meister-Veredelung)',
+                x: cx - 44.0,
+                z: cz - 22.0,
+                armorColor: 0x451a03,
+                accentColor: 0xfbbf24,
+                weaponVisual: 'hammer',
+                glbModel: 'pewi_legend_smith',
+                glbTextures: [
+                  'legend_smith_armor.png',
+                  'legend_smith_face.png',
+                  'legend_smith_neck.png',
+                  'legend_smith_weapon.png',
+                ],
+                targetHeight: 2.24,
+                canWalk: false,
+              },
+              {
+                id: 'npc_innkeeper',
+                windowId: 'generalstore',
+                name: '🍺 Wirt Barnaby (Seefahrer-Taverne Bakra)',
+                x: cx + 38.0,
+                z: cz + 42.0,
+                armorColor: 0x78350f,
+                accentColor: 0xfde047,
+                weaponVisual: 'staff',
+                glbModel: 'hotel_grandfa',
+                glbTextures: ['hotel_grandfa.png'],
+                targetHeight: 2.10,
+                canWalk: false,
+              },
+            ]
+          : [
+              {
+                id: 'npc_hunter',
+                windowId: 'character',
+                name: '🏹 Jäger Deokbae (Großwildjagd & Felle)',
+                x: cx + 38.0 * nMult,
+                z: cz - 12.0 * nMult,
+                armorColor: 0x14532d,
+                accentColor: 0x4ade80,
+                weaponVisual: 'sword',
+                glbModel: 'hunter',
+                glbTextures: ['hunter.png'],
+                targetHeight: 2.18,
+                canWalk: false,
+              },
+              {
+                id: 'npc_musician',
+                windowId: 'character',
+                name: '🪕 Barde Yu-Hwan (Lieder der Ahnen)',
+                x: cx - 36.0 * nMult,
+                z: cz + 32.0 * nMult,
+                armorColor: 0x1e3a8a,
+                accentColor: 0x60a5fa,
+                weaponVisual: 'staff',
+                glbModel: 'musician',
+                glbTextures: ['yu_hwan.png'],
+                targetHeight: 2.14,
+                canWalk: false,
+              },
+            ]),
         {
           id: 'npc_teleporter',
           windowId: 'worldmap',
@@ -17089,6 +18159,10 @@ export class OpenWorld3DEngine {
           if (npcShadow) npcContainer.add(npcShadow);
         }
 
+        if (n.id === 'npc_blacksmith' || n.id === 'npc_legend_smith') {
+          this._createBlacksmithProps?.(npcContainer);
+        }
+
         const hitBox = new THREE.Mesh(
           new THREE.CylinderGeometry(1.4, 1.4, 3.0, 12),
           new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false })
@@ -17106,6 +18180,26 @@ export class OpenWorld3DEngine {
         this.npcContainersById.set(mapKey, npcContainer);
         townGroup.add(npcContainer);
       });
+
+      // 6. Idyllische Fischerhütten mit Fischer Jonas, Mirko & Kai an den Küsten & Flussufern
+      if (town.isHarborCity) {
+        this.createFishermanHut(townGroup, cx - 32.0, cz + 164.0, 0, {
+          id: 'npc_fisherman_bakra',
+          name: '🎣 Fischer Jonas (Meeresangler & Köder)',
+          windowId: 'generalstore',
+        });
+      } else if (townIdx === 0) {
+        this.createFishermanHut(townGroup, 28.0, -12.0, Math.PI * 0.85, {
+          id: 'npc_fisherman_river',
+          name: '🎣 Fischer Mirko (Flussangler & Ködermeister)',
+          windowId: 'generalstore',
+        });
+        this.createFishermanHut(townGroup, -640.0, -22.0, Math.PI * 0.20, {
+          id: 'npc_fisherman_kaeryu',
+          name: '🎣 Fischer Kai (Seenangler)',
+          windowId: 'generalstore',
+        });
+      }
     });
 
     this.mapGroup.add(townGroup);
@@ -22406,7 +23500,7 @@ export class OpenWorld3DEngine {
           by = baseY + 1.75;
           attachedToLimb = true;
         }
-      } else if (bLower.includes('spine') || bLower.includes('pelvis') || bLower === 'bip01' || bLower === 'body') {
+      } else if (bLower.includes('spine') || bLower.includes('pelvis') || bLower.includes('hips') || bLower === 'bip01' || bLower === 'body') {
         by = baseY + (actor?.mountGroup?.visible ? 1.46 : 0.96);
         attachedToLimb = true;
       }
@@ -22764,24 +23858,37 @@ export class OpenWorld3DEngine {
 
       if (hasBladeBuff || activeLSwing || hasHighPlusGlow) {
         const att = this.getActorMetinAttachWorldPos(actor, 'right_hand', [0, 0, 0], rx, ry, rz, rotY);
+        // Lichtquelle entlang der Klinge vom Torso weg versetzen, damit kein 25cm-Hotspot die eigene Brust überblendet
+        let outX = att.x - rx;
+        let outZ = att.z - rz;
+        const outLen = Math.hypot(outX, outZ);
+        if (outLen > 0.04) {
+          outX /= outLen;
+          outZ /= outLen;
+        } else {
+          outX = Math.sin(rotY);
+          outZ = Math.cos(rotY);
+        }
+        const bladeOutOffset = activeLSwing ? 0.68 : hasBladeBuff ? 0.52 : 0.44;
         const pulse = 0.90 + 0.10 * Math.sin(nowSec * 7.2 + rx * 0.7) * Math.cos(nowSec * 4.3 + rz * 0.5);
         const auraHex = activeLSwing
           ? 0xe879f9
           : hasBladeBuff && actor._weaponTrailColorHex
           ? actor._weaponTrailColorHex
           : bladeAura?.userData?.defaultOuterHex || 0xf97316;
-        const baseBladeInt = activeLSwing ? 1.18 : hasBladeBuff ? 0.86 : 0.42;
+        const baseBladeInt = activeLSwing ? 1.05 : hasBladeBuff ? 0.68 : 0.16;
         candidates.push({
-          wx: att.x,
-          wy: Math.max(ry + 0.42, att.y),
-          wz: att.z,
+          wx: att.x + outX * bladeOutOffset,
+          wy: Math.max(ry + 0.48, att.y + 0.08),
+          wz: att.z + outZ * bladeOutOffset,
           colorHex: auraHex,
           rawInt: baseBladeInt * pulse,
-          distance: activeLSwing ? 9.6 : hasBladeBuff ? 7.8 : 5.2,
+          distance: activeLSwing ? 9.2 : hasBladeBuff ? 7.4 : 4.4,
           castShadow: false,
-          volScale: hasBladeBuff || activeLSwing ? 0.74 : 0.46,
+          skipPointLight: !activeLSwing,
+          volScale: hasBladeBuff || activeLSwing ? 0.70 : 0.34,
           d2,
-          priority: hasBladeBuff || activeLSwing ? 1.15 : 0.55,
+          priority: hasBladeBuff || activeLSwing ? 1.15 : 0.45,
         });
       }
 
@@ -22790,20 +23897,20 @@ export class OpenWorld3DEngine {
           const isHandBuff = entry.loop?.bone === 'right_hand' || entry.code === 'geomgyeong' || entry.code === 'gwigeom';
           if (isHandBuff) continue; // Bereits präzise auf der Schwertklinge platziert
           const pal = this.getMetinSkillPalette(entry.code, entry.tier || 1, Boolean(entry.isLSkill));
-          const bodyPulse = 0.88 + 0.12 * Math.sin(nowSec * 4.6 + d2 * 0.1 + (entry.tier || 1));
           candidates.push({
             wx: rx,
             wy: ry + (actor.mountGroup?.visible ? 1.38 : 1.02),
             wz: rz,
             colorHex: pal.env,
-            rawInt: (entry.isLSkill ? 0.84 : 0.64) * bodyPulse,
-            distance: entry.isLSkill ? 8.4 : 6.8,
+            rawInt: entry.isLSkill ? 0.48 : 0.34,
+            distance: entry.isLSkill ? 7.0 : 5.6,
             castShadow: false,
-            volScale: 0.72,
+            skipPointLight: true,
+            volScale: 0.48,
             d2,
-            priority: 0.92,
+            priority: 0.88,
           });
-          break; // Maximal 1 Körper-Aura-Punktlicht pro Charakter bündeln
+          break; // Maximal 1 ruhiges Körper-Aura-Punktlicht pro Charakter bündeln
         }
       }
     };
@@ -22855,7 +23962,7 @@ export class OpenWorld3DEngine {
     // B) 4x Echtzeit-PointLights für direkte PBR-Glanzlichter auf nicht-geshadeten Meshes & Details
     let poolSlot = 0;
     for (let i = 0; i < candidates.length && poolSlot < this._skillEnvPointLights.length; i++) {
-      if (i === shadowUsedIdx) continue;
+      if (i === shadowUsedIdx || candidates[i].skipPointLight) continue;
       const c = candidates[i];
       const pl = this._skillEnvPointLights[poolSlot++];
       pl.visible = true;
@@ -23719,6 +24826,29 @@ export class OpenWorld3DEngine {
           if (!this.disposed) this.triggerCameraShake(0.18, 0.14);
         }, Math.round(slamDelay * 1000));
       }
+    } else if (
+      opts.eventType === 'skill_buff' ||
+      [
+        'geomgyeong', 'jeongwi', 'cheongeun', 'gyeonggong', 'eunhyeong',
+        'gwigeom', 'jumagap', 'gongpo', 'heuksin', 'muyeong',
+        'hosin', 'gicheon', 'jeongeop', 'kwaesok',
+      ].includes(code)
+    ) {
+      // Einmaliger kraftvoller Energie-Ausbruch NUR beim Zünden des Buffs (danach ruhige Dauer-Aura ohne Puls-Explosionen!)
+      followCaster = true;
+      maxAge = 1.15;
+      addHorizLayer(ringTex, 1.1 * tierScale, 4.4 * tierScale, pal.core, pal.main, 0.86, 0.04, 0.72, 3.2, 0, 0.05, 0);
+      addHorizLayer(ringTex, 0.75 * tierScale, 2.8 * tierScale, pal.core, pal.accent, 0.64, 0.16, 0.64, -2.6, 0, 0.82, 0);
+      addRadialSparks(sparkTex, 14, 0.85 * tierScale, 0.24, 0.08, pal.core, pal.accent, 0.06, 0.78, 1.4 * tierScale, 2.8, 3.4, 2.2);
+      this.triggerSkillEnvironmentGlow(x, y, z, pal.env, {
+        delay: 0.04,
+        duration: 0.86,
+        intensity: isLSkill ? 1.42 : 1.18,
+        distance: 10.6,
+        groundWashAlpha: 0.12,
+        castShadow: false,
+        volumetricScale: 0.95,
+      });
     } else {
       // Universelle breite Metin2-Schockwelle + dynamisches Echtzeit-Magielicht (inkl. Schattenwurf bei mächtigen Magie-Explosionen)
       const majorShadowCasterCodes = new Set([
@@ -24465,6 +25595,7 @@ export class OpenWorld3DEngine {
       if (this.localPlayerActor.mountGroup) this.localPlayerActor.mountGroup.visible = false;
       if (this.localPlayerActor.petGroup) this.localPlayerActor.petGroup.visible = false;
       if (this.localPlayerActor.auraRing) this.localPlayerActor.auraRing.visible = false;
+      if (this.localPlayerActor._steadyBuffAuraGroup) this.localPlayerActor._steadyBuffAuraGroup.visible = false;
       this.applyActorWeaponAuraTintFromMetinLoop(this.localPlayerActor);
     }
   }
@@ -24537,33 +25668,475 @@ export class OpenWorld3DEngine {
   }
 
   updateActorMetinBuffLoop(actor, dt, elapsed) {
-    if (!actor || !actor._activeMetinBuffLoops || actor._activeMetinBuffLoops.size === 0) return;
-    actor._metinLoopTimer = (actor._metinLoopTimer || 0) - dt;
-    if (actor._metinLoopTimer > 0) return;
-    actor._metinLoopTimer = 1.12;
-    if (!actor.root || !actor.root.visible) return;
-    const rx = actor.root.position.x;
-    const ry = actor.root.position.y;
-    const rz = actor.root.position.z;
-    const rotY = actor.root.rotation.y;
-    for (const entry of actor._activeMetinBuffLoops.values()) {
-      if (entry.loop?.effect) {
-        const bone = entry.loop.bone || '';
-        const isHand = bone.includes('hand') || entry.code === 'geomgyeong' || entry.code === 'gwigeom';
-        const att = this.getActorMetinAttachWorldPos(actor, bone, [0, 0, 0], rx, ry, rz, rotY);
-        this.spawnMetinMseEffect(entry.loop.effect, att.x, att.y, att.z, rotY, actor, {
-          follow: true,
-          followBone: bone,
-          attachedToLimb: att.attachedToLimb,
-          offsetX: att.offsetX,
-          offsetY: att.offsetY,
-          offsetZ: att.offsetZ,
-          tier: entry.tier,
-          isLSkill: entry.isLSkill,
-          scaleMult: isHand ? (entry.isLSkill ? 0.56 : 0.46) : entry.isLSkill ? 0.88 : 0.76,
-        });
+    if (!actor) return;
+
+    // 1. Ruhige Metin2-Energiescheide entlang der Waffe für andere Spieler synchronisieren
+    //    (der lokale Charakter aktualisiert seine Klingen-Aura in updateLocalPlayer)
+    if (actor !== this.localPlayerActor) {
+      const bladeAura = actor.weaponGroup?.userData?.bladeAuraGroup;
+      if (bladeAura?.userData) {
+        const hasBladeBuff = Boolean(actor._hasMetinWeaponBladeBuff);
+        const isRsb = actor.weaponVisual === 'rsb';
+        const steadySheath = 0.92 + Math.sin(elapsed * 4.8) * 0.06;
+        const steadyFlame = 0.90 + Math.sin(elapsed * 8.2) * 0.06;
+        if (hasBladeBuff) {
+          if (bladeAura.userData.innerAuraMat) bladeAura.userData.innerAuraMat.opacity = 0.72 * steadySheath;
+          if (bladeAura.userData.outerAuraMat) bladeAura.userData.outerAuraMat.opacity = 0.66 * steadySheath;
+          if (bladeAura.userData.flameMat) bladeAura.userData.flameMat.opacity = 0.62 * steadyFlame;
+        } else if (isRsb) {
+          if (bladeAura.userData.innerAuraMat) bladeAura.userData.innerAuraMat.opacity = 0.18 * steadySheath;
+          if (bladeAura.userData.outerAuraMat) bladeAura.userData.outerAuraMat.opacity = 0.09 * steadySheath;
+          if (bladeAura.userData.flameMat) bladeAura.userData.flameMat.opacity = 0.22 * steadyFlame;
+        } else {
+          if (bladeAura.userData.innerAuraMat) bladeAura.userData.innerAuraMat.opacity = 0.0;
+          if (bladeAura.userData.outerAuraMat) bladeAura.userData.outerAuraMat.opacity = 0.0;
+          if (bladeAura.userData.flameMat) bladeAura.userData.flameMat.opacity = 0.0;
+        }
       }
     }
+
+    // 2. Ruhige, gleichmäßige Metin2-Daueraura (KEINE alle 1.12s pulsierenden Brust-Explosionen mehr!):
+    //    Dezenter, konstant großer Runen-Bodenring + feine ruhig aufsteigende Funken.
+    const loops = actor._activeMetinBuffLoops;
+    const isDead = Boolean(actor.playerData?.isDead);
+    if (!loops || loops.size === 0 || isDead || !actor.root || !actor.root.visible) {
+      if (actor._steadyBuffAuraGroup) {
+        actor._steadyBuffAuraGroup.visible = false;
+      }
+      return;
+    }
+
+    let primaryBodyEntry = null;
+    let secondaryEntry = null;
+    let handEntry = null;
+    let orbEntry = null;
+    for (const entry of loops.values()) {
+      const bone = entry.loop?.bone || '';
+      const isHand = bone.includes('hand') || entry.code === 'geomgyeong' || entry.code === 'gwigeom';
+      if (entry.code === 'muyeong' || entry.code === 'heuksin') {
+        orbEntry = entry;
+      }
+      if (isHand) {
+        if (!handEntry) handEntry = entry;
+        else if (!secondaryEntry) secondaryEntry = entry;
+      } else if (!primaryBodyEntry) {
+        primaryBodyEntry = entry;
+      } else if (!secondaryEntry) {
+        secondaryEntry = entry;
+      }
+    }
+    if (!secondaryEntry && primaryBodyEntry && handEntry) {
+      secondaryEntry = handEntry;
+    }
+    const leadEntry = primaryBodyEntry || handEntry;
+    if (!leadEntry) {
+      if (actor._steadyBuffAuraGroup) actor._steadyBuffAuraGroup.visible = false;
+      return;
+    }
+
+    let auraGrp = actor._steadyBuffAuraGroup;
+    if (!auraGrp) {
+      if (!this._sharedUnitPlaneGeo) {
+        this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
+        this._sharedUnitPlaneGeo.userData = { isShared: true };
+      }
+      const ringTex = this.getMetinRuneShockRingTexture();
+      const sparkTex = this.getShiningSparkleTexture ? this.getShiningSparkleTexture() : ringTex;
+
+      auraGrp = new THREE.Group();
+      auraGrp.name = 'steadyMetinBuffAura';
+
+      const outerMat = new THREE.MeshBasicMaterial({
+        map: ringTex,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.30,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const outerRing = new THREE.Mesh(this._sharedUnitPlaneGeo, outerMat);
+      outerRing.rotation.x = -Math.PI / 2;
+      outerRing.position.y = 0.042;
+      outerRing.renderOrder = 6;
+      auraGrp.add(outerRing);
+
+      const innerMat = new THREE.MeshBasicMaterial({
+        map: ringTex,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.20,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const innerRing = new THREE.Mesh(this._sharedUnitPlaneGeo, innerMat);
+      innerRing.rotation.x = -Math.PI / 2;
+      innerRing.position.y = 0.046;
+      innerRing.renderOrder = 6;
+      auraGrp.add(innerRing);
+
+      const sparks = [];
+      const SPARK_CNT = 6;
+      for (let i = 0; i < SPARK_CNT; i++) {
+        const sMat = new THREE.SpriteMaterial({
+          map: sparkTex,
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const sp = new THREE.Sprite(sMat);
+        const baseScale = 0.064 + (i % 3) * 0.011;
+        sp.scale.set(baseScale, baseScale, 1);
+        sp.userData = {
+          baseAngle: (i / SPARK_CNT) * Math.PI * 2,
+          phaseOffset: i / SPARK_CNT,
+          radius: 0.42 + (i % 2) * 0.08,
+          speed: 0.34 + (i % 3) * 0.04,
+          swirl: i % 2 === 0 ? 0.55 : -0.48,
+          baseScale,
+          isAccent: i % 2 === 1,
+        };
+        auraGrp.add(sp);
+        sparks.push(sp);
+      }
+
+      const wispMat = new THREE.SpriteMaterial({
+        map: sparkTex,
+        color: 0xc084fc,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const spiritWisp = new THREE.Sprite(wispMat);
+      spiritWisp.scale.set(0.16, 0.16, 1);
+      spiritWisp.visible = false;
+      auraGrp.add(spiritWisp);
+
+      auraGrp.userData = {
+        outerRing,
+        outerMat,
+        innerRing,
+        innerMat,
+        sparks,
+        spiritWisp,
+        wispMat,
+        sig: '',
+      };
+      actor.root.add(auraGrp);
+      actor._steadyBuffAuraGroup = auraGrp;
+    }
+
+    auraGrp.visible = true;
+    const ud = auraGrp.userData;
+    const hasBodyBuff = Boolean(primaryBodyEntry);
+    const leadPal = this.getMetinSkillPalette(leadEntry.code, leadEntry.tier || 1, Boolean(leadEntry.isLSkill));
+    const secPal = secondaryEntry
+      ? this.getMetinSkillPalette(secondaryEntry.code, secondaryEntry.tier || 1, Boolean(secondaryEntry.isLSkill))
+      : null;
+
+    const sig = `${leadEntry.code}:${leadEntry.tier}:${hasBodyBuff ? 1 : 0}|${secondaryEntry ? `${secondaryEntry.code}:${secondaryEntry.tier}` : ''}|${orbEntry ? `${orbEntry.code}:${orbEntry.tier}` : ''}`;
+    if (ud.sig !== sig) {
+      ud.sig = sig;
+      ud.outerMat.color.setHex(leadPal.main);
+      const outerDiam = hasBodyBuff ? (leadEntry.isLSkill ? 1.52 : 1.38) : 1.18;
+      ud.outerRing.scale.setScalar(outerDiam);
+      ud.outerMat.opacity = hasBodyBuff ? (leadEntry.isLSkill ? 0.36 : 0.28) : 0.16;
+
+      if (secPal) {
+        ud.innerRing.visible = true;
+        ud.innerMat.color.setHex(secPal.main);
+        ud.innerRing.scale.setScalar(hasBodyBuff ? 1.02 : 0.90);
+        ud.innerMat.opacity = 0.20;
+      } else {
+        ud.innerRing.visible = false;
+      }
+
+      for (const sp of ud.sparks) {
+        sp.material.color.setHex(sp.userData.isAccent ? (secPal ? secPal.accent : leadPal.accent) : leadPal.core);
+      }
+
+      if (orbEntry) {
+        const orbPal = this.getMetinSkillPalette(orbEntry.code, orbEntry.tier || 1, Boolean(orbEntry.isLSkill));
+        ud.wispMat.color.setHex(orbPal.main);
+        ud.spiritWisp.visible = true;
+      } else {
+        ud.spiritWisp.visible = false;
+      }
+    }
+
+    // Konstante, sanfte Drehung am Boden – keinerlei Größen- oder Helligkeits-Pulsieren!
+    ud.outerRing.rotation.z = elapsed * 0.46;
+    if (ud.innerRing.visible) {
+      ud.innerRing.rotation.z = -elapsed * 0.62;
+    }
+
+    const isMounted = Boolean(actor.mountGroup?.visible);
+    const maxRise = hasBodyBuff ? (isMounted ? 1.62 : 1.24) : 0.56;
+    const peakSparkAlpha = hasBodyBuff ? (leadEntry.isLSkill ? 0.52 : 0.42) : 0.20;
+    for (let i = 0; i < ud.sparks.length; i++) {
+      const sp = ud.sparks[i];
+      const sd = sp.userData;
+      const lifePhase = (elapsed * sd.speed + sd.phaseOffset) % 1.0;
+      const env = Math.sin(lifePhase * Math.PI); // Sanftes Ein- und Ausblenden oben/unten ohne Aufploppen
+      const ang = sd.baseAngle + elapsed * sd.swirl;
+      sp.position.set(
+        Math.cos(ang) * sd.radius,
+        0.08 + lifePhase * maxRise,
+        Math.sin(ang) * sd.radius
+      );
+      sp.material.opacity = peakSparkAlpha * env;
+    }
+
+    if (ud.spiritWisp.visible) {
+      const orbAng = elapsed * 1.65;
+      const orbY = (isMounted ? 1.54 : 1.02) + Math.sin(elapsed * 2.1) * 0.08;
+      ud.spiritWisp.position.set(Math.cos(orbAng) * 0.68, orbY, Math.sin(orbAng) * 0.68);
+      ud.wispMat.opacity = 0.72;
+    }
+  }
+
+  triggerAscensionEnergyBurst(actor, x, y, z, opts = {}) {
+    if (!this.scene) return;
+    if (!this._sharedUnitPlaneGeo) {
+      this._sharedUnitPlaneGeo = new THREE.PlaneGeometry(1.0, 1.0);
+      this._sharedUnitPlaneGeo.userData = { isShared: true };
+    }
+    const coreHex = opts.coreHex ?? 0xfef9c3;
+    const mainHex = opts.mainHex ?? 0xfbbf24;
+    const accentHex = opts.accentHex ?? 0x38bdf8;
+    const envHex = opts.envHex ?? mainHex;
+    const burstScale = Number(opts.scale || 1.0);
+
+    const ringTex = this.getMetinRuneShockRingTexture();
+    const softRingTex = this.getSoftShockwaveRingTexture();
+    const sparkTex = this.getShiningSparkleTexture ? this.getShiningSparkleTexture() : softRingTex;
+
+    const pGroup = new THREE.Group();
+    pGroup.position.set(x, y + 0.03, z);
+    const groundRings = [];
+    const verticalPlanes = [];
+    const sprites = [];
+
+    const pushDisc = (tex, s0, s1, c0Hex, c1Hex, alpha, delay, life, spinSpeed, ly = 0.05, tiltX = 0, tiltY = 0) => {
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        color: new THREE.Color(c0Hex),
+        transparent: true,
+        opacity: delay > 0.02 ? 0.0 : alpha,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      this.applyMetinLuminanceTintShader(mat);
+      const mesh = new THREE.Mesh(this._sharedUnitPlaneGeo, mat);
+      mesh.rotation.order = 'YXZ';
+      mesh.rotation.x = -Math.PI / 2 + tiltX;
+      mesh.rotation.y = tiltY;
+      mesh.rotation.z = Math.random() * Math.PI * 2;
+      mesh.position.set(0, ly, 0);
+      mesh.scale.setScalar(s0);
+      pGroup.add(mesh);
+      groundRings.push({
+        mesh,
+        mat,
+        s0,
+        s1,
+        c0: new THREE.Color(c0Hex),
+        c1: new THREE.Color(c1Hex),
+        peakAlpha: alpha,
+        delay,
+        life,
+        spinSpeed,
+        vx: 0,
+        vz: 0,
+      });
+    };
+
+    // Dreistufige aufsteigende & expandierende Metin2-Aufstiegswelle (ehem. Buff-Pulsieren, jetzt Belohnungs-Explosion!)
+    pushDisc(ringTex, 1.2 * burstScale, 5.8 * burstScale, coreHex, mainHex, 0.94, 0.0, 0.88, 3.4, 0.05);
+    pushDisc(ringTex, 0.95 * burstScale, 4.2 * burstScale, mainHex, accentHex, 0.82, 0.14, 0.82, -2.9, 0.78, 0.14, -0.12);
+    pushDisc(softRingTex, 0.8 * burstScale, 3.6 * burstScale, coreHex, accentHex, 0.74, 0.28, 0.76, 2.4, 1.34, -0.14, 0.14);
+
+    // Gekreuzte vertikale Lichtsäule durch den Helden
+    for (let pk = 0; pk < 2; pk++) {
+      const pMat = new THREE.MeshBasicMaterial({
+        map: softRingTex,
+        color: new THREE.Color(coreHex),
+        transparent: true,
+        opacity: 0.72,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      this.applyMetinLuminanceTintShader(pMat);
+      const pMesh = new THREE.Mesh(this._sharedUnitPlaneGeo, pMat);
+      pMesh.position.set(0, 1.45 * burstScale, 0);
+      pMesh.rotation.y = pk * (Math.PI / 2);
+      const s0 = 1.25 * burstScale;
+      const aspectY = 2.45;
+      pMesh.scale.set(s0, s0 * aspectY, 1);
+      pGroup.add(pMesh);
+      verticalPlanes.push({
+        mesh: pMesh,
+        mat: pMat,
+        s0,
+        s1: 2.15 * burstScale,
+        aspectY,
+        c0: new THREE.Color(coreHex),
+        c1: new THREE.Color(mainHex),
+        peakAlpha: 0.72,
+        delay: 0.02,
+        life: 0.84,
+        rotZ: 0,
+      });
+    }
+
+    // Aufsteigende spiralförmige Energie-Funken
+    const SPARK_BURST_CNT = 22;
+    for (let k = 0; k < SPARK_BURST_CNT; k++) {
+      const isAcc = k % 3 === 0;
+      const sMat = new THREE.SpriteMaterial({
+        map: sparkTex,
+        color: new THREE.Color(isAcc ? accentHex : coreHex),
+        transparent: true,
+        opacity: 0.94,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        rotation: Math.random() * Math.PI * 2,
+      });
+      const sp = new THREE.Sprite(sMat);
+      const ang = (k / SPARK_BURST_CNT) * Math.PI * 2;
+      const rDist = (0.35 + (k % 4) * 0.22) * burstScale;
+      sp.position.set(Math.cos(ang) * rDist, 0.18 + (k % 5) * 0.24, Math.sin(ang) * rDist);
+      const s0 = (0.20 + (k % 3) * 0.06) * burstScale;
+      sp.scale.set(s0, s0, 1);
+      sp.userData = {
+        vx: Math.cos(ang) * 1.45 * burstScale,
+        vy: 1.85 + (k % 4) * 0.55,
+        vz: Math.sin(ang) * 1.45 * burstScale,
+        swirl: (k % 2 === 0 ? 1 : -1) * 3.8,
+        rotSpd: k % 2 === 0 ? 2.2 : -2.2,
+        s0,
+        s1: s0 * 0.35,
+        c0: new THREE.Color(isAcc ? accentHex : coreHex),
+        c1: new THREE.Color(mainHex),
+        peakAlpha: 0.94,
+        delay: (k % 5) * 0.04,
+        life: 0.92,
+      };
+      pGroup.add(sp);
+      sprites.push(sp);
+    }
+
+    this.scene.add(pGroup);
+    this.vfxList.push({
+      type: 'metin_particles',
+      mesh: pGroup,
+      groundRings,
+      verticalPlanes,
+      sprites,
+      age: 0,
+      maxAge: 1.35,
+      followActor: actor || null,
+      followBone: '',
+      evPos: [0, 0, 0],
+      offsetX: 0,
+      offsetY: 0.03,
+      offsetZ: 0,
+    });
+
+    this.triggerSkillEnvironmentGlow(x, y, z, envHex, {
+      delay: 0.0,
+      duration: 1.15,
+      intensity: 1.65 * Math.min(1.25, burstScale),
+      distance: 13.5,
+      groundWashAlpha: 0.16,
+      castShadow: false,
+      volumetricScale: 1.15,
+    });
+  }
+
+  triggerLevelUpBurst(level = 1, targetActor = null, wx = null, wy = null, wz = null) {
+    const nowMs = performance.now();
+    const isLocal = !targetActor || targetActor === this.localPlayerActor;
+    if (isLocal && this._lastLocalLevelUpBurstMs && nowMs - this._lastLocalLevelUpBurstMs < 650) {
+      return;
+    }
+    if (isLocal) this._lastLocalLevelUpBurstMs = nowMs;
+    const act = targetActor || this.localPlayerActor;
+    const x = wx ?? act?.root?.position?.x ?? this.localPlayerPos?.x ?? 0;
+    const y = wy ?? act?.root?.position?.y ?? this.localPlayerPos?.y ?? 0;
+    const z = wz ?? act?.root?.position?.z ?? this.localPlayerPos?.z ?? 0;
+    this.triggerAscensionEnergyBurst(act, x, y, z, {
+      coreHex: 0xfef9c3,
+      mainHex: 0xfbbf24,
+      accentHex: 0x38bdf8,
+      envHex: 0xf59e0b,
+      scale: level >= 99 ? 1.24 : 1.08,
+    });
+  }
+
+  triggerSkillTierUpBurst(info = {}) {
+    const act = this.localPlayerActor;
+    const x = act?.root?.position?.x ?? this.localPlayerPos?.x ?? 0;
+    const y = act?.root?.position?.y ?? this.localPlayerPos?.y ?? 0;
+    const z = act?.root?.position?.z ?? this.localPlayerPos?.z ?? 0;
+    const tier = Number(info.tier || getMetinSkillTier(info.skillLevel || 20));
+    const classId = info.classId || this.localPlayerClassId || 'warrior';
+    const doctrine = info.doctrine || this.localPlayerDoctrine || '';
+    const gender = info.gender || this.localPlayerGender || 'm';
+    const resolved = info.skillId
+      ? resolveMetinSkill(classId, info.skillId, doctrine, info.skillLevel || 20, gender)
+      : null;
+
+    // Stufen-spezifische Aufstiegs-Farbgebung (M = Gold-Bernstein, G = Arkan-Violett, P = Blutrot-Gold, L = Himmlisch Magenta-Cyan)
+    let pal = resolved ? this.getMetinSkillPalette(resolved.code, tier, tier >= 5) : null;
+    if (!pal) {
+      pal =
+        tier >= 5
+          ? { core: 0xfef9ff, main: 0xe879f9, accent: 0x38bdf8, env: 0xd946ef }
+          : tier === 4
+          ? { core: 0xfff7ed, main: 0xef4444, accent: 0xfbbf24, env: 0xef4444 }
+          : tier === 3
+          ? { core: 0xfaf5ff, main: 0xa855f7, accent: 0xf43f5e, env: 0x9333ea }
+          : { core: 0xfffbeb, main: 0xf59e0b, accent: 0xfde047, env: 0xf59e0b };
+    }
+
+    this.triggerAscensionEnergyBurst(act, x, y, z, {
+      coreHex: pal.core,
+      mainHex: pal.main,
+      accentHex: pal.accent,
+      envHex: pal.env,
+      scale: tier >= 5 ? 1.32 : tier === 4 ? 1.22 : tier === 3 ? 1.14 : 1.06,
+    });
+
+    // Zusätzlich einmalig die originale Metin2-Durchbruchs-Energiewelle als Aufstiegs-Krönung zünden!
+    const burstEffect =
+      METIN_SKILL_CATALOG?.effects?.[tier >= 5 ? 'warrior:jeongwi_5.mse' : 'shaman:3hosin.mse'] || null;
+    if (burstEffect) {
+      this.spawnMetinMseEffect(burstEffect, x, y, z, act?.root?.rotation?.y || 0, act, {
+        follow: true,
+        tier,
+        isLSkill: tier >= 5,
+        scaleMult: tier >= 5 ? 0.92 : 0.78,
+      });
+    }
+
+    const displayName = info.skillName || resolved?.name || info.skillId || 'Fertigkeit';
+    const banner =
+      tier >= 5
+        ? { text: `👑 LEGENDÄRER SKILL (L1): ${displayName}!`, color: '#e879f9' }
+        : tier === 4
+        ? { text: `🌟 PERFEKTER MEISTER (P1): ${displayName}!`, color: '#f87171' }
+        : tier === 3
+        ? { text: `⚡ GROSSMEISTER (G1): ${displayName}!`, color: '#c084fc' }
+        : { text: `🔥 MEISTER (M1): ${displayName}!`, color: '#fbbf24' };
+    this.spawnFloatingText(x, y + 3.25, z, banner.text, banner.color);
+    this.triggerCameraShake(tier >= 4 ? 0.22 : 0.15, tier >= 4 ? 0.16 : 0.10);
   }
 
   getBladeAuraFlameTexture() {
@@ -27107,7 +28680,8 @@ export class OpenWorld3DEngine {
     const hasHelmet = cfg.hasHelmet !== false;
     const weaponPlus = Number(cfg.weaponPlus ?? 0);
     const armorPlus = Number(cfg.armorPlus ?? weaponPlus);
-    const key = `${cfg.classId || 'warrior'}_${cfg.gender || 'male'}_${cfg.hairIndex || 0}_${weaponPlus}_${armorPlus}_${cfg.weaponVisual || ''}`;
+    const normGender = isFemaleGender(cfg.gender) ? 'female' : 'male';
+    const key = `${cfg.classId || 'warrior'}_${normGender}_${cfg.hairIndex || 0}_${weaponPlus}_${armorPlus}_${cfg.weaponVisual || ''}`;
     if (key !== this.localAppearanceKey) {
       this.localAppearanceKey = key;
       const oldPos = this.localPlayerActor.root.position.clone();
@@ -27116,7 +28690,7 @@ export class OpenWorld3DEngine {
       this.scene.remove(this.localPlayerActor.root);
       this.localPlayerActor = this.createCharacterRig({
         classId: cfg.classId || 'warrior',
-        gender: cfg.gender || 'male',
+        gender: normGender,
         hairIndex: cfg.hairIndex || 0,
         weaponPlus,
         armorPlus,
@@ -27219,14 +28793,14 @@ export class OpenWorld3DEngine {
     const root = new THREE.Group();
     const classStyles = {
       warrior: { armorColor: 0x8b6f47, accentColor: 0xd4a853, capeColor: 0x7f1d1d, helmetType: 'horned', weaponVisual: 'sword' },
-      ninja: { armorColor: 0x1f3a33, accentColor: 0x10b981, capeColor: 0x064e3b, helmetType: 'hood', weaponVisual: 'sword' },
+      ninja: { armorColor: 0x7f1d1d, accentColor: 0xd4a853, capeColor: 0x450a0a, helmetType: 'hood', weaponVisual: 'dagger' },
       sura: { armorColor: 0x3b1d54, accentColor: 0xc084fc, capeColor: 0x4c1d95, helmetType: 'knight', weaponVisual: 'msk' },
       shaman: { armorColor: 0x6b3410, accentColor: 0xfde047, capeColor: 0x92400e, helmetType: 'crown', weaponVisual: 'bell' },
     };
     const st = { ...(classStyles[cfg.classId] || classStyles.warrior), ...(cfg.customColors || {}) };
     const weaponVisual = cfg.weaponVisual || st.weaponVisual;
     const plus = cfg.weaponPlus ?? 3;
-    const isFemale = cfg.gender === 'female';
+    const isFemale = isFemaleGender(cfg.gender);
     const hairColors = [0x291d12, 0xd4a359, 0xe2e8f0, 0x7f1d1d];
     const hairHex = hairColors[(cfg.hairIndex || 0) % hairColors.length];
 
@@ -27380,6 +28954,14 @@ export class OpenWorld3DEngine {
     weaponGroup.position.set(0, -0.48, 0.18);
     weaponGroup.visible = cfg.hasWeapon !== false;
     rightArmPivot.add(weaponGroup);
+
+    let offHandWeaponGroup = null;
+    if (weaponVisual === 'dagger') {
+      offHandWeaponGroup = this.buildWeaponMesh('dagger', plus);
+      offHandWeaponGroup.position.set(0, -0.48, 0.18);
+      offHandWeaponGroup.visible = cfg.hasWeapon !== false;
+      leftArmPivot.add(offHandWeaponGroup);
+    }
 
     // Schild an linker Hand (nur sichtbar wenn ein Schild ausgerüstet ist)
     const shield = new THREE.Mesh(
@@ -27606,8 +29188,15 @@ export class OpenWorld3DEngine {
 
     const armorShining = buildShiningEmitter(armorPlusLvl, 0.46, 0.84, 1.15, false);
     if (armorShining) root.add(armorShining);
-    const weaponShining = buildShiningEmitter(plus, 0.042, 1.02, 0.76, true);
+    const shiningRad = weaponVisual === 'dagger' ? 0.034 : 0.042;
+    const shiningSpan = weaponVisual === 'dagger' ? 0.38 : weaponVisual === 'bow' ? 0.88 : 1.02;
+    const shiningAxisOff = weaponVisual === 'dagger' ? 0.30 : weaponVisual === 'bow' ? 0.0 : 0.76;
+    const weaponShining = buildShiningEmitter(plus, shiningRad, shiningSpan, shiningAxisOff, true);
     if (weaponShining) weaponGroup.add(weaponShining);
+    const offHandWeaponShining = offHandWeaponGroup
+      ? buildShiningEmitter(plus, shiningRad, shiningSpan, shiningAxisOff, true)
+      : null;
+    if (offHandWeaponShining && offHandWeaponGroup) offHandWeaponGroup.add(offHandWeaponShining);
 
     // --- 2. ECHTES 3D-GLB-HELDENMODELL PRO KLASSE & GESCHLECHT (High-Poly im PC-Client, Low-Poly im Browser & Fern-LOD) ---
     const classKey = cfg.classId || 'warrior';
@@ -27618,6 +29207,8 @@ export class OpenWorld3DEngine {
       ? heroGlbCfg.glb
       : (heroGlbCfg.glbLow || heroGlbCfg.glb);
     const heroGlbHolder = new THREE.Group();
+    heroGlbHolder.userData._mountOffsetY = heroGlbCfg.mountOffsetY ?? 0.56;
+    heroGlbHolder.userData._mountOffsetZ = heroGlbCfg.mountOffsetZ ?? -0.10;
     heroGlbHolder.userData._heroLodInfo = {
       highUrl: heroGlbCfg.glb,
       lowUrl: heroGlbCfg.glbLow || null,
@@ -27641,6 +29232,7 @@ export class OpenWorld3DEngine {
           }
         }
       }
+      const isDelitHeroModel = Boolean(heroGlbCfg.useMeshyHandSocket);
       this.attachGLBModelToGroup(
         heroGlbHolder,
         activeHeroGlbUrl,
@@ -27649,12 +29241,15 @@ export class OpenWorld3DEngine {
         bodyGroup,
         false,
         {
-          color: new THREE.Color(1.02, 1.01, 1.00),
-          roughness: 0.54,
-          metalness: 0.08,
+          color: new THREE.Color(1.0, 1.0, 1.0),
+          roughness: isDelitHeroModel ? 0.68 : 0.70,
+          metalness: 0.06,
           normalMap: heroGlbCfg.normalMap || null,
+          normalScale: isDelitHeroModel ? 1.18 : 0.90,
+          isDelitHero: isDelitHeroModel,
           emissive: new THREE.Color(0x000000),
           emissiveIntensity: 0.0,
+          noSelfShadow: false,
         }
       );
 
@@ -27683,8 +29278,7 @@ export class OpenWorld3DEngine {
           }
         }
 
-        // 1. Kalibrierter Weapon-Socket in der rechten Hand (Griff sitzt exakt in den geschlossenen Fingern,
-        //    Klinge zeigt heroisch nach vorn-oben statt rückwärts in Körper/Kopf oder in den Boden!)
+        // 1. Kalibrierter Weapon-Socket in der rechten & linken Hand (inkl. Zwillingsdolche & Bogen-Linkshand!)
         const handIdx = tpl.nodes.findIndex((n) =>
           /^(bip01 r hand|r_hand|r hand|righthand)$/i.test((n.name || '').trim())
         );
@@ -27692,53 +29286,86 @@ export class OpenWorld3DEngine {
           handIdx >= 0
             ? handIdx
             : tpl.nodes.findIndex((n) => /bip01 r hand|r_hand|r hand|righthand|weapon/i.test(n.name || ''));
-
         if (fallbackHandIdx >= 0) {
-          const handBone = glbAct.rigGroup.getObjectByName(`bone_${fallbackHandIdx}`);
-          if (handBone) {
-            glbAct.rightHandBone = handBone;
-          }
-          if (handBone && weaponGroup) {
-            const weaponSocket = new THREE.Group();
-            weaponSocket.name = 'weaponSocket';
-            if (heroGlbCfg.useMeshyHandSocket || activeHeroGlbUrl.includes('klingenwaechter_male')) {
-              // Exakt anatomisch aus R_Hand-Bindpose (Knöchel-Achse +X, Handflächen-Normale +Y, Daumen/Klinge +Z)
-              // berechneter lokaler Faust-Socket – 100 % unabhängig von der aktuellen Mixer-Animationsphase!
-              weaponSocket.position.set(-0.0177, -0.0118, 0.0389);
-              weaponSocket.quaternion.set(0.04521, 0.66362, 0.67493, -0.31941);
-            } else {
-              heroGlbHolder.updateMatrixWorld(true);
-              const qRootWorld = new THREE.Quaternion();
-              const qHandWorld = new THREE.Quaternion();
-              heroGlbHolder.getWorldQuaternion(qRootWorld);
-              handBone.getWorldQuaternion(qHandWorld);
-              const qHandInRoot = qRootWorld.clone().invert().multiply(qHandWorld);
-              const targetSwordQuatInRoot = new THREE.Quaternion().setFromEuler(
-                new THREE.Euler(-0.50, -0.16, 0.32, 'YXZ')
-              );
-              if (tpl.isYUp) {
-                weaponSocket.position.set(-0.022, -0.028, 0.032);
-              } else {
-                weaponSocket.position.set(6.2, 0.6, 0.0);
-              }
-              weaponSocket.quaternion.copy(qHandInRoot).invert().multiply(targetSwordQuatInRoot);
-            }
-            const invScale = 1.0 / Math.max(0.005, glbAct.rigGroup.scale.x || 0.01);
-            weaponSocket.scale.setScalar(invScale * (tpl.isYUp ? 0.92 : 0.86));
-
-            weaponGroup.position.set(0, 0, 0);
-            weaponGroup.rotation.set(0, 0, 0);
-            weaponGroup.scale.setScalar(1.0);
-            weaponSocket.add(weaponGroup);
-            handBone.add(weaponSocket);
-            glbAct.weaponSocket = weaponSocket;
-          }
+          glbAct.rightHandBone = glbAct.rigGroup.getObjectByName(`bone_${fallbackHandIdx}`) || null;
         }
         const leftHandIdx = tpl.nodes.findIndex((n) =>
           /^(bip01 l hand|l_hand|l hand|lefthand)$/i.test((n.name || '').trim())
         );
         if (leftHandIdx >= 0) {
           glbAct.leftHandBone = glbAct.rigGroup.getObjectByName(`bone_${leftHandIdx}`) || null;
+        }
+
+        const invScale = 1.0 / Math.max(0.005, glbAct.rigGroup.scale.x || 0.01);
+        const socketScale = invScale * (tpl.isYUp ? 0.92 : 0.86);
+        const isBowWeapon = weaponVisual === 'bow' && Boolean(glbAct.leftHandBone);
+        const primaryHandBone = isBowWeapon ? glbAct.leftHandBone : glbAct.rightHandBone;
+
+        if (primaryHandBone && weaponGroup) {
+          const weaponSocket = new THREE.Group();
+          weaponSocket.name = 'weaponSocket';
+          if (
+            isBowWeapon &&
+            Array.isArray(heroGlbCfg.leftWeaponSocketPos) &&
+            Array.isArray(heroGlbCfg.leftWeaponSocketQuat)
+          ) {
+            weaponSocket.position.fromArray(heroGlbCfg.leftWeaponSocketPos);
+            weaponSocket.quaternion.fromArray(heroGlbCfg.leftWeaponSocketQuat);
+          } else if (Array.isArray(heroGlbCfg.weaponSocketPos) && Array.isArray(heroGlbCfg.weaponSocketQuat)) {
+            weaponSocket.position.fromArray(heroGlbCfg.weaponSocketPos);
+            weaponSocket.quaternion.fromArray(heroGlbCfg.weaponSocketQuat);
+          } else if (heroGlbCfg.useMeshyHandSocket || activeHeroGlbUrl.includes('klingenwaechter_male')) {
+            weaponSocket.position.set(-0.0177, -0.0118, 0.0389);
+            weaponSocket.quaternion.set(0.04521, 0.66362, 0.67493, -0.31941);
+          } else {
+            heroGlbHolder.updateMatrixWorld(true);
+            const qRootWorld = new THREE.Quaternion();
+            const qHandWorld = new THREE.Quaternion();
+            heroGlbHolder.getWorldQuaternion(qRootWorld);
+            primaryHandBone.getWorldQuaternion(qHandWorld);
+            const qHandInRoot = qRootWorld.clone().invert().multiply(qHandWorld);
+            const targetSwordQuatInRoot = new THREE.Quaternion().setFromEuler(
+              new THREE.Euler(-0.50, -0.16, 0.32, 'YXZ')
+            );
+            if (tpl.isYUp) {
+              weaponSocket.position.set(-0.022, -0.028, 0.032);
+            } else {
+              weaponSocket.position.set(6.2, 0.6, 0.0);
+            }
+            weaponSocket.quaternion.copy(qHandInRoot).invert().multiply(targetSwordQuatInRoot);
+          }
+          weaponSocket.scale.setScalar(socketScale);
+
+          weaponGroup.position.set(0, 0, 0);
+          weaponGroup.rotation.set(0, 0, 0);
+          weaponGroup.scale.setScalar(1.0);
+          weaponSocket.add(weaponGroup);
+          primaryHandBone.add(weaponSocket);
+          glbAct.weaponSocket = weaponSocket;
+        }
+
+        // Zweiter Zwillingsdolch in der linken Faust bei Schattenjäger / Ninja (weaponVisual === 'dagger')
+        if (offHandWeaponGroup && glbAct.leftHandBone && !heroGlbCfg.hasBuiltinWeapon) {
+          const leftWeaponSocket = new THREE.Group();
+          leftWeaponSocket.name = 'leftWeaponSocket';
+          if (
+            Array.isArray(heroGlbCfg.leftWeaponSocketPos) &&
+            Array.isArray(heroGlbCfg.leftWeaponSocketQuat)
+          ) {
+            leftWeaponSocket.position.fromArray(heroGlbCfg.leftWeaponSocketPos);
+            leftWeaponSocket.quaternion.fromArray(heroGlbCfg.leftWeaponSocketQuat);
+          } else {
+            leftWeaponSocket.position.set(0.018, 0.082, -0.005);
+            leftWeaponSocket.quaternion.set(0.34, 0.34, 0.62, 0.62).normalize();
+          }
+          leftWeaponSocket.scale.setScalar(socketScale);
+
+          offHandWeaponGroup.position.set(0, 0, 0);
+          offHandWeaponGroup.rotation.set(0, 0, 0);
+          offHandWeaponGroup.scale.setScalar(1.0);
+          leftWeaponSocket.add(offHandWeaponGroup);
+          glbAct.leftHandBone.add(leftWeaponSocket);
+          glbAct.leftWeaponSocket = leftWeaponSocket;
         }
         const headIdx = tpl.nodes.findIndex((n) =>
           /^(bip01 head|head)$/i.test((n.name || '').trim())
@@ -27763,12 +29390,12 @@ export class OpenWorld3DEngine {
           return { bone, localPitchAxis };
         };
         glbAct.ikBones = {
-          lThigh: findLegBone(/^(bip01 l thigh|l_thigh|l thigh)$/i),
-          rThigh: findLegBone(/^(bip01 r thigh|r_thigh|r thigh)$/i),
-          lCalf: findLegBone(/^(bip01 l calf|l_calf|l calf)$/i),
-          rCalf: findLegBone(/^(bip01 r calf|r_calf|r calf)$/i),
-          lFoot: findLegBone(/^(bip01 l foot|l_foot|l foot)$/i),
-          rFoot: findLegBone(/^(bip01 r foot|r_foot|r foot)$/i),
+          lThigh: findLegBone(/^(bip01 l thigh|l_thigh|l thigh|leftupleg|l_upleg)$/i),
+          rThigh: findLegBone(/^(bip01 r thigh|r_thigh|r thigh|rightupleg|r_upleg)$/i),
+          lCalf: findLegBone(/^(bip01 l calf|l_calf|l calf|leftleg|l_leg)$/i),
+          rCalf: findLegBone(/^(bip01 r calf|r_calf|r calf|rightleg|r_leg)$/i),
+          lFoot: findLegBone(/^(bip01 l foot|l_foot|l foot|leftfoot)$/i),
+          rFoot: findLegBone(/^(bip01 r foot|r_foot|r foot|rightfoot)$/i),
         };
       };
 
@@ -27854,6 +29481,7 @@ export class OpenWorld3DEngine {
       rightArmPivot,
       leftArmPivot,
       weaponGroup,
+      offHandWeaponGroup,
       shield,
       chestCrest,
       lShoulder,
@@ -27863,6 +29491,7 @@ export class OpenWorld3DEngine {
       auraRing,
       armorShining,
       weaponShining,
+      offHandWeaponShining,
       fishingGroup,
       miningGroup,
       mountGroup,
@@ -27903,7 +29532,15 @@ export class OpenWorld3DEngine {
           : Math.sin(elapsed * 2.2) * 0.008
         : 0.0;
       const ikPelvisY = !isMounted ? (actor._ikPelvisOffset || 0.0) : 0.0;
-      actor.heroGlbHolder.position.set(0, isMounted ? 0.46 + rideBob : ikPelvisY, isMounted ? -0.06 : 0.0);
+      const mountTargetH = actor.mountGroup?.userData?.glbActor?.targetHeight || 1.92;
+      const mountScale = mountTargetH / 1.92;
+      const baseMountY = actor.heroGlbHolder.userData?._mountOffsetY ?? 0.56;
+      const baseMountZ = actor.heroGlbHolder.userData?._mountOffsetZ ?? -0.10;
+      actor.heroGlbHolder.position.set(
+        0,
+        isMounted ? baseMountY * mountScale + rideBob : ikPelvisY,
+        isMounted ? baseMountZ * mountScale : 0.0
+      );
 
       let targetClip = 'wait';
       let speedMult = 1.0;
@@ -27947,16 +29584,28 @@ export class OpenWorld3DEngine {
         speedMult = 1.05;
         fadeTime = 0.10;
       } else if (isAttacking || gatherMode === 'mining') {
-        const comboLen = heroGlbAct.clips?.attack4 ? 4 : heroGlbAct.clips?.attack7 ? 7 : 6;
-        const stepIdx = ((comboStep || 0) % comboLen) + 1;
-        const stepKey = `attack${stepIdx}`;
-        targetClip = heroGlbAct.clips?.[stepKey]
-          ? stepKey
-          : heroGlbAct.clips?.attack1
-          ? 'attack1'
-          : 'attack';
-        speedMult = stepIdx === 4 || stepIdx >= 6 ? 1.08 : 1.14;
-        fadeTime = 0.08;
+        if (actor.weaponVisual === 'bow' && heroGlbAct.clips?.bow_attack) {
+          targetClip = 'bow_attack';
+          speedMult = 1.16;
+          fadeTime = 0.08;
+        } else if (actor.weaponVisual !== 'dagger' && heroGlbAct.clips?.attack8) {
+          const stepIdx = ((comboStep || 0) % 4) + 5;
+          const stepKey = `attack${stepIdx}`;
+          targetClip = heroGlbAct.clips?.[stepKey] ? stepKey : 'attack1';
+          speedMult = stepIdx === 8 ? 1.08 : 1.14;
+          fadeTime = 0.08;
+        } else {
+          const comboLen = heroGlbAct.clips?.attack4 ? 4 : heroGlbAct.clips?.attack7 ? 7 : 6;
+          const stepIdx = ((comboStep || 0) % comboLen) + 1;
+          const stepKey = `attack${stepIdx}`;
+          targetClip = heroGlbAct.clips?.[stepKey]
+            ? stepKey
+            : heroGlbAct.clips?.attack1
+            ? 'attack1'
+            : 'attack';
+          speedMult = stepIdx === 4 || stepIdx >= 6 ? 1.08 : 1.14;
+          fadeTime = 0.08;
+        }
       } else if (isJumping && heroGlbAct.clips?.jump) {
         targetClip = 'jump';
         speedMult = 1.0;
@@ -28026,8 +29675,13 @@ export class OpenWorld3DEngine {
       this.updateActorWeaponRibbonTrail(actor, (actor._ribbonSwingTimer || 0) > 0 && !isDead, dt);
     }
 
+    if (actor.offHandWeaponGroup && actor.weaponGroup) {
+      actor.offHandWeaponGroup.visible =
+        Boolean(actor.weaponGroup.visible) && gatherMode !== 'mining' && gatherMode !== 'fishing';
+    }
+
     // 2. +7 / +8 / +9 Rüstungs- & Waffen-Funkeln (Metin2 Shinings) rotieren & pulsieren lassen
-    for (const shGroup of [actor.armorShining, actor.weaponShining]) {
+    for (const shGroup of [actor.armorShining, actor.weaponShining, actor.offHandWeaponShining]) {
       if (shGroup && shGroup.userData?.sparks) {
         const alongZ = Boolean(shGroup.userData.alongZ);
         if (alongZ) {
@@ -28312,6 +29966,268 @@ export class OpenWorld3DEngine {
       );
       bell.position.z = 0.25;
       g.add(bell);
+      return g;
+    }
+
+    // 1a. Schattenjäger-Zwillingsdolch (Dolche.png: dunkler Walnuss- & Karmesin-Seidengriff, Goldknauf + Quaste, Halbmond-Parierstange & geschwungene Elfenbeinstahl-Klinge)
+    if (weaponVisual === 'dagger') {
+      const bronzeGoldMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        metalness: 0.48,
+        roughness: 0.26,
+        emissive: 0x78350f,
+        emissiveIntensity: 0.24,
+      });
+      const crimsonSilkMat = new THREE.MeshStandardMaterial({
+        color: 0x991b1b,
+        roughness: 0.52,
+        metalness: 0.08,
+        emissive: 0x450a0a,
+        emissiveIntensity: 0.16,
+      });
+      const walnutMat = new THREE.MeshStandardMaterial({
+        color: 0x3b1f10,
+        roughness: 0.58,
+        metalness: 0.14,
+      });
+
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.022, 0.15, 10), walnutMat);
+      grip.rotation.x = Math.PI / 2;
+      grip.position.z = -0.005;
+      g.add(grip);
+
+      for (const zBand of [-0.045, 0.0, 0.042]) {
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.0205, 0.0042, 6, 12), crimsonSilkMat);
+        band.position.z = zBand;
+        g.add(band);
+      }
+
+      const pommel = new THREE.Mesh(new THREE.OctahedronGeometry(0.032, 0), bronzeGoldMat);
+      pommel.scale.set(1.0, 0.82, 1.25);
+      pommel.position.z = -0.10;
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.082, 7), crimsonSilkMat);
+      tassel.rotation.x = Math.PI / 2 + 0.18;
+      tassel.position.set(0.0, -0.008, -0.148);
+      g.add(pommel, tassel);
+
+      const guardCenter = new THREE.Mesh(new THREE.BoxGeometry(0.148, 0.028, 0.036), bronzeGoldMat);
+      guardCenter.position.z = 0.082;
+      const wingL = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.056, 5), bronzeGoldMat);
+      wingL.rotation.z = Math.PI / 2 - 0.36;
+      wingL.rotation.x = Math.PI / 2;
+      wingL.position.set(0.082, 0, 0.096);
+      const wingR = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.056, 5), bronzeGoldMat);
+      wingR.rotation.z = -Math.PI / 2 + 0.36;
+      wingR.rotation.x = Math.PI / 2;
+      wingR.position.set(-0.082, 0, 0.096);
+      const rubyGem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.023, 0),
+        new THREE.MeshStandardMaterial({
+          color: 0xef4444,
+          emissive: 0xdc2626,
+          emissiveIntensity: plus >= 7 ? 0.92 : 0.65,
+          metalness: 0.35,
+          roughness: 0.18,
+        })
+      );
+      rubyGem.position.z = 0.084;
+      g.add(guardCenter, wingL, wingR, rubyGem);
+
+      const dLen = 0.42;
+      const dBody = dLen * 0.68;
+      const dTip = dLen * 0.32;
+      const dBladeMat = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        metalness: 0.44,
+        roughness: 0.22,
+        emissive: 0x334155,
+        emissiveIntensity: plus >= 9 ? 0.28 : 0.15,
+      });
+      const dBlade = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.014, dBody), dBladeMat);
+      dBlade.position.z = 0.098 + dBody * 0.5;
+
+      const dTipGeo = new THREE.ConeGeometry(0.056 * Math.SQRT1_2, dTip, 4);
+      dTipGeo.rotateY(Math.PI / 4);
+      dTipGeo.scale(1.0, 1.0, 0.014 / 0.056);
+      dTipGeo.rotateX(Math.PI / 2);
+      dTipGeo.computeVertexNormals();
+      const dBladeTip = new THREE.Mesh(dTipGeo, dBladeMat);
+      dBladeTip.position.z = 0.098 + dBody + dTip * 0.5;
+
+      const dFuller = new THREE.Mesh(
+        new THREE.BoxGeometry(0.016, 0.017, dBody * 0.84),
+        new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.5,
+          roughness: 0.3,
+          emissive: 0x7f1d1d,
+          emissiveIntensity: 0.24,
+        })
+      );
+      dFuller.position.z = 0.098 + dBody * 0.46;
+
+      const bladeAuraGroup = new THREE.Group();
+      const defaultCoreHex = 0xfef08a;
+      const defaultOuterHex = 0xef4444;
+      const flameTex = this.getBladeAuraFlameTexture ? this.getBladeAuraFlameTexture() : null;
+      const innerAuraMat = new THREE.MeshBasicMaterial({
+        map: flameTex,
+        color: defaultCoreHex,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const outerAuraMat = new THREE.MeshBasicMaterial({
+        map: flameTex,
+        color: defaultCoreHex,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const flameMat = new THREE.MeshBasicMaterial({
+        map: flameTex,
+        color: defaultOuterHex,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const coreGeo = new THREE.PlaneGeometry(0.085, dLen * 1.06);
+      coreGeo.rotateX(Math.PI / 2);
+      const innerAura = new THREE.Mesh(coreGeo, innerAuraMat);
+      innerAura.position.z = 0.098 + dLen * 0.5;
+      const outerAura = new THREE.Mesh(coreGeo, outerAuraMat);
+      outerAura.position.z = 0.098 + dLen * 0.5;
+      outerAura.rotation.z = Math.PI * 0.5;
+      const flameGeo = new THREE.PlaneGeometry(0.18, dLen * 1.12);
+      flameGeo.rotateX(Math.PI / 2);
+      const flamePlaneA = new THREE.Mesh(flameGeo, flameMat);
+      flamePlaneA.position.z = 0.098 + dLen * 0.52;
+      const flamePlaneB = new THREE.Mesh(flameGeo, flameMat);
+      flamePlaneB.position.z = 0.098 + dLen * 0.52;
+      flamePlaneB.rotation.z = Math.PI * 0.5;
+      const flamePlaneC = new THREE.Mesh(flameGeo, flameMat);
+      flamePlaneC.position.z = 0.098 + dLen * 0.52;
+      flamePlaneC.rotation.z = Math.PI * 0.25;
+      const flamePlaneD = new THREE.Mesh(flameGeo, flameMat);
+      flamePlaneD.position.z = 0.098 + dLen * 0.52;
+      flamePlaneD.rotation.z = -Math.PI * 0.25;
+      bladeAuraGroup.add(innerAura, outerAura, flamePlaneA, flamePlaneB, flamePlaneC, flamePlaneD);
+      bladeAuraGroup.userData = {
+        innerAura,
+        outerAura,
+        flamePlaneA,
+        flamePlaneB,
+        flamePlaneC,
+        flamePlaneD,
+        innerAuraMat,
+        outerAuraMat,
+        flameMat,
+        defaultCoreHex,
+        defaultOuterHex,
+        len: dLen,
+      };
+      g.add(dBlade, dBladeTip, dFuller, bladeAuraGroup);
+      g.userData.bladeAuraGroup = bladeAuraGroup;
+      g.traverse((child) => {
+        if (child.isMesh && !child.material?.transparent) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      return g;
+    }
+
+    // 1b. Schattenjäger-Recurve-Jagdbogen (Bogen.png: geschwungene Walnuss-/Gold-Wurfarme entlang Z, Karmesin-Griff, Gold-Rauten, Quasten & gespannte Bogensehne)
+    if (weaponVisual === 'bow') {
+      const walnutLimbMat = new THREE.MeshStandardMaterial({
+        color: 0x451f10,
+        roughness: 0.48,
+        metalness: 0.16,
+      });
+      const bronzeGoldMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        metalness: 0.5,
+        roughness: 0.25,
+        emissive: 0x78350f,
+        emissiveIntensity: 0.24,
+      });
+      const crimsonGripMat = new THREE.MeshStandardMaterial({
+        color: 0x991b1b,
+        roughness: 0.5,
+        metalness: 0.08,
+        emissive: 0x450a0a,
+        emissiveIntensity: 0.16,
+      });
+
+      const bowInner = new THREE.Group();
+      // Drehung um -90° (X): Bogen-Wurfarme (±Z -> ±Y_socket) stehen vertikal aufrecht,
+      // Bogenrücken (+X_socket) zeigt zum Ziel, Bogensehne (-X_socket) zeigt zur ziehenden rechten Hand!
+      bowInner.rotation.x = -Math.PI / 2;
+      g.add(bowInner);
+
+      const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.20, 10), crimsonGripMat);
+      riser.rotation.x = Math.PI / 2;
+      bowInner.add(riser);
+
+      for (const sgn of [1, -1]) {
+        const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.024, 0.048, 10), bronzeGoldMat);
+        collar.rotation.x = Math.PI / 2;
+        collar.position.z = sgn * 0.11;
+
+        const midLimb = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.036, 0.28), walnutLimbMat);
+        midLimb.position.set(0.036, 0, sgn * 0.24);
+        midLimb.rotation.y = sgn * 0.26;
+
+        const goldSpine = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.040, 0.25), bronzeGoldMat);
+        goldSpine.position.set(0.044, 0, sgn * 0.24);
+        goldSpine.rotation.y = sgn * 0.26;
+
+        const outerLimb = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.030, 0.325), walnutLimbMat);
+        outerLimb.position.set(-0.053, 0, sgn * 0.46);
+        outerLimb.rotation.y = -sgn * 0.88;
+
+        const recurveTip = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.095, 6), bronzeGoldMat);
+        recurveTip.rotation.x = sgn > 0 ? Math.PI / 2 : -Math.PI / 2;
+        recurveTip.rotation.y = -sgn * 0.34;
+        recurveTip.position.set(-0.185, 0, sgn * 0.585);
+
+        const gem = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.022, 0),
+          new THREE.MeshStandardMaterial({
+            color: 0xef4444,
+            emissive: 0xdc2626,
+            emissiveIntensity: plus >= 7 ? 0.92 : 0.62,
+            metalness: 0.35,
+            roughness: 0.2,
+          })
+        );
+        gem.position.set(0.028, 0, sgn * 0.13);
+
+        const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.013, 0.075, 6), crimsonGripMat);
+        tassel.position.set(-0.165, -0.012, sgn * 0.555);
+        bowInner.add(collar, midLimb, goldSpine, outerLimb, recurveTip, gem, tassel);
+      }
+
+      const bowString = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0028, 0.0028, 1.15, 6),
+        new THREE.MeshBasicMaterial({ color: 0xe2e8f0 })
+      );
+      bowString.rotation.x = Math.PI / 2;
+      bowString.position.set(-0.19, 0, 0);
+      bowInner.add(bowString);
+
+      g.traverse((child) => {
+        if (child.isMesh && !child.material?.transparent) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
       return g;
     }
 
@@ -30788,7 +32704,7 @@ export class OpenWorld3DEngine {
       const opLabelKey = `${op.level}|${opRankName}|${opRankColor || ''}|${op.name}|${opGuild}|${opShowGuild}`;
       const opWeaponPlus = Number(op.weaponPlus ?? 0);
       const opArmorPlus = Number(op.armorPlus ?? opWeaponPlus);
-      const opGender = op.gender === 'f' || op.gender === 'female' ? 'female' : 'male';
+      const opGender = isFemaleGender(op.gender) ? 'female' : 'male';
       const opAppearanceKey = `${op.classId || 'warrior'}_${opGender}_${opWeaponPlus}_${opArmorPlus}_${op.weaponVisual || ''}_${op.mountSkin || ''}`;
       if (!mesh || mesh.appearanceKey !== opAppearanceKey) {
         const prevPos = mesh?.root ? mesh.root.position.clone() : null;
@@ -31826,8 +33742,9 @@ export class OpenWorld3DEngine {
       this.spawnRingWave(ev.x, y + 0.25, ev.z, 0xfde047, 4.8);
       this.spawnRingWave(ev.x, y + 0.65, ev.z, 0x34d399, 3.2);
     } else if (ev.type === 'level_up') {
+      const lvlActor = isLocalPlayerEvent ? this.localPlayerActor : this.otherPlayerMeshes?.get(d.playerId) || null;
       this.spawnFloatingText(ev.x, y + 3.2, ev.z, `🎉 LEVEL UP! (Lv.${ev.data?.level})`, '#fde047');
-      this.spawnRingWave(ev.x, y + 0.3, ev.z, 0xfde047, 5.5);
+      this.triggerLevelUpBurst(Number(ev.data?.level || 1), lvlActor, ev.x, y, ev.z);
     } else if (ev.type === 'quest_ready') {
       this.spawnFloatingText(ev.x, y + 3.3, ev.z, `📜 QUESTZIEL ERREICHT: ${d.title || ''}!`, '#34d399');
       this.spawnRingWave(ev.x, y + 0.3, ev.z, 0x34d399, 5.2);
@@ -34216,7 +36133,7 @@ export class OpenWorld3DEngine {
     if (!isPc || candidates.length === 0) return;
     candidates.sort((a, b) => a.distSq - b.distSq);
 
-    const MAX_NEARBY_HIGH_POLY_PLAYERS = 4;
+    const MAX_NEARBY_HIGH_POLY_PLAYERS = 3;
     let highCount = 0;
     for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
       const { glbAct, lodInfo, distSq } = candidates[cIdx];
@@ -34254,6 +36171,15 @@ export class OpenWorld3DEngine {
     if (this.disposed) return;
     this._scheduleNextFrame();
     if (!this._mapEnvironmentBuilt) return;
+    if (this._webglContextLost) {
+      if (!this._contextLostSinceMs) this._contextLostSinceMs = performance.now();
+      else if (performance.now() - this._contextLostSinceMs > 1800) {
+        this._contextLostSinceMs = 0;
+        this.recoverIfContextLost();
+      }
+      return;
+    }
+    this._contextLostSinceMs = 0;
 
     this._frameIndex = (this._frameIndex || 0) + 1;
 
@@ -35289,26 +37215,26 @@ export class OpenWorld3DEngine {
       }
     }
 
-    // Formschlüssige Metin2-Energiescheide ("Aura des Schwertes" / "Verzauberte Klinge") entlang der Klinge animieren
+    // Formschlüssige, ruhige Metin2-Energiescheide ("Aura des Schwertes" / "Verzauberte Klinge") entlang der Klinge animieren
     const bladeAura = lp.weaponGroup?.userData?.bladeAuraGroup;
     if (bladeAura) {
       const hasBladeBuff = Boolean(lp._hasMetinWeaponBladeBuff || this.hasActiveWeaponBuff);
       const isRsb = lp.weaponVisual === 'rsb';
-      const pulse = 0.88 + Math.sin(elapsed * 12.5) * 0.14;
-      const flicker = 0.86 + Math.sin(elapsed * 21.0) * 0.10 + Math.cos(elapsed * 33.0) * 0.06;
-      const swingBoost = (lp._ribbonSwingTimer || 0) > 0 ? 1.18 : 1.0;
+      const pulse = 0.92 + Math.sin(elapsed * 4.8) * 0.06;
+      const flicker = 0.90 + Math.sin(elapsed * 8.2) * 0.06 + Math.cos(elapsed * 13.0) * 0.03;
+      const swingBoost = (lp._ribbonSwingTimer || 0) > 0 ? 1.16 : 1.0;
       if (hasBladeBuff) {
         if (bladeAura.userData.innerAuraMat) {
-          bladeAura.userData.innerAuraMat.opacity = Math.min(0.95, 0.72 * pulse * swingBoost);
+          bladeAura.userData.innerAuraMat.opacity = Math.min(0.95, 0.74 * pulse * swingBoost);
         }
         if (bladeAura.userData.outerAuraMat) {
           bladeAura.userData.outerAuraMat.opacity = Math.min(0.92, 0.68 * pulse * swingBoost);
-          const s = 0.94 + Math.sin(elapsed * 15.0) * 0.14;
+          const s = 0.97 + Math.sin(elapsed * 5.6) * 0.05;
           bladeAura.userData.outerAura.scale.set(s, 1.0, 1.0);
         }
         if (bladeAura.userData.flameMat) {
           bladeAura.userData.flameMat.opacity = Math.min(0.92, 0.64 * flicker * swingBoost);
-          const fw = 0.92 + Math.sin(elapsed * 19.0) * 0.16;
+          const fw = 0.96 + Math.sin(elapsed * 7.2) * 0.06;
           if (bladeAura.userData.flamePlaneA) bladeAura.userData.flamePlaneA.scale.set(fw, 1.0, 1.0);
           if (bladeAura.userData.flamePlaneB) bladeAura.userData.flamePlaneB.scale.set(fw, 1.0, 1.0);
           if (bladeAura.userData.flamePlaneC) bladeAura.userData.flamePlaneC.scale.set(fw * 0.94, 1.0, 1.0);
@@ -35593,6 +37519,7 @@ export class OpenWorld3DEngine {
     }
 
     if (this.npcActors && this.npcActors.length > 0) {
+      this._updateSpecialNpcEffects?.(dt, elapsed);
       const maxNpcDistSq = this._viewTier === 0 ? 11025 : this._viewTier === 1 ? 25600 : 48400; // 105m / 160m / 220m
       for (const npcAct of this.npcActors) {
         const container = npcAct.container;
@@ -37631,6 +39558,7 @@ export class OpenWorld3DEngine {
       if (this._compPreview.rafId) cancelAnimationFrame(this._compPreview.rafId);
       this._compPreview.abort?.abort();
       this._compPreview.renderer?.dispose?.();
+      this._compPreview.renderer?.forceContextLoss?.();
       this._compPreview = null;
     }
     if (this.snowWeather) {
@@ -37642,13 +39570,163 @@ export class OpenWorld3DEngine {
       this.dayNightSystem = null;
     }
   }
+
+  _attachRendererContextHandlers() {
+    const dom = this.renderer?.domElement;
+    if (!dom || dom.__aeryndorCtxBound) return;
+    dom.__aeryndorCtxBound = true;
+    dom.addEventListener(
+      'webglcontextlost',
+      (e) => {
+        e.preventDefault();
+        this._webglContextLost = true;
+      },
+      false
+    );
+    dom.addEventListener(
+      'webglcontextrestored',
+      () => {
+        this._webglContextLost = false;
+        this._rebuildAfterContextRestore();
+      },
+      false
+    );
+  }
+
+  _rebuildAfterContextRestore() {
+    if (!this.renderer || !this.scene) return;
+    this._waterDepthRT = null;
+    this._waterDepthRenderedOnce = false;
+    this._reflTarget = null;
+    if (this._waterShaderUniforms) {
+      if (this._waterShaderUniforms.uSceneDepthTex) this._waterShaderUniforms.uSceneDepthTex.value = null;
+      if (this._waterShaderUniforms.uSceneColorTex) this._waterShaderUniforms.uSceneColorTex.value = null;
+      if (this._waterShaderUniforms.uReflTex) this._waterShaderUniforms.uReflTex.value = null;
+    }
+    if (this.sunLight?.shadow?.map) {
+      this.sunLight.shadow.map = null;
+    }
+    this.renderer.shadowMap.needsUpdate = true;
+    const markCacheDirty = (cache) => {
+      if (!cache) return;
+      cache.forEach((tex) => {
+        if (tex && tex.image) tex.needsUpdate = true;
+      });
+    };
+    markCacheDirty(this._terrainTexCache);
+    markCacheDirty(this._modelTextureCache);
+    markCacheDirty(this._baltazarTexCache);
+    markCacheDirty(this._damageTexCache);
+
+    if (this.snowWeather) {
+      this.snowWeather.renderer = this.renderer;
+      if (this.snowWeather._occ) {
+        const { res, half } = this.snowWeather._occ;
+        try {
+          this.snowWeather._occ.solid?.dispose?.();
+          this.snowWeather._occ.canopy?.dispose?.();
+        } catch (_) {}
+        this.snowWeather._createOcclusion?.(res, half);
+      }
+      this.snowWeather.invalidateOcclusion?.();
+    }
+    if (this.dayNightSystem) {
+      try {
+        this.dayNightSystem.dispose();
+      } catch (_) {}
+      this.dayNightSystem = new DayNightSystem(this);
+      this.initSkyDome();
+      if (this.dayNightSystem.atmosphere?.starField) {
+        this.starField = this.dayNightSystem.atmosphere.starField;
+      }
+    }
+    if (this._lastAppliedProfile) {
+      this.applyGraphicsProfile(this._lastAppliedProfile);
+    }
+  }
+
+  recoverIfContextLost() {
+    const gl = this.renderer?.getContext?.();
+    if (!gl || !gl.isContextLost?.()) return false;
+    if (!this.container) return false;
+    try {
+      this.renderer.dispose();
+    } catch (_) {}
+
+    const w = this.container.clientWidth || window.innerWidth || 1280;
+    const h = this.container.clientHeight || window.innerHeight || 720;
+    const isMobileDevice = Boolean(this.isMobileDevice);
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !isMobileDevice || (window.devicePixelRatio || 1) < 2,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.setSize(w, h);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileDevice ? 1.0 : 1.25));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
+    if ('outputColorSpace' in this.renderer && THREE.SRGBColorSpace) {
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+    this.container.innerHTML = '';
+    this.container.appendChild(this.renderer.domElement);
+    this._webglContextLost = false;
+    this._attachRendererContextHandlers();
+    this.bindInputEvents?.();
+    this._rebuildAfterContextRestore();
+    return true;
+  }
 }
 
 // ============================================================================
 // 8. 3D-HELDEN-PODEST FÜR CHARAKTERAUSWAHL & CHARAKTERERSTELLUNG
 // ============================================================================
 export class CharacterShowcase3D {
-  static preloadHeroModels(priorityClassId = 'warrior') {
+  static _acquireSharedRenderer(w, h) {
+    let r = CharacterShowcase3D._sharedRenderer;
+    const ctxLost = Boolean(r?.getContext?.()?.isContextLost?.());
+    if (!r || ctxLost) {
+      if (r) {
+        try {
+          r.dispose();
+        } catch (_) {}
+      }
+      r = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      r.shadowMap.enabled = true;
+      r.shadowMap.type = THREE.PCFSoftShadowMap;
+      r.toneMapping = THREE.ACESFilmicToneMapping;
+      r.toneMappingExposure = 1.12;
+      if ('outputColorSpace' in r && THREE.SRGBColorSpace) {
+        r.outputColorSpace = THREE.SRGBColorSpace;
+      }
+      CharacterShowcase3D._sharedRenderer = r;
+    }
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    r.setSize(w, h);
+    return r;
+  }
+
+  static releaseSharedRenderer() {
+    if (CharacterShowcase3D._activeInstance && !CharacterShowcase3D._activeInstance.disposed) {
+      CharacterShowcase3D._activeInstance.dispose();
+    }
+    CharacterShowcase3D._activeInstance = null;
+    const r = CharacterShowcase3D._sharedRenderer;
+    if (r) {
+      CharacterShowcase3D._sharedRenderer = null;
+      try {
+        r.domElement?.remove?.();
+      } catch (_) {}
+      try {
+        r.dispose();
+      } catch (_) {}
+      try {
+        r.forceContextLoss?.();
+      } catch (_) {}
+    }
+  }
+  static preloadHeroModels(priorityClassId = 'warrior', priorityGender = null) {
     if (!CharacterShowcase3D._preloadHelper) {
       const h = Object.create(OpenWorld3DEngine.prototype);
       h._modelTextureCache = GLOBAL_MODEL_TEXTURE_CACHE;
@@ -37658,6 +39736,7 @@ export class CharacterShowcase3D {
     }
     const helper = CharacterShowcase3D._preloadHelper;
     const isPc = isPcClientRuntime();
+    const preferFemale = isFemaleGender(priorityGender);
     const warmVariant = (v) => {
       if (!v || !v.glb) return Promise.resolve();
       if (Array.isArray(v.tex)) {
@@ -37679,28 +39758,39 @@ export class CharacterShowcase3D {
       }
       return p;
     };
-    const warmClass = (clsKey) => {
+    const warmClass = (clsKey, femaleFirst = false) => {
       const entry = HERO_GLB_BY_CLASS[clsKey];
       if (!entry) return Promise.resolve();
+      const femVariant = entry.female && entry.female.glb ? { ...entry, ...entry.female } : null;
+      if (femaleFirst && femVariant) {
+        const pFem = warmVariant(femVariant);
+        pFem.finally(() => warmVariant(entry));
+        return pFem;
+      }
       const pMain = warmVariant(entry);
-      if (entry.female && entry.female.glb) {
-        pMain.finally(() => warmVariant({ ...entry, ...entry.female }));
+      if (femVariant) {
+        pMain.finally(() => warmVariant(femVariant));
       }
       return pMain;
     };
 
     const firstKey = HERO_GLB_BY_CLASS[priorityClassId] ? priorityClassId : 'warrior';
     const otherKeys = Object.keys(HERO_GLB_BY_CLASS).filter((k) => k !== firstKey);
-    warmClass(firstKey).finally(() => {
+    warmClass(firstKey, preferFemale).finally(() => {
       for (const k of otherKeys) {
-        warmClass(k);
+        warmClass(k, false);
       }
     });
   }
 
   constructor(container, initialCfg = {}) {
+    if (CharacterShowcase3D._activeInstance && !CharacterShowcase3D._activeInstance.disposed) {
+      CharacterShowcase3D._activeInstance.dispose();
+    }
     this.container = container;
     this.disposed = false;
+    this._rafId = null;
+    this._abort = new AbortController();
     this.clock = new THREE.Clock();
     this.targetRotY = 0.0;
     this.currentRotY = 0.0;
@@ -37709,6 +39799,7 @@ export class CharacterShowcase3D {
     this._heroRetryTimer = 0;
 
     if (!this.container) return;
+    CharacterShowcase3D._activeInstance = this;
 
     const w = this.container.clientWidth || 560;
     const h = this.container.clientHeight || 620;
@@ -37718,16 +39809,7 @@ export class CharacterShowcase3D {
     this.camera.position.set(0, 1.25, this.currentZoom);
     this.camera.lookAt(0, 0.95, 0);
 
-    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    this.renderer.setSize(w, h);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
-    if ('outputColorSpace' in this.renderer && THREE.SRGBColorSpace) {
-      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    }
+    this.renderer = CharacterShowcase3D._acquireSharedRenderer(w, h);
 
     this.container.innerHTML = '';
     this.container.appendChild(this.renderer.domElement);
@@ -37908,7 +39990,7 @@ export class CharacterShowcase3D {
     }
     this.scene.add(this.actor.root);
     // Restliche Heldenklassen im Hintergrund nachwärmen
-    CharacterShowcase3D.preloadHeroModels(cfg.classId || 'warrior');
+    CharacterShowcase3D.preloadHeroModels(cfg.classId || 'warrior', cfg.gender || null);
   }
 
   triggerActionPose() {
@@ -37925,7 +40007,7 @@ export class CharacterShowcase3D {
       if (this.actor.bodyGroup) {
         this.actor.bodyGroup.visible = false;
       }
-      this.targetZoom = this.isMountedPreview ? 5.65 : 4.85;
+      this.targetZoom = this.isMountedPreview ? 6.10 : 4.85;
     }
     return Boolean(this.isMountedPreview);
   }
@@ -37944,19 +40026,25 @@ export class CharacterShowcase3D {
 
   resetView() {
     this.targetRotY = 0.0;
-    this.targetZoom = this.isMountedPreview ? 5.65 : 4.85;
+    this.targetZoom = this.isMountedPreview ? 6.10 : 4.85;
   }
 
   bindInteractions() {
     const dom = this.renderer.domElement;
+    const signal = this._abort?.signal;
+    const sigOpt = signal ? { signal } : undefined;
     dom.style.touchAction = 'pan-y';
     let dragging = false;
     let prevX = 0;
 
-    dom.addEventListener('pointerdown', (e) => {
-      dragging = true;
-      prevX = e.clientX;
-    });
+    dom.addEventListener(
+      'pointerdown',
+      (e) => {
+        dragging = true;
+        prevX = e.clientX;
+      },
+      sigOpt
+    );
     this.onMove = (e) => {
       if (!dragging) return;
       const dx = e.clientX - prevX;
@@ -37966,32 +40054,36 @@ export class CharacterShowcase3D {
     this.onUp = () => {
       dragging = false;
     };
-    window.addEventListener('pointermove', this.onMove);
-    window.addEventListener('pointerup', this.onUp);
+    window.addEventListener('pointermove', this.onMove, sigOpt);
+    window.addEventListener('pointerup', this.onUp, sigOpt);
 
     dom.addEventListener(
       'wheel',
       (e) => {
         e.preventDefault();
-        this.targetZoom = Math.max(3.6, Math.min(6.6, this.targetZoom + e.deltaY * 0.003));
+        this.targetZoom = Math.max(3.6, Math.min(7.1, this.targetZoom + e.deltaY * 0.003));
       },
-      { passive: false }
+      signal ? { passive: false, signal } : { passive: false }
     );
 
-    dom.addEventListener('dblclick', () => {
-      this.targetRotY = 0.0;
-      this.targetZoom = 4.85;
-    });
+    dom.addEventListener(
+      'dblclick',
+      () => {
+        this.targetRotY = 0.0;
+        this.targetZoom = 4.85;
+      },
+      sigOpt
+    );
 
     this.onResize = () => {
-      if (this.disposed || !this.container) return;
+      if (this.disposed || !this.container || !this.renderer) return;
       const w = Math.max(120, this.container.clientWidth || 320);
       const h = Math.max(120, this.container.clientHeight || 260);
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
     };
-    window.addEventListener('resize', this.onResize);
+    window.addEventListener('resize', this.onResize, sigOpt);
     if (typeof ResizeObserver === 'function' && this.container) {
       this._ro = new ResizeObserver(() => this.onResize());
       this._ro.observe(this.container);
@@ -38001,8 +40093,8 @@ export class CharacterShowcase3D {
   }
 
   animate() {
-    if (this.disposed) return;
-    requestAnimationFrame(() => this.animate());
+    if (this.disposed || !this.renderer) return;
+    this._rafId = requestAnimationFrame(() => this.animate());
 
     const dt = Math.min(0.1, this.clock.getDelta());
     const t = this.clock.getElapsedTime();
@@ -38013,8 +40105,8 @@ export class CharacterShowcase3D {
     this.currentRotY += (this.targetRotY - this.currentRotY) * Math.min(1.0, dt * 10.0);
     this.currentZoom += (this.targetZoom - this.currentZoom) * Math.min(1.0, dt * 10.0);
 
-    const lookY = this.isMountedPreview ? 1.25 : 0.95;
-    const camY = this.isMountedPreview ? 1.58 : 1.25;
+    const lookY = this.isMountedPreview ? 1.38 : 0.95;
+    const camY = this.isMountedPreview ? 1.72 : 1.25;
     this.camera.position.set(0, camY, this.currentZoom);
     this.camera.lookAt(0, lookY, 0);
 
@@ -38073,15 +40165,49 @@ export class CharacterShowcase3D {
   }
 
   dispose() {
+    if (this.disposed) return;
     this.disposed = true;
+    if (CharacterShowcase3D._activeInstance === this) {
+      CharacterShowcase3D._activeInstance = null;
+    }
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+    try {
+      this._abort?.abort?.();
+    } catch (_) {}
     try {
       this._ro?.disconnect?.();
     } catch (_) {}
-    window.removeEventListener('pointermove', this.onMove);
-    window.removeEventListener('pointerup', this.onUp);
-    window.removeEventListener('resize', this.onResize);
+    if (this.onMove) window.removeEventListener('pointermove', this.onMove);
+    if (this.onUp) window.removeEventListener('pointerup', this.onUp);
+    if (this.onResize) window.removeEventListener('resize', this.onResize);
+    if (this.actor && this.scene) {
+      this.scene.remove(this.actor.root);
+      this.helperEngine?.disposeSafeHierarchy?.(this.actor.root);
+      this.actor = null;
+    }
+    if (this.pedestalGroup) {
+      this.pedestalGroup.traverse((n) => {
+        n.geometry?.dispose?.();
+        n.material?.dispose?.();
+      });
+      this.pedestalGroup = null;
+    }
     if (this.renderer) {
-      this.renderer.dispose();
+      if (this.renderer.domElement?.parentElement === this.container) {
+        try {
+          this.container.removeChild(this.renderer.domElement);
+        } catch (_) {}
+      }
+      if (this.renderer !== CharacterShowcase3D._sharedRenderer) {
+        try {
+          this.renderer.dispose();
+          this.renderer.forceContextLoss?.();
+        } catch (_) {}
+      }
+      this.renderer = null;
     }
   }
 }

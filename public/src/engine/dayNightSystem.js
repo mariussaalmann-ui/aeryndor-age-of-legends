@@ -1200,7 +1200,11 @@ export class SunbeamRenderer {
             if (i >= steps) break;
             sampleUv -= stepUv;
             if (sampleUv.x >= 0.002 && sampleUv.x <= 0.998 && sampleUv.y >= 0.002 && sampleUv.y <= 0.998) {
-              vec4 occSample = texture2D(uOcclusionTex, sampleUv);
+              #if defined(GL_EXT_shader_texture_lod) || __VERSION__ >= 300
+                vec4 occSample = texture2DLodEXT(uOcclusionTex, sampleUv, 0.0);
+              #else
+                vec4 occSample = texture2D(uOcclusionTex, sampleUv);
+              #endif
               accumRays += occSample.rgb * illuminationDecay * weight;
             }
             illuminationDecay *= decay;

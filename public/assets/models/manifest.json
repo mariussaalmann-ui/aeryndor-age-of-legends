@@ -700,6 +700,133 @@
         "human_aide_face.png",
         "human_aide_hair.png"
       ]
+    },
+    "plechi_horse_guard": {
+      "meshes": 7,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk"
+      ],
+      "textures": [
+        "horse_guard_tex00.png",
+        "horse_guard_tex01.png",
+        "horse_guard_tex02.png",
+        "horse_guard_tex03.png",
+        "horse_guard_tex04.png",
+        "horse_guard_tex05.png",
+        "horse_guard_tex06.png"
+      ]
+    },
+    "sailor": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run"
+      ],
+      "textures": [
+        "sailor.png"
+      ]
+    },
+    "bookworm": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "walk",
+        "run"
+      ],
+      "textures": [
+        "bookworm.png"
+      ]
+    },
+    "plechi_merchant_npc1": {
+      "meshes": 3,
+      "animations": [
+        "wait",
+        "wait1",
+        "wait2"
+      ],
+      "textures": [
+        "merchant_tex00.png",
+        "merchant_tex01.png",
+        "merchant_tex02.png"
+      ]
+    },
+    "hunter": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "textures": [
+        "hunter.png"
+      ]
+    },
+    "chagirap": {
+      "meshes": 3,
+      "animations": [
+        "wait",
+        "walk",
+        "run"
+      ],
+      "textures": [
+        "chagirap.png",
+        "chagirap_01.png"
+      ]
+    },
+    "musician": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "wait1",
+        "walk",
+        "run"
+      ],
+      "textures": [
+        "yu_hwan.png"
+      ]
+    },
+    "plechi_lady_npc10": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "textures": [
+        "lady_npc10_tex.png"
+      ]
+    },
+    "plechi_lady_npc11": {
+      "meshes": 2,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "textures": [
+        "lady_npc11_tex.png"
+      ]
+    },
+    "pewi_legend_smith": {
+      "meshes": 4,
+      "animations": [
+        "wait",
+        "wait1"
+      ],
+      "textures": [
+        "legend_smith.png"
+      ]
+    },
+    "hotel_grandfa": {
+      "meshes": 2,
+      "animations": [
+        "wait"
+      ],
+      "textures": [
+        "hotel_grandfa.png"
+      ]
     }
   },
   "monoliths": {},

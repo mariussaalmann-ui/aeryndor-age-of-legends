@@ -43879,6 +43879,8 @@ class CompressedTextureLoader extends Loader {
 
 }
 
+const _inflightImagePinSet = new Set();
+
 class ImageLoader extends Loader {
 
 	constructor( manager ) {
@@ -43914,6 +43916,7 @@ class ImageLoader extends Loader {
 		}
 
 		const image = createElementNS( 'img' );
+		_inflightImagePinSet.add( image );
 
 		function onImageLoad() {
 
@@ -43940,6 +43943,7 @@ class ImageLoader extends Loader {
 
 		function removeEventListeners() {
 
+			_inflightImagePinSet.delete( image );
 			image.removeEventListener( 'load', onImageLoad, false );
 			image.removeEventListener( 'error', onImageError, false );
 
