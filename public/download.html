@@ -83,7 +83,7 @@
             <div class="di-wave" id="di-wave" aria-hidden="true">
               <span></span><span></span><span></span><span></span>
             </div>
-            <span class="di-badge-pill" id="di-compact-badge">v4.39</span>
+            <span class="di-badge-pill" id="di-compact-badge">ALPHA v0.5</span>
           </div>
         </div>
 
@@ -176,7 +176,8 @@
 
         <div class="sys-bullet-tags" style="padding-top:14px;border-top:1px solid var(--glass-border-subtle);">
           <span class="sys-bullet-tag">🔒 SHA-256 Signiert &amp; Verifiziert</span>
-          <span class="sys-bullet-tag">📦 Engine.pak Vault v4.39</span>
+          <span class="sys-bullet-tag">📦 Engine.pak Vault • Alpha v0.5</span>
+          <span class="sys-bullet-tag">💎 Interface: Liquid Horizons v1.0</span>
           <span class="sys-bullet-tag">⚡ Unlimitierte 144+ FPS</span>
         </div>
       </div>
@@ -215,88 +216,146 @@
     </div>
   </section>
 
-  <!-- THREE.JS 3D-ENGINE & TECHNISCHE ARCHITEKTUR -->
+  <!-- THREE.JS 3D-ENGINE & GRAFIK-ARCHITEKTUR (ÜBERSICHTLICHE AUFLISTUNG) -->
   <section class="section-wrap reveal-on-scroll" id="engine-tech">
     <div class="section-head">
-      <div class="section-kicker">UNTER DER HAUBE VON AERYNDOR</div>
-      <h2 class="section-title">Die Three.js 3D-Engine &amp; Client-Architektur</h2>
+      <div class="section-kicker">3D-ENGINE &amp; GRAFIK-TECHNOLOGIE • VERSION ALPHA v0.5</div>
+      <h2 class="section-title">Three.js WebGL2 3D-Engine &amp; Grafik-Pipeline</h2>
       <p class="section-desc">
-        Aeryndor verbindet eine maßgeschneiderte <strong>Three.js WebGL2 3D-Rendering-Engine</strong> mit einer nativen Windows-Desktop-Laufzeitumgebung und einem autoritativen Echtzeit-Weltenserver.
+        Übersichtliche Auflistung aller aktiven <strong>Engine-, Shader-, Beleuchtungs- und Performance-Systeme</strong>, die Aeryndor im nativen Windows-Client und im Browser antreiben.
       </p>
     </div>
 
-    <div class="sys-showcase-grid">
-      <article class="sys-feature-card spotlight-card">
-        <div class="sys-feature-media">
-          <img src="/assets/client_ui/logo/3.png" alt="Three.js 3D Rendering &amp; Rissmonolithen Shader" loading="lazy" />
-          <span class="sys-cat-badge">🎨 Three.js WebGL 2.0</span>
+    <!-- 4 ÜBERSICHTLICHE ENGINE- & GRAFIK-SÄULEN (OHNE UNPASSENDE SCREENSHOTS) -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-bottom:26px;">
+      <article class="spotlight-card" style="padding:22px 24px;border-radius:20px;background:linear-gradient(180deg,rgba(15,23,42,0.88),rgba(9,13,24,0.96));border:1px solid rgba(56,189,248,0.38);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <span style="font-size:0.74rem;font-weight:800;padding:4px 10px;border-radius:999px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.42);color:#7dd3fc;">🎨 1. SHADER &amp; PBR-RENDERING</span>
+          <span style="font-size:0.72rem;color:#38bdf8;font-weight:700;">WebGL 2.0 • GLSL</span>
         </div>
-        <div class="sys-feature-body">
-          <h3>1. Three.js 3D-Rendering, PBR-Shading &amp; Custom GLSL-Shader</h3>
-          <p>
-            Das Herzstück der Grafik von Aeryndor ist unsere hochoptimierte <strong>Three.js (WebGL 2.0) 3D-Engine</strong>. Sie berechnet Physically Based Rendering (PBR) für metallische Rüstungen, weiche Echtzeit-Schattenwürfe (<code>PCFSoftShadowMap</code>), atmosphärischen Höhennebel, dynamische Tag-/Nacht-Beleuchtung sowie maßgeschneiderte Shader für das Pulsieren der 18 Rissmonolithen und den +9 Waffen-Schimmer.
-          </p>
-          <div class="sys-bullet-tags">
-            <span class="sys-bullet-tag">✨ Three.js WebGL2 Pipeline</span>
-            <span class="sys-bullet-tag">🔮 Custom Monolith- &amp; +9-Shader</span>
-            <span class="sys-bullet-tag">🌅 Dynamisches Licht &amp; Schatten</span>
-          </div>
-        </div>
+        <h3 style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--text-primary);margin:0 0 10px;">
+          PBR-Shading, 3D Vertex-AO &amp; Custom GLSL-Shader
+        </h3>
+        <ul style="margin:0;padding-left:18px;color:var(--text-secondary);font-size:0.86rem;line-height:1.68;">
+          <li><strong>Physically Based Rendering (PBR):</strong> Realistische Metall-, Leder-, Stoff- und Haut-Oberflächen für alle Charakter-, NPC- und Monster-Modelle.</li>
+          <li><strong>3D Multi-Scale Vertex-AO &amp; MikkTSpace:</strong> Tiefe Konturen in Gesichtern und Rüstungsfalten ohne Überstrahlen (Highlight-Rolloff).</li>
+          <li><strong>16× Anisotrope Texturfilterung:</strong> Gestochen scharfe Boden-, Rüstungs- und Felltexturen auch aus flachen Kamerawinkeln.</li>
+          <li><strong>Custom GLSL-Shader:</strong> Eigene Shader für das Pulsieren der 18 Rissmonolithen, den <code>+7 bis +9</code> Ausrüstungs-Schimmer und animierte Gewässer.</li>
+        </ul>
       </article>
 
-      <article class="sys-feature-card spotlight-card">
-        <div class="sys-feature-media">
-          <img src="/assets/homepage/sura_f_armor.png" alt="3D Skinned Mesh Charakter-Pipeline" class="contain-img" loading="lazy" />
-          <span class="sys-cat-badge">🦴 3D-Skelett &amp; Animation</span>
+      <article class="spotlight-card" style="padding:22px 24px;border-radius:20px;background:linear-gradient(180deg,rgba(15,23,42,0.88),rgba(9,13,24,0.96));border:1px solid rgba(251,191,36,0.38);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <span style="font-size:0.74rem;font-weight:800;padding:4px 10px;border-radius:999px;background:rgba(251,191,36,0.16);border:1px solid rgba(251,191,36,0.42);color:#fde047;">🌅 2. LICHT, SCHATTEN &amp; ATMOSPHÄRE</span>
+          <span style="font-size:0.72rem;color:#fbbf24;font-weight:700;">Time-of-Day IBL</span>
         </div>
-        <div class="sys-feature-body">
-          <h3>2. Skinned-Mesh Charakter-Pipeline &amp; Echtzeit-Ausrüstung</h3>
-          <p>
-            Alle 8 Heldenpfade (männlich &amp; weiblich für alle 4 Klassen), Reittiere, Begleiter und Monster basieren auf 3D-Skinned-Meshes (GLTF/GLB &amp; FBX) mit sanftem Animation-Blending über den Three.js <code>AnimationMixer</code>. Waffen, Schilde und Rüstungssets werden in Echtzeit an die Knochen-Sockets (Hand, Rücken, Sattel) gebunden.
-          </p>
-          <div class="sys-bullet-tags">
-            <span class="sys-bullet-tag">🦴 GLB/FBX AnimationMixer</span>
-            <span class="sys-bullet-tag">⚔️ Echtzeit-Bone-Attachments</span>
-            <span class="sys-bullet-tag">🐎 Berittene Kampf-Animationen</span>
-          </div>
-        </div>
+        <h3 style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--text-primary);margin:0 0 10px;">
+          Dynamischer Tag-/Nacht-Zyklus &amp; Echtzeit-Schatten
+        </h3>
+        <ul style="margin:0;padding-left:18px;color:var(--text-secondary);font-size:0.86rem;line-height:1.68;">
+          <li><strong>Time-of-Day IBL (Image-Based Lighting):</strong> Nahtloser Übergang zwischen Sonnenaufgang, Tag, Abendrot und klarer Sternennacht.</li>
+          <li><strong>Weiche Echtzeit-Schatten (<code>PCFSoftShadowMap</code>):</strong> Dynamische Schattenwürfe für Helden, Reittiere, Begleiter, Bäume und Stadtgebäude.</li>
+          <li><strong>Dynamische Punktlichter &amp; Partikel:</strong> Glühende Schmiede-Essen, Fackeln, Stadt-Laternen, Riss-Strahlen und klassenspezifische Skill-Partikel.</li>
+          <li><strong>Biom-Atmosphäre &amp; Höhennebel:</strong> Eigene Farb- und Nebelprofile für <em>Kaeryu, Seiryu, Bakra, Wüstenoase, Eisgipfel &amp; Obsidian-Krater</em>.</li>
+        </ul>
       </article>
 
-      <article class="sys-feature-card spotlight-card">
-        <div class="sys-feature-media">
-          <img src="/assets/homepage/systems/hud_interface.png" alt="Native Standalone Engine &amp; HUD" loading="lazy" />
-          <span class="sys-cat-badge">🛡️ Native Client &amp; Vault</span>
+      <article class="spotlight-card" style="padding:22px 24px;border-radius:20px;background:linear-gradient(180deg,rgba(15,23,42,0.88),rgba(9,13,24,0.96));border:1px solid rgba(16,185,129,0.38);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <span style="font-size:0.74rem;font-weight:800;padding:4px 10px;border-radius:999px;background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.42);color:#6ee7b7;">🦴 3. 3D-SKELETT, LOD &amp; ANIMATION</span>
+          <span style="font-size:0.72rem;color:#34d399;font-weight:700;">GLB • Meshopt • LOD</span>
         </div>
-        <div class="sys-feature-body">
-          <h3>3. Native Windows-Runtime &amp; Verschlüsselter Asset-Vault</h3>
-          <p>
-            Im nativen Windows PC-Client läuft die Three.js-Engine in einer dedizierten High-Performance-Desktop-Umgebung ohne Browser-Overhead. Alle 3D-Modelle, Texturen und Sounds werden blitzschnell aus dem lokal verschlüsselten <strong>Asset-Vault (<code>Engine.pak</code>)</strong> gestreamt – für unlimitierte 144+ FPS und minimale Ladezeiten beim Gebietswechsel.
-          </p>
-          <div class="sys-bullet-tags">
-            <span class="sys-bullet-tag">🔒 Verschlüsselter Engine.pak Vault</span>
-            <span class="sys-bullet-tag">🚀 Smart-Launcher Auto-Patcher</span>
-            <span class="sys-bullet-tag">⚡ Unlimitierte 144+ FPS</span>
-          </div>
-        </div>
+        <h3 style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--text-primary);margin:0 0 10px;">
+          Skinned-Mesh Pipeline, 3-Stufen-LOD &amp; Bone-Sockets
+        </h3>
+        <ul style="margin:0;padding-left:18px;color:var(--text-secondary);font-size:0.86rem;line-height:1.68;">
+          <li><strong>3-stufiges Hero-LOD-System (<code>LOD0 / LOD1 / LOD2</code>):</strong> Automatische Detailstufen mit <code>EXT_meshopt_compression</code> für maximale FPS in Städten und Raids.</li>
+          <li><strong>Echtzeit-Bone-Sockets:</strong> Präzise Bindung von Waffen an die rechte/linke Hand, Sattel-Positionierung auf allen 3 Mount-EQ-Stufen und Zaumzeug-Physik.</li>
+          <li><strong>AnimationMixer &amp; Blending:</strong> Flüssige Übergänge zwischen Stand, Lauf, 4-Schlag-Kombo, Fertigkeiten, Reit-Galopp und mitlaufendem Begleit-Pferd.</li>
+          <li><strong>360°-WebGLRenderTarget-Bühnen:</strong> Dedizierte 3D-Echtzeit-Vorschau für alle 10 Pferde-Fellfarben und 9 3D-Pets direkt im UI.</li>
+        </ul>
       </article>
 
-      <article class="sys-feature-card spotlight-card">
-        <div class="sys-feature-media">
-          <img src="/assets/homepage/systems/boss_target_ui.png" alt="Autoritativer Multiplayer-Server &amp; Telemetrie" loading="lazy" />
-          <span class="sys-cat-badge">🌐 Low-Latency Netcode</span>
+      <article class="spotlight-card" style="padding:22px 24px;border-radius:20px;background:linear-gradient(180deg,rgba(15,23,42,0.88),rgba(9,13,24,0.96));border:1px solid rgba(168,85,247,0.38);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <span style="font-size:0.74rem;font-weight:800;padding:4px 10px;border-radius:999px;background:rgba(168,85,247,0.16);border:1px solid rgba(168,85,247,0.42);color:#d8b4fe;">⚡ 4. PERFORMANCE &amp; NATIVE RUNTIME</span>
+          <span style="font-size:0.72rem;color:#c084fc;font-weight:700;">144+ FPS • Engine.pak</span>
         </div>
-        <div class="sys-feature-body">
-          <h3>4. Autoritativer Echtzeit-Server &amp; Cross-Play-Synchronisation</h3>
-          <p>
-            Alle Kampf-Berechnungen, Trefferzonen (AoE), Beute-Drops, Schmiede-Versuche und die garantierte Verteilung der Instabilen Rissmonolithen werden vom zentralen Aeryndor-Server in Echtzeit validiert. Dank des einheitlichen Protokolls spielen PC-Client-Nutzer und WebGL2-Browser-Spieler nahtlos gemeinsam auf derselben Welt.
-          </p>
-          <div class="sys-bullet-tags">
-            <span class="sys-bullet-tag">📡 Echtzeit-WebSocket-Sync</span>
-            <span class="sys-bullet-tag">🛡️ Serverseitiger Anti-Cheat</span>
-            <span class="sys-bullet-tag">🔄 100% Cross-Play &amp; Cloud-Save</span>
+        <h3 style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--text-primary);margin:0 0 10px;">
+          GPU-Instancing, Frustum-Culling &amp; Asset-Vault
+        </h3>
+        <ul style="margin:0;padding-left:18px;color:var(--text-secondary);font-size:0.86rem;line-height:1.68;">
+          <li><strong>Hardware-GPU-Instancing:</strong> Tausende Bäume, Gräser, Felsen und Umgebungsdetails werden in wenigen Draw-Calls gerendert.</li>
+          <li><strong>Intelligentes Frustum- &amp; Distanz-Culling:</strong> Nicht sichtbare Objekte und entfernte Animationen werden automatisch pausiert.</li>
+          <li><strong>Verschlüsselter Asset-Vault (<code>Engine.pak</code>):</strong> Sofortiges lokales Streaming aller 3D-Modelle und Texturen im nativen Windows-Client.</li>
+          <li><strong>Integrierte Live-Telemetrie:</strong> Echtzeit-Anzeige von <code>FPS</code>, <code>Frame-Gen</code>, <code>GPU-Last (%)</code>, <code>CPU-Last (%)</code> und <code>Server-Latenz (ms)</code>.</li>
+        </ul>
+      </article>
+    </div>
+
+    <!-- KOMPLETTE TECHNISCHE AUFLISTUNG (WAS WIR HABEN) -->
+    <div class="spotlight-card" style="padding:24px 28px;border-radius:22px;background:linear-gradient(180deg,rgba(15,23,42,0.9),rgba(9,13,24,0.97));border:1px solid rgba(216,178,92,0.38);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(148,163,184,0.16);">
+        <div>
+          <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--gold-light);">
+            📋 Vollständige Übersicht • Engine- &amp; Grafik-Spezifikationen
+          </div>
+          <h3 style="font-family:'Cinzel',serif;font-size:1.28rem;color:var(--text-primary);margin:4px 0 0;">
+            Was unsere Engine &amp; Grafik im Detail bietet
+          </h3>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="sys-bullet-tag">🎮 Game: Alpha v0.5</span>
+          <span class="sys-bullet-tag">💎 Interface: Liquid Horizons v1.0</span>
+          <span class="sys-bullet-tag">🧬 KI/AI: Sysenery v5.0</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+        <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.68);border:1px solid rgba(148,163,184,0.18);">
+          <div style="font-weight:800;font-size:0.88rem;color:#7dd3fc;margin-bottom:8px;">🖥️ Rendering &amp; Grafik-Kern</div>
+          <div style="font-size:0.81rem;line-height:1.65;color:var(--text-secondary);">
+            • <strong>Engine:</strong> Three.js WebGL 2.0 (Custom Build)<br/>
+            • <strong>Framerate:</strong> Unlimitiert (60 / 120 / 144+ FPS)<br/>
+            • <strong>Kantenglättung:</strong> Hardware MSAA &amp; Post-FX<br/>
+            • <strong>Texturfilter:</strong> 16× Anisotropes Filtering<br/>
+            • <strong>Farbraum:</strong> ACES Filmic / Neutral Tone-Mapping
           </div>
         </div>
-      </article>
+
+        <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.68);border:1px solid rgba(148,163,184,0.18);">
+          <div style="font-weight:800;font-size:0.88rem;color:#fde047;margin-bottom:8px;">✨ Beleuchtung &amp; Effekte (VFX)</div>
+          <div style="font-size:0.81rem;line-height:1.65;color:var(--text-secondary);">
+            • <strong>Charakter-Licht:</strong> 3D Vertex-AO + MikkTSpace<br/>
+            • <strong>Tageszeiten:</strong> Dynamisches Tag-/Nacht-IBL<br/>
+            • <strong>Schatten:</strong> Echtzeit <code>PCFSoftShadowMap</code><br/>
+            • <strong>Ausrüstung:</strong> Stufen-Aura &amp; Funken (<code>+7 bis +9</code>)<br/>
+            • <strong>Skills &amp; Risse:</strong> Custom GLSL-Partikel &amp; Strahlen
+          </div>
+        </div>
+
+        <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.68);border:1px solid rgba(148,163,184,0.18);">
+          <div style="font-weight:800;font-size:0.88rem;color:#6ee7b7;margin-bottom:8px;">🦴 3D-Modelle &amp; Animationen</div>
+          <div style="font-size:0.81rem;line-height:1.65;color:var(--text-secondary);">
+            • <strong>Helden:</strong> 8 Skinned-Meshes (<code>LOD0 / LOD1 / LOD2</code>)<br/>
+            • <strong>NPCs:</strong> 100% eigene Custom-3D-Charaktere<br/>
+            • <strong>Reittiere:</strong> 3 Mount-EQ-Modelle &amp; 10 Felltexturen<br/>
+            • <strong>Begleiter:</strong> 9 animierte 3D-Pets + Mitlauf-Ross<br/>
+            • <strong>Kompression:</strong> <code>EXT_meshopt_compression</code>
+          </div>
+        </div>
+
+        <div style="padding:14px 16px;border-radius:14px;background:rgba(15,23,42,0.68);border:1px solid rgba(148,163,184,0.18);">
+          <div style="font-weight:800;font-size:0.88rem;color:#d8b4fe;margin-bottom:8px;">🚀 Client-Architektur &amp; Netcode</div>
+          <div style="font-size:0.81rem;line-height:1.65;color:var(--text-secondary);">
+            • <strong>Windows-Client:</strong> Native 64-Bit Desktop-Runtime<br/>
+            • <strong>Asset-Speicher:</strong> Verschlüsselter <code>Engine.pak</code> Vault<br/>
+            • <strong>Updater:</strong> Smart-Launcher mit Live-Stream<br/>
+            • <strong>Cross-Play:</strong> 100% Sync zwischen PC &amp; Browser<br/>
+            • <strong>HUD-Design:</strong> Liquid Horizons v1.0 (Dark/Light)
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
