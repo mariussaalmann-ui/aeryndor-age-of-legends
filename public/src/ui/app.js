@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v639';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v641';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -4519,6 +4519,8 @@ class AeryndorMMOApp {
         this._hadWsConnectionOnce = true;
         this.wsConnected = true;
         if (this.inWorld) {
+          const isAutoReconnect = Boolean(this._pendingWsAutoReconnect);
+          this._pendingWsAutoReconnect = false;
           const activeDocInfo = this.getActiveDoctrineInfo();
           const joinPayload = {
             action: 'join',
@@ -4526,6 +4528,7 @@ class AeryndorMMOApp {
             accountName: this.currentAccount || '',
             sessionToken: this.getSessionToken(),
             inWorld: true,
+            isReconnect: isAutoReconnect,
             name: this.playerName,
             classId: this.playerClassId || 'warrior',
             doctrineIdx: activeDocInfo.docIdx,
@@ -4563,6 +4566,9 @@ class AeryndorMMOApp {
 
       this.ws.onclose = () => {
         this.wsConnected = false;
+        if (this.inWorld) {
+          this._pendingWsAutoReconnect = true;
+        }
         setTimeout(() => this.connectMultiplayer(), 1500);
       };
     } catch (err) {
@@ -4850,6 +4856,7 @@ class AeryndorMMOApp {
               accountName: this.currentAccount || '',
               sessionToken: this.getSessionToken(),
               inWorld: true,
+              isReconnect: true,
               name: this.playerName,
               classId: this.playerClassId,
               doctrineIdx: activeDocInfo.docIdx,
@@ -4864,6 +4871,17 @@ class AeryndorMMOApp {
     if (snap?.serverBootId) {
       if (this._lastServerBootId && this._lastServerBootId !== snap.serverBootId) {
         this._lastServerBootId = snap.serverBootId;
+        if (!this._seenChatBubbleMsgIds) {
+          this._seenChatBubbleMsgIds = new Set();
+        }
+        for (const seedId of ['sys_welcome', 'chat_gm_on', 'chat_trade_1', 'chat_normal_1', 'chat_drops_init', 'chat_global_2']) {
+          this._seenChatBubbleMsgIds.add(seedId);
+        }
+        if (Array.isArray(snap.chat)) {
+          for (const cm of snap.chat) {
+            if (cm?.id) this._seenChatBubbleMsgIds.add(cm.id);
+          }
+        }
         if (this.inWorld && this.ws && this.ws.readyState === WebSocket.OPEN) {
           const activeDocInfo = this.getActiveDoctrineInfo();
           const rejoinPayload = {
@@ -4872,6 +4890,7 @@ class AeryndorMMOApp {
             accountName: this.currentAccount || '',
             sessionToken: this.getSessionToken(),
             inWorld: true,
+            isReconnect: true,
             name: this.playerName,
             classId: this.playerClassId || 'warrior',
             doctrineIdx: activeDocInfo.docIdx,
@@ -9099,24 +9118,49 @@ class AeryndorMMOApp {
     const list = this.latestChatList || [];
 
     // --- ECHTES 3D-CHAT-SPRECHBLASEN-TRIGGER (Über dem Kopf im 3D-Raum) ---
+    const staticSeedChatIds = new Set([
+      'sys_welcome',
+      'chat_gm_on',
+      'chat_trade_1',
+      'chat_normal_1',
+      'chat_drops_init',
+      'chat_global_2',
+    ]);
     if (!this._seenChatBubbleMsgIds) {
-      this._seenChatBubbleMsgIds = new Set(list.map((m) => m?.id).filter(Boolean));
+      this._seenChatBubbleMsgIds = new Set([
+        ...staticSeedChatIds,
+        ...list.map((m) => m?.id).filter(Boolean),
+      ]);
     } else {
       for (const m of list) {
         if (!m || !m.id || this._seenChatBubbleMsgIds.has(m.id)) continue;
         this._seenChatBubbleMsgIds.add(m.id);
+        if (
+          m.isSeed ||
+          staticSeedChatIds.has(m.id) ||
+          m.sender === 'System' ||
+          m.sender === 'Beute' ||
+          m.sender === '[GM] Aeryndor' ||
+          String(m.sender || '').startsWith('📢')
+        ) {
+          continue;
+        }
         const ch = m.channel === 'world' ? 'normal' : (m.channel || 'normal');
         if (['normal', 'party', 'global', 'trade', 'guild', 'bots'].includes(ch)) {
+          const myPid = this.selfState?.player_id ? String(this.selfState.player_id) : '';
+          const myName = this.selfState?.name ? String(this.selfState.name).trim() : '';
+          const senderTrim = String(m.sender || '').trim();
           const isLocal = Boolean(
-            (this.selfState?.player_id && String(m.senderPlayerId) === String(this.selfState.player_id)) ||
-            (this.selfState?.name && (m.sender === this.selfState.name || m.sender?.includes(this.selfState.name)))
+            (myPid && m.senderPlayerId && String(m.senderPlayerId) === myPid) ||
+            (myName && senderTrim && senderTrim === myName)
           );
           this.engine?.showSpeechBubble?.(m.sender, m.text, ch, m.senderPlayerId, isLocal);
         }
       }
-      if (this._seenChatBubbleMsgIds.size > 300) {
+      // Wichtig: Cache muss größer als sessionChatMessages (420) bleiben, damit ältere Sitzungsnachrichten nie erneut triggern!
+      if (this._seenChatBubbleMsgIds.size > 900) {
         const arr = Array.from(this._seenChatBubbleMsgIds);
-        this._seenChatBubbleMsgIds = new Set(arr.slice(-150));
+        this._seenChatBubbleMsgIds = new Set([...staticSeedChatIds, ...arr.slice(-600)]);
       }
     }
 

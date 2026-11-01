@@ -17809,29 +17809,29 @@ export class OpenWorld3DEngine {
         {
           id: 'npc_biologist',
           windowId: 'character',
-          name: '🔬 Biologe Chaegirab (Forschung & Elixiere)',
+          name: '🔬 Äther-Biologe Aurelius (Forschung & Elixiere)',
           x: cx - 22.0 * nMult,
           z: cz + 46.0 * nMult,
           armorColor: 0x78350f,
           accentColor: 0xfde047,
           weaponVisual: 'bell',
-          glbModel: 'chagirap',
-          glbTextures: ['chagirap.png', 'chagirap_01.png'],
-          targetHeight: 2.14,
+          glbModel: 'plechi_old_alchemist',
+          glbTextures: ['alchemist_body.png', 'alchemist_deco.png'],
+          targetHeight: 2.16,
           canWalk: false,
         },
         {
           id: 'npc_uriel',
           windowId: 'character',
-          name: '📜 Gelehrter Uriel (Alte Schriften & Reichs-Chroniken)',
+          name: '📜 Erzgelehrter Caelum (Alte Schriften & Reichs-Chroniken)',
           x: cx - 14.0 * nMult,
           z: cz - 26.0 * nMult,
           armorColor: 0x4c1d95,
           accentColor: 0xfde047,
           weaponVisual: 'staff',
-          glbModel: 'bookworm',
-          glbTextures: ['bookworm.png'],
-          targetHeight: 2.12,
+          glbModel: 'plechi_wizard_npc1',
+          glbTextures: ['wizard_npc1_tex.png'],
+          targetHeight: 2.16,
           canWalk: false,
         },
         {
@@ -17948,9 +17948,9 @@ export class OpenWorld3DEngine {
                 armorColor: 0x78350f,
                 accentColor: 0xfde047,
                 weaponVisual: 'staff',
-                glbModel: 'hotel_grandfa',
-                glbTextures: ['hotel_grandfa.png'],
-                targetHeight: 2.10,
+                glbModel: 'plechi_turban_npc',
+                glbTextures: ['turban_npc_tex.png'],
+                targetHeight: 2.16,
                 canWalk: false,
               },
             ]
@@ -17958,29 +17958,29 @@ export class OpenWorld3DEngine {
               {
                 id: 'npc_hunter',
                 windowId: 'character',
-                name: '🏹 Jäger Deokbae (Großwildjagd & Felle)',
+                name: '🏹 Meisterjäger Eldrin (Großwildjagd & Felle)',
                 x: cx + 38.0 * nMult,
                 z: cz - 12.0 * nMult,
                 armorColor: 0x14532d,
                 accentColor: 0x4ade80,
                 weaponVisual: 'sword',
-                glbModel: 'hunter',
-                glbTextures: ['hunter.png'],
+                glbModel: 'plechi_forest_elf2',
+                glbTextures: ['forest_elf2_tex00.png', 'forest_elf2_tex01.png'],
                 targetHeight: 2.18,
                 canWalk: false,
               },
               {
                 id: 'npc_musician',
                 windowId: 'character',
-                name: '🪕 Barde Yu-Hwan (Lieder der Ahnen)',
+                name: '🪕 Ahnen-Schamane Tharion (Lieder der Ahnen)',
                 x: cx - 36.0 * nMult,
                 z: cz + 32.0 * nMult,
                 armorColor: 0x1e3a8a,
                 accentColor: 0x60a5fa,
                 weaponVisual: 'staff',
-                glbModel: 'musician',
-                glbTextures: ['yu_hwan.png'],
-                targetHeight: 2.14,
+                glbModel: 'plechi_great_shaman',
+                glbTextures: ['great_shaman_tex00.png', 'great_shaman_tex01.png'],
+                targetHeight: 2.18,
                 canWalk: false,
               },
             ]),
@@ -18172,9 +18172,9 @@ export class OpenWorld3DEngine {
           armorColor: 0x3b4d63,
           accentColor: 0xfde047,
           weaponVisual: 'staff',
-          glbModel: 'plechi_old_alchemist',
-          glbTextures: ['alchemist_body.png', 'alchemist_deco.png'],
-          targetHeight: 2.16,
+          glbModel: 'plechi_plan_npc',
+          glbTextures: ['plan_npc_tex00.png', 'plan_npc_tex01.png'],
+          targetHeight: 2.22,
           canWalk: true,
           walkSpeed: 1.48,
           waypoints: [
@@ -32255,7 +32255,7 @@ export class OpenWorld3DEngine {
       depthWrite: false,
     });
     const sprite = new THREE.Sprite(mat);
-    sprite.center.set(0.5, 0.5);
+    sprite.center.set(0.5, 0.0);
     sprite.renderOrder = 9999;
     sprite.layers.enable(0);
     sprite.layers.enable(1);
@@ -32269,32 +32269,59 @@ export class OpenWorld3DEngine {
     return { sprite, worldW: baseW, worldH: baseH };
   }
 
+  _getActorSpeechBubbleTargetY(actor) {
+    const isMounted = Boolean(actor?.mountGroup?.visible);
+    const isLocalActor = Boolean(actor && actor === this.localPlayerActor);
+    const emblemGroup = isLocalActor ? this.localTeamEmblemGroup : actor?.teamEmblemGroup;
+    const hasVisibleTeamEmblem = Boolean(
+      emblemGroup && emblemGroup.visible && this.showTeamEmblems !== false
+    );
+    if (hasVisibleTeamEmblem) {
+      const baseEmblemY = Number(emblemGroup.userData?.baseY || (isMounted ? 3.86 : 3.22));
+      const localZoomRatio = isLocalActor ? Math.min(1.0, Math.max(0.46, (this.cameraDistance || 13.5) / 13.5)) : 1.0;
+      const zoomYOffset = isLocalActor ? -(1.0 - localZoomRatio) * 0.22 : 0.0;
+      const emblemHalfHeight = 0.43 * localZoomRatio;
+      return baseEmblemY + zoomYOffset + emblemHalfHeight;
+    }
+    return isMounted ? 3.58 : 2.94;
+  }
+
   showSpeechBubble(sender = '', text = '', channel = 'normal', senderPlayerId = null, isLocal = false) {
     if (!text) return;
+
+    const rawSender = String(sender || '').trim();
+    if (
+      rawSender === 'System' ||
+      rawSender === 'Beute' ||
+      rawSender === '[GM] Aeryndor' ||
+      rawSender.startsWith('📢')
+    ) {
+      return;
+    }
 
     let targetActor = null;
 
     if (isLocal && this.localPlayerActor) {
       targetActor = this.localPlayerActor;
     } else {
-      const cleanSender = String(sender || '').replace(/^\[(?:SA|GM|GA|DEV)\]/i, '').trim().toLowerCase();
+      const cleanSender = rawSender.replace(/^\[(?:SA|SGA|GA|TM|CM|SGM|GM|TGM|DEV)\]\s*/i, '').trim().toLowerCase();
       const localName = String(
         this.localPlayerName || this._selfPlayerName || this._lastLocalAppearanceCfg?.name || this.customPlayerName || ''
-      ).replace(/^\[(?:SA|GM|GA|DEV)\]/i, '').trim().toLowerCase();
+      ).replace(/^\[(?:SA|SGA|GA|TM|CM|SGM|GM|TGM|DEV)\]\s*/i, '').trim().toLowerCase();
 
       if (
         isLocal ||
-        (localName && cleanSender && (cleanSender === localName || cleanSender.includes(localName) || localName.includes(cleanSender))) ||
-        (senderPlayerId && this.localPlayerId && String(senderPlayerId) === String(this.localPlayerId))
+        (senderPlayerId && this.localPlayerId && String(senderPlayerId) === String(this.localPlayerId)) ||
+        (localName && cleanSender && cleanSender === localName)
       ) {
         targetActor = this.localPlayerActor;
       } else if (this.otherPlayerMeshes) {
         for (const [pId, mesh] of this.otherPlayerMeshes.entries()) {
-          const meshName = String(mesh.playerName || mesh.lastLabelKey || '').toLowerCase();
-          const cleanMeshName = meshName.replace(/^\[(?:SA|GM|GA|DEV)\]/i, '').trim();
+          const meshName = String(mesh.playerName || '').trim().toLowerCase();
+          const cleanMeshName = meshName.replace(/^\[(?:SA|SGA|GA|TM|CM|SGM|GM|TGM|DEV)\]\s*/i, '').trim();
           if (
             (senderPlayerId && String(pId) === String(senderPlayerId)) ||
-            (cleanSender && (cleanMeshName.includes(cleanSender) || cleanSender.includes(cleanMeshName)))
+            (cleanSender && (meshName === rawSender.toLowerCase() || (cleanMeshName && cleanMeshName === cleanSender)))
           ) {
             targetActor = mesh;
             break;
@@ -32303,11 +32330,6 @@ export class OpenWorld3DEngine {
       }
     }
 
-    if (!targetActor) {
-      if (isLocal || !senderPlayerId) {
-        targetActor = this.localPlayerActor;
-      }
-    }
     if (!targetActor || !targetActor.root) return;
 
     if (targetActor._speechBubble) {
@@ -32322,8 +32344,7 @@ export class OpenWorld3DEngine {
     const spriteData = this.createSpeechBubbleSprite(text, channel, sender);
     if (!spriteData) return;
 
-    const isMounted = Boolean(targetActor.mountGroup?.visible);
-    const startY = isMounted ? 3.84 : 3.20;
+    const startY = this._getActorSpeechBubbleTargetY(targetActor);
     spriteData.sprite.position.set(0, startY, 0);
     targetActor.root.add(spriteData.sprite);
 
@@ -32361,8 +32382,7 @@ export class OpenWorld3DEngine {
         b.sprite.scale.set(b.baseW * zoomScale, b.baseH * zoomScale, 1);
       }
 
-      const isMounted = Boolean(b.actor?.mountGroup?.visible);
-      const targetY = isMounted ? 3.84 : 3.20;
+      const targetY = this._getActorSpeechBubbleTargetY(b.actor);
       b.sprite.position.y += (targetY - b.sprite.position.y) * Math.min(1.0, dt * 10.0);
 
       const remain = (b.expiresAt - now) / 800.0;
