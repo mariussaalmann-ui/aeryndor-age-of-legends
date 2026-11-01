@@ -12002,7 +12002,7 @@ export class OpenWorld3DEngine {
     const maxEntityDistSq = 6400; // 80m Radius rund um den Spieler
 
     // 1. Lokaler Charakter (+ Reittier & Begleiter-Pet)
-    const isMounted = Boolean(this.localPlayerActor?.mountGroup?.visible);
+    const isMounted = Boolean(this.localPlayerActor?.isRiding);
     const lpRadius = isMounted ? 1.58 : 1.22;
     const lpPrevX = this._lpTrailPrevX ?? px;
     const lpPrevZ = this._lpTrailPrevZ ?? pz;
@@ -12015,6 +12015,20 @@ export class OpenWorld3DEngine {
       this._lpTrailPrevZ = pz;
       this._lpTrailIdleTimer = 0.55;
       anyStamped = true;
+    }
+    const hSt = this.localPlayerActor?.mountGroup?.userData?.horseWorldState;
+    if (this.localPlayerActor?.mountGroup?.visible && !isMounted && hSt?.initialized) {
+      const hwx = hSt.wx;
+      const hwz = hSt.wz;
+      const hPrevX = this._lpHorseTrailPrevX ?? hwx;
+      const hPrevZ = this._lpHorseTrailPrevZ ?? hwz;
+      const hMovedSq = (hwx - hPrevX) * (hwx - hPrevX) + (hwz - hPrevZ) * (hwz - hPrevZ);
+      if (hMovedSq >= 0.002 || this._lpTrailIdleTimer === 0.55) {
+        this.stampGrassTrailSegment(hPrevX, hPrevZ, hwx, hwz, 1.38, 0.96, 2.4, hSt.wRot || 0);
+        this._lpHorseTrailPrevX = hwx;
+        this._lpHorseTrailPrevZ = hwz;
+        anyStamped = true;
+      }
     }
     if (this.localPlayerPetGroup && this.localPlayerPetGroup.visible) {
       const lpx = this.localPlayerPetGroup.position.x;
@@ -17874,11 +17888,11 @@ export class OpenWorld3DEngine {
           glbModel: 'plechi_horse_guard',
           glbTextures: [
             'horse_guard_tex00.png',
-            'horse_guard_tex01.png',
             'horse_guard_tex02.png',
-            'horse_guard_tex03.png',
             'horse_guard_tex04.png',
             'horse_guard_tex05.png',
+            'horse_guard_tex01.png',
+            'horse_guard_tex03.png',
             'horse_guard_tex06.png',
           ],
           targetHeight: 3.42,
@@ -23600,7 +23614,7 @@ export class OpenWorld3DEngine {
           attachedToLimb = true;
         }
       } else if (bLower.includes('spine') || bLower.includes('pelvis') || bLower.includes('hips') || bLower === 'bip01' || bLower === 'body') {
-        by = baseY + (actor?.mountGroup?.visible ? 1.46 : 0.96);
+        by = baseY + (actor?.isRiding ? 1.46 : 0.96);
         attachedToLimb = true;
       }
     }
@@ -23998,7 +24012,7 @@ export class OpenWorld3DEngine {
           const pal = this.getMetinSkillPalette(entry.code, entry.tier || 1, Boolean(entry.isLSkill));
           candidates.push({
             wx: rx,
-            wy: ry + (actor.mountGroup?.visible ? 1.38 : 1.02),
+            wy: ry + (actor.isRiding ? 1.38 : 1.02),
             wz: rz,
             colorHex: pal.env,
             rawInt: entry.isLSkill ? 0.48 : 0.34,
@@ -25530,7 +25544,7 @@ export class OpenWorld3DEngine {
     }
 
     // Sausen (tanhwan) & Blitzangriff (gungsin): spürbarer Vorwärts-Sturmimpuls in Blickrichtung!
-    if (opts.isLocal && !this.localPlayerActor?.mountGroup?.visible && (code === 'tanhwan' || code === 'gungsin')) {
+    if (opts.isLocal && !this.localPlayerActor?.isRiding && (code === 'tanhwan' || code === 'gungsin')) {
       this.combatLungeTimer = 0.25;
       this.combatLungeSpeed = 10.6;
     }
@@ -25973,7 +25987,7 @@ export class OpenWorld3DEngine {
       ud.innerRing.rotation.z = -elapsed * 0.62;
     }
 
-    const isMounted = Boolean(actor.mountGroup?.visible);
+    const isMounted = Boolean(actor.isRiding);
     const maxRise = hasBodyBuff ? (isMounted ? 1.62 : 1.24) : 0.56;
     const peakSparkAlpha = hasBodyBuff ? (leadEntry.isLSkill ? 0.52 : 0.42) : 0.20;
     for (let i = 0; i < ud.sparks.length; i++) {
@@ -28426,6 +28440,7 @@ export class OpenWorld3DEngine {
       }
     }
     mg.userData.glbActor = null;
+    mg.userData.roamShadow = null;
     mg.userData._activeGlbRigGroup = null;
     mg.userData._glbIsLoading = false;
     mg.userData._glbLoadingUrl = null;
@@ -28830,9 +28845,15 @@ export class OpenWorld3DEngine {
     }
   }
 
-  setPetAppearance(petKey = 'ridack_dragonpet') {
+  setPetAppearance(petKey = 'ridack_dragonpet', fromServerSync = false) {
+    if (fromServerSync && performance.now() <= (this._optimisticPetSkinUntil || 0)) {
+      return;
+    }
     const petCfg = this.getPetSkinConfig(petKey);
     this.customPetSkin = petCfg.key;
+    if (!fromServerSync) {
+      this._optimisticPetSkinUntil = performance.now() + 2000;
+    }
     try {
       localStorage.setItem('aeryndor_pet_skin_v1', petCfg.key);
     } catch (_) {}
@@ -28860,6 +28881,9 @@ export class OpenWorld3DEngine {
       const oldPos = this.localPlayerActor.root.position.clone();
       const oldRot = this.localPlayerActor.root.rotation.y;
       const oldPetState = this.localPlayerActor.petGroup?.userData?.petWorldState || null;
+      const oldHorseState = this.localPlayerActor.mountGroup?.userData?.horseWorldState || null;
+      const oldIsRiding = Boolean(this.localPlayerActor.isRiding);
+      const oldHasSummonedHorse = this.localPlayerActor.hasSummonedHorse !== false;
       this.scene.remove(this.localPlayerActor.root);
       this.localPlayerActor = this.createCharacterRig({
         classId: cfg.classId || 'warrior',
@@ -28875,8 +28899,13 @@ export class OpenWorld3DEngine {
         mountSkin: this.customMountSkin,
         isLocal: true,
       });
+      this.localPlayerActor.isRiding = oldIsRiding;
+      this.localPlayerActor.hasSummonedHorse = oldHasSummonedHorse;
       if (oldPetState && this.localPlayerActor.petGroup) {
         this.localPlayerActor.petGroup.userData.petWorldState = oldPetState;
+      }
+      if (oldHorseState && this.localPlayerActor.mountGroup) {
+        this.localPlayerActor.mountGroup.userData.horseWorldState = oldHorseState;
       }
       this.localPlayerActor.root.position.copy(oldPos);
       this.localPlayerActor.root.rotation.y = oldRot;
@@ -28951,7 +28980,7 @@ export class OpenWorld3DEngine {
           this._currentLocalTeamRank = teamRank;
         }
         if (this.localTeamEmblemGroup) {
-          const isMounted = Boolean(this.localPlayerActor.mountGroup?.visible);
+          const isMounted = Boolean(this.localPlayerActor.isRiding);
           this.localTeamEmblemGroup.userData.baseY = isMounted ? 3.86 : 3.22;
           this.localTeamEmblemGroup.visible = this.showTeamEmblems !== false;
         }
@@ -29670,6 +29699,8 @@ export class OpenWorld3DEngine {
       miningGroup,
       mountGroup,
       petGroup,
+      isRiding: false,
+      hasSummonedHorse: Boolean(cfg.isLocal),
       blockDome,
       contactShadowGroup,
       classId: cfg.classId || 'warrior',
@@ -30063,7 +30094,7 @@ export class OpenWorld3DEngine {
       return;
     }
 
-    if (actor.mountGroup) {
+    if (actor.mountGroup && !actor.mountGroup.visible) {
       actor._mountSlopePitch = (actor._mountSlopePitch || 0) * (1.0 - blend);
       actor._mountSlopeRoll = (actor._mountSlopeRoll || 0) * (1.0 - blend);
       actor.mountGroup.rotation.x = actor._mountSlopePitch;
@@ -32300,7 +32331,7 @@ export class OpenWorld3DEngine {
   }
 
   _getActorSpeechBubbleTargetY(actor) {
-    const isMounted = Boolean(actor?.mountGroup?.visible);
+    const isMounted = Boolean(actor?.isRiding ?? actor?.mountGroup?.visible);
     const isLocalActor = Boolean(actor && actor === this.localPlayerActor);
     const emblemGroup = isLocalActor ? this.localTeamEmblemGroup : actor?.teamEmblemGroup;
     const hasVisibleTeamEmblem = Boolean(
@@ -32875,7 +32906,15 @@ export class OpenWorld3DEngine {
       guild: resolvedLocalGuild,
     });
     const isNowMounted = Boolean(p.active_mount);
-    this.localPlayerActor.mountGroup.visible = isNowMounted;
+    this.localPlayerActor.isRiding = isNowMounted;
+    if (isNowMounted || this.localPlayerActor.hasSummonedHorse === undefined) {
+      this.localPlayerActor.hasSummonedHorse = true;
+    }
+    this.localPlayerActor.mountGroup.visible = Boolean(isNowMounted || this.localPlayerActor.hasSummonedHorse) && !this.localPlayerIsDead;
+    if (isNowMounted) {
+      this.localPlayerActor.mountGroup.position.set(0, 0, 0);
+      this.localPlayerActor.mountGroup.rotation.y = 0;
+    }
     this.localPlayerActor.bodyGroup.position.set(0, isNowMounted ? 0.72 : 0.0, isNowMounted ? -0.06 : 0.0);
     if (this.localPlayerLabel) {
       this.localPlayerLabel.position.y = isNowMounted ? 3.34 : 2.70;
@@ -32890,14 +32929,17 @@ export class OpenWorld3DEngine {
     if (hasPetNow && this.localPlayerActor.petGroup) {
       const petLv = Math.max(1, Number(p.petData?.level || 1));
       this._lastPetLevel = petLv;
+      const inOptimisticPetWindow = performance.now() <= (this._optimisticPetSkinUntil || 0);
       let chosenSkin = 'ridack_dragonpet';
-      if (comp.hasCostumePetSkin && comp.petSkin) {
+      if (inOptimisticPetWindow && this.customPetSkin) {
+        chosenSkin = this.customPetSkin;
+      } else if (comp.hasCostumePetSkin && comp.petSkin && !p.petData?.skinExplicit) {
         chosenSkin = comp.petSkin;
       } else {
         chosenSkin = p.petData?.skinKey || comp.petSkin || this.customPetSkin || 'ridack_dragonpet';
         this.customPetSkin = chosenSkin;
       }
-      const rawCustom = p.petData?.customName || '';
+      const rawCustom = inOptimisticPetWindow ? '' : (p.petData?.customName || '');
       this.applyPetSkinToGroup(this.localPlayerActor.petGroup, chosenSkin, petLv, rawCustom);
     }
     if (hasPetNow && !hadPetVisible && this.hasInitialServerPos) {
@@ -33775,7 +33817,7 @@ export class OpenWorld3DEngine {
       this.spawnDamageNumber(hitX, dmgBaseY, hitZ, dmgLabel, dmgStyle);
 
       // Maßgeschneiderte 3D-Treffer-Effekte direkt am getroffenen Ziel (Normal, Krit-Kreuzschnitt, DB-Durchstoß, Finisher)
-      const isFinisher = Boolean(d.isFinisher) || (!Boolean(this.localPlayerActor?.mountGroup?.visible) && d.comboStep === (d.maxComboSteps || 6)) || Boolean(d.killed);
+      const isFinisher = Boolean(d.isFinisher) || (!Boolean(this.localPlayerActor?.isRiding) && d.comboStep === (d.maxComboSteps || 6)) || Boolean(d.killed);
       const isStagger = Boolean(d.stagger) || isCrit || isPierce || isFinisher;
       const impactY = hitY + (isMetinTarget ? 1.55 : 1.05);
       this.spawnHitSparkVFX(hitX, impactY, hitZ, isCrit, isFinisher, isPierce);
@@ -33821,7 +33863,7 @@ export class OpenWorld3DEngine {
         dmgLabel,
         isBossSkill ? 'boss_hit' : 'player_hit'
       );
-      const isMounted = Boolean(this.localPlayerActor?.mountGroup?.visible);
+      const isMounted = Boolean(this.localPlayerActor?.isRiding);
       this.spawnPlayerHitVFX(ev.x, y + (isMounted ? 1.48 : 1.15), ev.z, isBossSkill);
       if (isLocalPlayerEvent) {
         this.localPlayerHitFlashTimer = isBossSkill ? 0.26 : 0.15;
@@ -34280,7 +34322,7 @@ export class OpenWorld3DEngine {
     const stepMod = ((comboStep || 0) % 6 + 6) % 6;
     const isFinisher = stepMod === 5 || stepMod === 3;
     const isHeavyStep = stepMod === 4 || stepMod === 5;
-    const isMounted = Boolean(this.localPlayerActor?.mountGroup?.visible);
+    const isMounted = Boolean(this.localPlayerActor?.isRiding);
     const arcRadius = (stepMod === 5 ? 2.48 : isHeavyStep ? 2.28 : 1.92) * (isMounted ? 1.15 : 1.0);
     const thetaStart = stepMod === 5 ? -Math.PI * 0.66 : isFinisher ? -Math.PI * 0.58 : -Math.PI * 0.50;
     const thetaLength = stepMod === 5 ? Math.PI * 1.32 : isFinisher ? Math.PI * 1.16 : Math.PI * 1.00;
@@ -35040,7 +35082,7 @@ export class OpenWorld3DEngine {
   }
 
   triggerDodge() {
-    if (this.localPlayerActor?.mountGroup?.visible) return;
+    if (this.localPlayerActor?.isRiding) return;
     if (this.dodgeCooldown > 0 || this.dodgeTimer > 0) return;
     if (this.isBlocking) {
       this.setBlocking(false);
@@ -35084,7 +35126,7 @@ export class OpenWorld3DEngine {
   triggerNextComboSwing(withLunge = true) {
     const now = performance.now();
     const lp = this.localPlayerActor;
-    const isMounted = Boolean(lp?.mountGroup?.visible);
+    const isMounted = Boolean(lp?.isRiding);
     const hasGlbHeroSocket = Boolean(lp?.heroGlbHolder?.userData?.glbActor?.weaponSocket);
     const maxCombo = hasGlbHeroSocket ? (isMounted ? 3 : 4) : isMounted ? 4 : this.localMaxComboSteps || 6;
     if ((this.localAttackAnimTimer || 0) <= 0.06 || now - (this._lastComboSwingAt || 0) > 760) {
@@ -35877,8 +35919,9 @@ export class OpenWorld3DEngine {
     }
 
     const distToOwner = Math.hypot(ownerX - st.wx, ownerZ - st.wz);
+    const isOwnerRiding = Boolean(this.localPlayerActor?.root === ownerRoot && this.localPlayerActor?.isRiding);
     const restAng = ownerRot - Math.PI * 0.68;
-    const restDist = 1.72;
+    const restDist = isOwnerRiding ? 2.38 : 1.78;
     if (!st.initialized || distToOwner > 28.0) {
       st.wx = ownerX + Math.sin(restAng) * restDist;
       st.wz = ownerZ + Math.cos(restAng) * restDist;
@@ -35893,13 +35936,15 @@ export class OpenWorld3DEngine {
       // Spieler läuft: Begleiter folgt flüssig leicht seitlich versetzt hinter dem Charakter
       const flankWeave = Math.sin(elapsed * 1.15 + st.phase) * 0.16;
       const followAng = ownerRot - Math.PI * 0.70 + flankWeave;
-      const followDist = 1.92;
+      const followDist = isOwnerRiding ? 2.55 : 1.96;
       st.tx = ownerX + Math.sin(followAng) * followDist;
       st.tz = ownerZ + Math.cos(followAng) * followDist;
       st.repositioning = true;
     } else {
       // Spieler steht still: Kein nervöses Umherkreisen! Begleiter steht ruhig in 'wait'-Pose an der Flanke.
-      if (distToOwner > 2.45 || distToOwner < 1.02) {
+      const minClearDist = isOwnerRiding ? 1.85 : 1.10;
+      const maxClearDist = isOwnerRiding ? 3.05 : 2.45;
+      if (distToOwner > maxClearDist || distToOwner < minClearDist) {
         st.tx = ownerX + Math.sin(restAng) * restDist;
         st.tz = ownerZ + Math.cos(restAng) * restDist;
         st.repositioning = true;
@@ -35980,6 +36025,244 @@ export class OpenWorld3DEngine {
         sp.position.y = sp.userData.baseY + Math.sin(elapsed * 4.2 + sp.userData.phase) * 0.09;
         const sc = 0.34 + Math.sin(elapsed * 5.0 + sp.userData.phase) * 0.10;
         sp.scale.set(sc, sc, 1);
+      }
+    }
+  }
+
+  updateMountCompanion(mountGroup, ownerRoot, isOwnerMoving, isMounted, dt, elapsed) {
+    if (!mountGroup || !ownerRoot) return;
+    const ownerX = ownerRoot.position.x;
+    const ownerY = ownerRoot.position.y;
+    const ownerZ = ownerRoot.position.z;
+    const ownerRot = ownerRoot.rotation.y || 0;
+
+    let st = mountGroup.userData.horseWorldState;
+    if (!st) {
+      const initAng = ownerRot + Math.PI * 0.68;
+      st = {
+        initialized: false,
+        wx: ownerX + Math.sin(initAng) * 3.25,
+        wz: ownerZ + Math.cos(initAng) * 3.25,
+        wRot: ownerRot,
+        tx: ownerX + Math.sin(initAng) * 3.25,
+        tz: ownerZ + Math.cos(initAng) * 3.25,
+        wanderTimer: 7.5 + Math.random() * 3.5,
+        wanderAngle: initAng,
+        phase: Math.random() * Math.PI * 2,
+        isMoving: false,
+        repositioning: false,
+        isGentleStroll: false,
+        wasMounted: false,
+        slopePitch: 0,
+        slopeRoll: 0,
+      };
+      mountGroup.userData.horseWorldState = st;
+    }
+
+    if (isMounted) {
+      mountGroup.position.set(0, 0, 0);
+      mountGroup.rotation.y = 0;
+      if (mountGroup.userData.roamShadow) {
+        mountGroup.userData.roamShadow.visible = false;
+      }
+      st.wx = ownerX;
+      st.wz = ownerZ;
+      st.wRot = ownerRot;
+      st.tx = ownerX;
+      st.tz = ownerZ;
+      st.isMoving = false;
+      st.repositioning = false;
+      st.isGentleStroll = false;
+      st.wasMounted = true;
+      st.initialized = true;
+      return;
+    }
+
+    if (!mountGroup.visible) {
+      st.initialized = false;
+      return;
+    }
+
+    if (!mountGroup.userData.roamShadow && this.createActorContactShadowGroup) {
+      const sh = this.createActorContactShadowGroup({
+        radius: 0.98,
+        elongationZ: 1.55,
+        withFeet: false,
+        opacity: 0.34,
+      });
+      if (sh) {
+        mountGroup.add(sh);
+        mountGroup.userData.roamShadow = sh;
+      }
+    }
+    if (mountGroup.userData.roamShadow) {
+      mountGroup.userData.roamShadow.visible = true;
+    }
+
+    const flankAng = ownerRot + Math.PI * 0.68;
+    const flankDist = 3.25;
+    let distToOwner = Math.hypot(ownerX - st.wx, ownerZ - st.wz);
+
+    if (!st.initialized || distToOwner > 22.0) {
+      st.wx = ownerX + Math.sin(flankAng) * flankDist;
+      st.wz = ownerZ + Math.cos(flankAng) * flankDist;
+      st.wRot = ownerRot;
+      st.tx = st.wx;
+      st.tz = st.wz;
+      st.wanderAngle = flankAng;
+      st.wanderTimer = 8.0 + Math.random() * 3.5;
+      st.isMoving = false;
+      st.repositioning = false;
+      st.isGentleStroll = false;
+      st.wasMounted = false;
+      st.initialized = true;
+      distToOwner = flankDist;
+    } else if (st.wasMounted) {
+      // Gerade vom Pferd abgestiegen: Pferd tritt ruhig 3.15m seitlich an die rechte Flanke, ohne zu verschwinden
+      st.wasMounted = false;
+      st.tx = ownerX + Math.sin(flankAng) * 3.15;
+      st.tz = ownerZ + Math.cos(flankAng) * 3.15;
+      st.wanderAngle = flankAng;
+      st.wanderTimer = 8.0 + Math.random() * 4.0;
+      st.repositioning = true;
+      st.isGentleStroll = true;
+    }
+
+    if (isOwnerMoving) {
+      // Spieler läuft: Pferd folgt geschmeidig auf der rechten hinteren Flanke (gegenüber vom Pet) in angenehmem Abstand (~3.25m)
+      const gentleWeave = Math.sin(elapsed * 0.85 + st.phase) * 0.14;
+      const followAng = ownerRot + Math.PI * 0.68 + gentleWeave;
+      st.tx = ownerX + Math.sin(followAng) * flankDist;
+      st.tz = ownerZ + Math.cos(followAng) * flankDist;
+      st.wanderAngle = followAng;
+      st.wanderTimer = 7.5 + Math.random() * 4.0;
+      st.repositioning = true;
+      st.isGentleStroll = false;
+    } else {
+      // Spieler steht: Pferd hält höflichen Abstand (min. 2.4m, max. 4.6m) und läuft alle 8–13s ruhig ein paar Schritte im Bogen
+      if (distToOwner < 2.35) {
+        const awayAng = distToOwner > 0.15 ? Math.atan2(st.wx - ownerX, st.wz - ownerZ) : flankAng;
+        st.tx = ownerX + Math.sin(awayAng) * 3.25;
+        st.tz = ownerZ + Math.cos(awayAng) * 3.25;
+        st.wanderAngle = awayAng;
+        st.repositioning = true;
+        st.isGentleStroll = true;
+      } else if (distToOwner > 4.75) {
+        const backAng = Math.atan2(st.wx - ownerX, st.wz - ownerZ);
+        st.tx = ownerX + Math.sin(backAng) * 3.45;
+        st.tz = ownerZ + Math.cos(backAng) * 3.45;
+        st.wanderAngle = backAng;
+        st.repositioning = true;
+        st.isGentleStroll = false;
+      } else if (!st.repositioning) {
+        st.wanderTimer = (st.wanderTimer ?? 8.5) - dt;
+        if (st.wanderTimer <= 0) {
+          const curAng = Math.atan2(st.wx - ownerX, st.wz - ownerZ);
+          const dirSign = Math.random() < 0.5 ? 1 : -1;
+          const stepAng = dirSign * (0.85 + Math.random() * 0.75);
+          let nextAng = curAng + stepAng;
+          // Direkten Sichtkegel genau vor der Nase des Spielers meiden, damit das Pferd nie im Weg steht
+          let relFront = (nextAng - ownerRot) % (Math.PI * 2);
+          if (relFront > Math.PI) relFront -= Math.PI * 2;
+          if (relFront < -Math.PI) relFront += Math.PI * 2;
+          if (Math.abs(relFront) < 0.55) {
+            nextAng = ownerRot + (relFront >= 0 ? 0.72 : -0.72);
+          }
+          const nextRadius = 3.05 + Math.random() * 1.05;
+          st.wanderAngle = nextAng;
+          st.tx = ownerX + Math.sin(nextAng) * nextRadius;
+          st.tz = ownerZ + Math.cos(nextAng) * nextRadius;
+          st.wanderTimer = 8.0 + Math.random() * 5.0;
+          st.repositioning = true;
+          st.isGentleStroll = true;
+        } else {
+          st.tx = st.wx;
+          st.tz = st.wz;
+        }
+      }
+    }
+
+    const dx = st.tx - st.wx;
+    const dz = st.tz - st.wz;
+    const distToTarget = Math.hypot(dx, dz);
+
+    if (distToTarget > 0.18) {
+      st.isMoving = true;
+      const catchingUp = isOwnerMoving || distToOwner > 4.8;
+      const moveSpeed = catchingUp
+        ? (distToTarget < 1.35 && distToOwner < 4.2 ? 3.2 : Math.min(13.5, 7.2 + distToTarget * 1.05))
+        : 1.95; // Ruhiges, entspanntes Schritt-Tempo beim Grasen/Umherlaufen
+      const step = Math.min(distToTarget, moveSpeed * dt);
+      let nextX = st.wx + (dx / distToTarget) * step;
+      let nextZ = st.wz + (dz / distToTarget) * step;
+
+      // Sanftes Ausweichen um den Spieler herum (niemals quer durch den Charakter laufen!)
+      const dNextOwner = Math.hypot(nextX - ownerX, nextZ - ownerZ);
+      if (dNextOwner < 2.25 && dNextOwner > 0.01 && dNextOwner < distToOwner) {
+        const pushOut = 2.28;
+        nextX = ownerX + ((nextX - ownerX) / dNextOwner) * pushOut;
+        nextZ = ownerZ + ((nextZ - ownerZ) / dNextOwner) * pushOut;
+      }
+
+      const actualDx = nextX - st.wx;
+      const actualDz = nextZ - st.wz;
+      st.wx = nextX;
+      st.wz = nextZ;
+
+      if (Math.hypot(actualDx, actualDz) > 0.001) {
+        const desiredRot = Math.atan2(actualDx, actualDz);
+        let diffRot = desiredRot - st.wRot;
+        while (diffRot > Math.PI) diffRot -= Math.PI * 2;
+        while (diffRot < -Math.PI) diffRot += Math.PI * 2;
+        st.wRot += diffRot * Math.min(1.0, dt * (catchingUp ? 7.5 : 4.5));
+      }
+    } else {
+      st.isMoving = false;
+      st.repositioning = false;
+      st.isGentleStroll = false;
+      st.tx = st.wx;
+      st.tz = st.wz;
+    }
+
+    const groundY = this.getTerrainHeight(st.wx, st.wz, this.currentMapId);
+    const waterInfo = this.getWaterDistanceInfo ? this.getWaterDistanceInfo(st.wx, st.wz) : null;
+    const wy = waterInfo?.inWater ? Math.max(-0.18, groundY) : groundY;
+    const slope = this.getTerrainSlopeAngles
+      ? this.getTerrainSlopeAngles(st.wx, st.wz, st.wRot, 0.85, this.currentMapId)
+      : { pitch: 0, roll: 0 };
+    const sBlend = 1.0 - Math.exp(-12.0 * dt);
+    st.slopePitch = (st.slopePitch || 0) + (slope.pitch * 0.85 - (st.slopePitch || 0)) * sBlend;
+    st.slopeRoll = (st.slopeRoll || 0) + (slope.roll * 0.42 - (st.slopeRoll || 0)) * sBlend;
+
+    const relX = st.wx - ownerX;
+    const relZ = st.wz - ownerZ;
+    const cosR = Math.cos(ownerRot);
+    const sinR = Math.sin(ownerRot);
+    mountGroup.position.set(
+      relX * cosR - relZ * sinR,
+      wy - ownerY,
+      relX * sinR + relZ * cosR
+    );
+    mountGroup.rotation.set(st.slopePitch, st.wRot - ownerRot, st.slopeRoll);
+
+    const mountActor = mountGroup.userData?.glbActor;
+    if (mountActor) {
+      if (st.isMoving) {
+        const isFastFollow = (isOwnerMoving || distToOwner > 4.8) && distToTarget >= 1.35;
+        if (isFastFollow && (mountActor.clips?.run || mountActor.actions?.run)) {
+          mountActor.playAnim('run', 0.22);
+          mountActor.mixer.update(dt * 1.25);
+        } else {
+          mountActor.playAnim('walk', 0.25);
+          mountActor.mixer.update(dt * (isFastFollow ? 1.55 : 0.95));
+        }
+      } else {
+        const hIdle =
+          (mountActor.clips?.wait1 || mountActor.actions?.wait1) && Math.sin(elapsed * 0.48 + st.phase) > 0.72
+            ? 'wait1'
+            : 'wait';
+        mountActor.playAnim(hIdle, 0.28);
+        mountActor.mixer.update(dt * 0.90);
       }
     }
   }
@@ -36575,7 +36858,7 @@ export class OpenWorld3DEngine {
     if (this.keys.space && !this.localPlayerIsDead) {
       if (this.spaceAttackCooldown <= 0) {
         this.triggerNextComboSwing();
-        const isMountedSpace = Boolean(this.localPlayerActor?.mountGroup?.visible);
+        const isMountedSpace = Boolean(this.localPlayerActor?.isRiding);
         const maxComboSpace = isMountedSpace ? 4 : (this.localMaxComboSteps || 6);
         this.spaceAttackCooldown = (!isMountedSpace && this.localComboStep === maxComboSpace - 1) ? 0.58 : 0.44;
         if (this.callbacks.onSpaceAttack) {
@@ -36700,7 +36983,7 @@ export class OpenWorld3DEngine {
           }
         }
       } else {
-        const isMounted = Boolean(this.localPlayerActor?.mountGroup?.visible);
+        const isMounted = Boolean(this.localPlayerActor?.isRiding);
         const isSprinting = !isMounted && Boolean(this.keys.shift);
         const speed = isMounted ? 8.4 * 2.0 : (isSprinting ? 11.4 : 8.4);
 
@@ -36839,7 +37122,7 @@ export class OpenWorld3DEngine {
         const distToWp = Math.hypot(dx, dz);
 
         if (distToGoal > stopDist && distToWp > 0.2) {
-          const isMounted = Boolean(this.localPlayerActor?.mountGroup?.visible);
+          const isMounted = Boolean(this.localPlayerActor?.isRiding);
           const isSprinting = !isMounted && Boolean(this.keys.shift);
           const speed = isMounted ? 8.0 * 2.0 : (isSprinting ? 10.5 : 8.0);
           const step = Math.min(distToWp, speed * dt);
@@ -37128,7 +37411,7 @@ export class OpenWorld3DEngine {
       this.localBuffAnimTimer = Math.max(0, this.localBuffAnimTimer - dt);
     }
 
-    const isMountedNow = Boolean(lp.mountGroup?.visible) && !this.localPlayerIsDead;
+    const isMountedNow = Boolean(lp.isRiding) && !this.localPlayerIsDead;
     const isSprintingNow =
       !isMountedNow &&
       this.localPlayerMoving &&
@@ -37401,7 +37684,7 @@ export class OpenWorld3DEngine {
     // Interaktive Pfützen-/Uferwasser-Wellen & Wasserspritzer sowie 3D-Schnee-Fußstapfen / Mount-Hufspuren beim Laufen
     {
       const isMovingOrFighting = this.localPlayerMoving || this.localAttackAnimTimer > 0 || this.localWhirlwindTimer > 0;
-      const isMounted = Boolean(lp.mountGroup?.visible);
+      const isMounted = Boolean(lp.isRiding);
       const isFast = Boolean(this.keys.shift) || isMounted || this.localWhirlwindTimer > 0;
       const px = this.localPlayerPos.x;
       const py = this.localPlayerPos.y;
@@ -37509,6 +37792,7 @@ export class OpenWorld3DEngine {
       }
     }
 
+    this.updateMountCompanion(lp.mountGroup, lp.root, this.localPlayerMoving, isMountedNow, dt, elapsed);
     this.updatePetCompanion(lp.petGroup, lp.root, this.localPlayerMoving, dt, elapsed);
     lp.auraRing.rotation.z = elapsed * 2.2;
 
@@ -37984,7 +38268,7 @@ export class OpenWorld3DEngine {
       // + Intelligente Schwarm-Separation zwischen Monstern untereinander (kein Ineinanderstapeln im Kampf/Patrol!):
       if (!mRoot.userData.crystal && !this.localPlayerIsDead) {
         const mobScaleNow = Math.max(0.85, Number(mobData.scale || 1.0));
-        const isMountedLocal = Boolean(this.localPlayerActor?.mountGroup?.visible);
+        const isMountedLocal = Boolean(this.localPlayerActor?.isRiding);
         const minPlayerClearance = 2.25 + Math.max(0.0, (mobScaleNow - 1.0) * 0.90) + (isMountedLocal ? 0.35 : 0.0);
         const dxP = mRoot.position.x - lpX;
         const dzP = mRoot.position.z - lpZ;

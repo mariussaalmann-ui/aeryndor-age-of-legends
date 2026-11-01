@@ -710,11 +710,11 @@
       ],
       "textures": [
         "horse_guard_tex00.png",
-        "horse_guard_tex01.png",
         "horse_guard_tex02.png",
-        "horse_guard_tex03.png",
         "horse_guard_tex04.png",
         "horse_guard_tex05.png",
+        "horse_guard_tex01.png",
+        "horse_guard_tex03.png",
         "horse_guard_tex06.png"
       ]
     },

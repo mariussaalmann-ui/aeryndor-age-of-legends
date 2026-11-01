@@ -1541,6 +1541,7 @@ class WorldAuthority:
         pet_data = {
             "petId": "pet_fire_phoenix",
             "skinKey": skin_key,
+            "skinExplicit": bool(raw_pet.get("skinExplicit", False)),
             "customName": custom_name,
             "level": pet_lvl,
             "exp": max(0, int(raw_pet.get("exp", 0) or 0)),
@@ -2395,8 +2396,12 @@ class WorldAuthority:
             ),
             "mountData": mount_data,
             "petActive": bool(pet_id and pet_id in PETS),
-            "petSkin": costume_pet_skin or pet_data.get("skinKey", "ridack_dragonpet"),
-            "hasCostumePetSkin": bool(costume_pet_skin),
+            "petSkin": (
+                pet_data.get("skinKey")
+                if pet_data.get("skinExplicit") and pet_data.get("skinKey")
+                else (costume_pet_skin or pet_data.get("skinKey", "ridack_dragonpet"))
+            ),
+            "hasCostumePetSkin": bool(costume_pet_skin and not pet_data.get("skinExplicit")),
             "petLevel": int(pet_data.get("level", 1)),
             "petName": pet_data.get("customName", "Grüner Smaragddrache"),
             "petBonusAtk": pet_bonus_atk,
@@ -10234,7 +10239,12 @@ class WorldAuthority:
         old_skin_label = self.VALID_PET_SKINS.get(pd.get("skinKey", "ridack_dragonpet"), "Grüner Smaragddrache")
         new_skin_label = self.VALID_PET_SKINS[clean_skin]
         pd["skinKey"] = clean_skin
-        if not pd.get("customName") or pd["customName"] in (old_skin_label, "Grüner Smaragddrache"):
+        pd["skinExplicit"] = True
+        eq_map = p.get("equipment")
+        if isinstance(eq_map, dict) and isinstance(eq_map.get("costume_pet_skin"), dict):
+            eq_map["costume_pet_skin"]["petSkin"] = clean_skin
+        default_labels = set(self.VALID_PET_SKINS.values()) | {"Grüner Smaragddrache", old_skin_label}
+        if not pd.get("customName") or pd["customName"] in default_labels:
             pd["customName"] = new_skin_label
         self.compute_player_combat_stats(p)
         self.db.save_player_state(p)

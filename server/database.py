@@ -570,6 +570,7 @@ class GameDatabase:
             quests_data["__pet_profile__"] = {
                 "petId": "pet_fire_phoenix",
                 "skinKey": str(existing_pet.get("skinKey") or "ridack_dragonpet"),
+                "skinExplicit": bool(existing_pet.get("skinExplicit", False)),
                 "customName": str(existing_pet.get("customName") or "Astralphönix"),
                 "level": MAX_PET_LEVEL,
                 "exp": 0,
@@ -1954,6 +1955,7 @@ class GameDatabase:
         p["petData"] = {
             "petId": "pet_fire_phoenix",
             "skinKey": str(raw_pet.get("skinKey") or "ridack_dragonpet"),
+            "skinExplicit": bool(raw_pet.get("skinExplicit", False)),
             "customName": str(raw_pet.get("customName") or "Grüner Smaragddrache"),
             "level": pet_lvl,
             "exp": max(0, int(raw_pet.get("exp", 0) or 0)),

@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v642';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v643';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -4620,7 +4620,13 @@ class AeryndorMMOApp {
     }
     if (this.engine?.localPlayerActor) {
       const isNowMounted = Boolean(nextMount);
-      this.engine.localPlayerActor.mountGroup.visible = isNowMounted;
+      this.engine.localPlayerActor.isRiding = isNowMounted;
+      this.engine.localPlayerActor.hasSummonedHorse = true;
+      this.engine.localPlayerActor.mountGroup.visible = true;
+      if (isNowMounted) {
+        this.engine.localPlayerActor.mountGroup.position.set(0, 0, 0);
+        this.engine.localPlayerActor.mountGroup.rotation.set(0, 0, 0);
+      }
       this.engine.localPlayerActor.bodyGroup.position.set(0, isNowMounted ? 0.72 : 0.0, isNowMounted ? -0.06 : 0.0);
       if (this.engine.localPlayerLabel) {
         this.engine.localPlayerLabel.position.y = isNowMounted ? 3.48 : 2.84;
@@ -5622,13 +5628,16 @@ class AeryndorMMOApp {
       if (s.active_pet) {
         const pd = s.petData || {};
         const pLvl = Math.max(1, Math.min(120, Number(pd.level || 1)));
+        const inOptimisticPetWindow = performance.now() <= (this.engine?._optimisticPetSkinUntil || 0);
         activePetSkinKey =
-          s.computed?.hasCostumePetSkin && s.computed?.petSkin
-            ? s.computed.petSkin
-            : pd.skinKey ||
-              this.engine?.customPetSkin ||
-              localStorage.getItem('aeryndor_pet_skin_v1') ||
-              'ridack_dragonpet';
+          inOptimisticPetWindow && this.engine?.customPetSkin
+            ? this.engine.customPetSkin
+            : s.computed?.hasCostumePetSkin && s.computed?.petSkin && !pd.skinExplicit
+              ? s.computed.petSkin
+              : pd.skinKey ||
+                this.engine?.customPetSkin ||
+                localStorage.getItem('aeryndor_pet_skin_v1') ||
+                'ridack_dragonpet';
         const petSkinMeta = this.engine?.getPetSkinConfig?.(activePetSkinKey) || { label: 'Grüner Smaragddrache', emoji: '🐉' };
         const petName = (pd.customName && pd.customName !== 'Grüner Smaragddrache') ? pd.customName : (petSkinMeta.label || 'Grüner Smaragddrache');
         const petEmoji = petSkinMeta.emoji || '🐾';
@@ -15958,9 +15967,13 @@ class AeryndorMMOApp {
     };
 
     const isSummoned = Boolean(s.active_pet);
-    const activePetSkinKey = (s.computed?.hasCostumePetSkin && s.computed?.petSkin)
-      ? s.computed.petSkin
-      : (this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || pd.skinKey || 'ridack_dragonpet');
+    const inOptimisticPetWindow = performance.now() <= (this.engine?._optimisticPetSkinUntil || 0);
+    const activePetSkinKey =
+      inOptimisticPetWindow && this.engine?.customPetSkin
+        ? this.engine.customPetSkin
+        : (s.computed?.hasCostumePetSkin && s.computed?.petSkin && !pd.skinExplicit)
+          ? s.computed.petSkin
+          : (pd.skinKey || this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || 'ridack_dragonpet');
     const petSkinMeta = this.engine?.getPetSkinConfig?.(activePetSkinKey) || { label: 'Grüner Smaragddrache', emoji: '🐉' };
     const petName = (pd.customName && pd.customName !== 'Grüner Smaragddrache') ? pd.customName : (petSkinMeta.label || 'Grüner Smaragddrache');
     const petEmoji = petSkinMeta.emoji || '🐉';
@@ -16176,13 +16189,13 @@ class AeryndorMMOApp {
           </div>
         </div>
 
-        <!-- 2. MITTE: 8 WÄHLBARE 3D-PET-SKINS -->
+        <!-- 2. MITTE: 9 WÄHLBARE 3D-PET-SKINS -->
         <div class="cw-section-box" style="padding:8px 10px;">
           <div class="cw-sec-header" style="margin-bottom:6px;">
-            <span>🐉 3D-Begleiter-Skins (8 Modelle • Alle Stufen &amp; 24 Skills bleiben erhalten)</span>
+            <span>🐉 3D-Begleiter-Skins (9 Modelle • Alle Stufen &amp; 24 Skills bleiben erhalten)</span>
             <span style="color:#38bdf8;font-size:10px;">Aktiv: ${this.escapeHtml(petSkinMeta.label || 'Smaragddrache')}</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:100%;">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:100%;">
             ${[
               { id: 'ridack_dragonpet', label: '🐉 Smaragddrache' },
               { id: 'plechi_smaragd_dragon', label: '🐲 Jade-Wyrm' },
@@ -16190,12 +16203,12 @@ class AeryndorMMOApp {
               { id: 'plechi_flamegoblin_pet', label: '🔥 Glutkobold' },
               { id: 'plechi_lich_pet', label: '💀 Seelen-Lich' },
               { id: 'plechi_fantasy_flypet2', label: '🦋 Äther-Schwinge' },
+              { id: 'astral_phoenix', label: '🔥 Astralphönix' },
               { id: 'plechi_emd_pet', label: '🛡️ Runen-Wächter' },
               { id: 'plechi_elephant_pet2', label: '🐘 Kaiser-Elefant' },
             ]
               .map((pOpt) => {
-                const curSkin = this.engine?.customPetSkin || localStorage.getItem('aeryndor_pet_skin_v1') || 'ridack_dragonpet';
-                const isAct = curSkin === pOpt.id;
+                const isAct = activePetSkinKey === pOpt.id;
                 return `<button type="button" data-pet-skin-select="${pOpt.id}" style="padding:6px 6px;font-size:10px;font-weight:700;border-radius:6px;cursor:pointer;border:1px solid ${isAct ? '#38bdf8' : 'rgba(148,163,184,0.28)'};background:${isAct ? 'rgba(56,189,248,0.22)' : 'rgba(15,23,42,0.75)'};color:${isAct ? '#f8fafc' : '#cbd5e1'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pOpt.label}</button>`;
               })
               .join('')}
@@ -16264,12 +16277,25 @@ class AeryndorMMOApp {
           try {
             localStorage.setItem('aeryndor_pet_skin_v1', skinKey);
           } catch (_) {}
-          this.engine?.setPetAppearance?.(skinKey);
-          this.sendAction('select_pet_skin', { skinKey });
           const cfg = this.engine?.getPetSkinConfig?.(skinKey);
+          if (this.selfState) {
+            if (!this.selfState.petData) this.selfState.petData = {};
+            this.selfState.petData.skinKey = skinKey;
+            this.selfState.petData.skinExplicit = true;
+            if (cfg?.label) {
+              this.selfState.petData.customName = cfg.label;
+            }
+            if (this.selfState.computed) {
+              this.selfState.computed.petSkin = skinKey;
+              this.selfState.computed.hasCostumePetSkin = false;
+            }
+          }
+          this.engine?.setPetAppearance?.(skinKey, false);
+          this.sendAction('select_pet_skin', { skinKey });
           if (cfg) {
             this.showToast(`${cfg.emoji || '🐾'} 3D-Begleiter gewechselt: ${cfg.label}`);
           }
+          this.updateTopLeftPlayerHUD();
           this.renderPetWindow();
         }
       });
