@@ -14,7 +14,7 @@ import * as THREE from '../../vendor/three.module.js';
 import { DayNightSystem, MOON_PHASES } from './dayNightSystem.js?v=v20261101_v637';
 import { WindField, WIND_SPEED_PER_STRENGTH } from './windSystem.js?v=20261029_v600';
 import { SnowWeatherSystem, isSnowWeather, SNOW_INTENSITY_LEVELS } from './snowSystem.js?v=20261029_v600';
-import { TeamEmblemSystem } from './teamEmblemSystem.js?v=20261030_v603';
+import { TeamEmblemSystem } from './teamEmblemSystem.js?v=v20261101_v638';
 import { METIN_SKILL_CATALOG, resolveMetinSkill, getMetinSkillTier } from './metinSkillCatalog.js?v=v20261031_v619';
 
 // Modulweite Caches für 3D-GLB-Templates, Modell-Texturen, PBR-IBL-EnvironmentMaps & Kontaktschatten:
@@ -7137,9 +7137,9 @@ export class OpenWorld3DEngine {
         name: 'Krieger',
         guild: 'Drachenorden',
       },
-      0.42
+      0.34
     );
-    this.localPlayerLabel.position.set(0, 2.84, 0);
+    this.localPlayerLabel.position.set(0, 2.70, 0);
     this.localPlayerActor.root.add(this.localPlayerLabel);
     this.scene.add(this.localPlayerActor.root);
 
@@ -17244,15 +17244,15 @@ export class OpenWorld3DEngine {
         {
           id: 'stable_horse_col4',
           name: '🐎 Rotbraunes Kastanien-Streitross',
-          tex: 'pewi_mount_horse_col2.png',
-          coatHex: 0x9a3412,
-          maneHex: 0x451a03,
+          tex: 'pewi_mount_horse_col4.png',
+          coatHex: 0x6b3410,
+          maneHex: 0xeab308,
           saddleHex: 0x991b1b,
           matOpts: {
-            color: new THREE.Color(1.18, 0.74, 0.52),
+            color: new THREE.Color(1.12, 1.06, 1.00),
             emissive: new THREE.Color(0x000000),
             emissiveIntensity: 0.0,
-            roughness: 0.51,
+            roughness: 0.50,
             metalness: 0.06,
           },
           speed: 1.52,
@@ -17267,16 +17267,16 @@ export class OpenWorld3DEngine {
         {
           id: 'stable_horse_col5',
           name: '🐎 Gold-Palomino der Sonnenwache',
-          tex: 'pewi_mount_horse_col3.png',
+          tex: 'pewi_mount_horse_col5.png',
           coatHex: 0xd97706,
-          maneHex: 0xfef08a,
+          maneHex: 0xf8fafc,
           saddleHex: 0x0369a1,
           matOpts: {
-            color: new THREE.Color(1.16, 0.98, 0.64),
+            color: new THREE.Color(1.06, 1.04, 1.00),
             emissive: new THREE.Color(0x000000),
             emissiveIntensity: 0.0,
             roughness: 0.48,
-            metalness: 0.08,
+            metalness: 0.07,
           },
           speed: 1.60,
           pause: 1.9,
@@ -28168,9 +28168,9 @@ export class OpenWorld3DEngine {
         tex: ['/assets/models/npcs/pewi_mount_horse_col3.png'],
         texFile: 'pewi_mount_horse_col3.png',
         height: 1.98,
-        color: new THREE.Color(1.06, 1.28, 1.22),
-        emissive: new THREE.Color(0x10b981),
-        emissiveIntensity: 0.18,
+        color: new THREE.Color(0.84, 1.26, 1.24),
+        emissive: new THREE.Color(0x06b6d4),
+        emissiveIntensity: 0.22,
         roughness: 0.42,
         metalness: 0.16,
       },
@@ -28179,23 +28179,23 @@ export class OpenWorld3DEngine {
         label: 'Nachtschatten-Streitross',
         emoji: '🌑',
         glb: '/assets/models/npcs/pewi_mount_horse.glb',
-        tex: ['/assets/models/npcs/pewi_mount_horse_col2.png'],
-        texFile: 'pewi_mount_horse_col2.png',
+        tex: ['/assets/models/npcs/pewi_mount_horse_col1.png'],
+        texFile: 'pewi_mount_horse_col1.png',
         height: 1.96,
-        color: new THREE.Color(1.02, 0.90, 1.24),
-        emissive: new THREE.Color(0x8b5cf6),
-        emissiveIntensity: 0.18,
-        roughness: 0.45,
+        color: new THREE.Color(1.04, 0.90, 1.32),
+        emissive: new THREE.Color(0x7c3aed),
+        emissiveIntensity: 0.24,
+        roughness: 0.44,
         metalness: 0.14,
       },
       col1: {
         key: 'col1',
-        label: 'Kampfpferd',
-        emoji: '🐎',
+        label: 'Schwarzer Rappe',
+        emoji: '🖤',
         glb: '/assets/models/npcs/pewi_mount_horse.glb',
         tex: ['/assets/models/npcs/pewi_mount_horse_col1.png'],
         texFile: 'pewi_mount_horse_col1.png',
-        height: 1.92,
+        height: 1.94,
         color: new THREE.Color(1.16, 1.14, 1.12),
         emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.0,
@@ -28204,12 +28204,12 @@ export class OpenWorld3DEngine {
       },
       col2: {
         key: 'col2',
-        label: 'Pferd',
-        emoji: '🐎',
+        label: 'Braun-Weißer Königs-Schecke',
+        emoji: '👑',
         glb: '/assets/models/npcs/pewi_mount_horse.glb',
         tex: ['/assets/models/npcs/pewi_mount_horse_col2.png'],
         texFile: 'pewi_mount_horse_col2.png',
-        height: 1.92,
+        height: 1.94,
         color: new THREE.Color(1.06, 1.04, 1.02),
         emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.0,
@@ -28218,28 +28218,66 @@ export class OpenWorld3DEngine {
       },
       col3: {
         key: 'col3',
-        label: 'Militärgaul',
-        emoji: '👑',
+        label: 'Edler Licht-Schimmel',
+        emoji: '✨',
         glb: '/assets/models/npcs/pewi_mount_horse.glb',
         tex: ['/assets/models/npcs/pewi_mount_horse_col3.png'],
         texFile: 'pewi_mount_horse_col3.png',
-        height: 1.92,
+        height: 1.94,
         color: new THREE.Color(1.04, 1.03, 1.01),
         emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.0,
         roughness: 0.48,
         metalness: 0.06,
       },
+      col4: {
+        key: 'col4',
+        label: 'Rotbraunes Kastanien-Streitross',
+        emoji: '🔥',
+        glb: '/assets/models/npcs/pewi_mount_horse.glb',
+        tex: ['/assets/models/npcs/pewi_mount_horse_col4.png'],
+        texFile: 'pewi_mount_horse_col4.png',
+        height: 1.94,
+        color: new THREE.Color(1.12, 1.06, 1.00),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.50,
+        metalness: 0.06,
+      },
+      col5: {
+        key: 'col5',
+        label: 'Gold-Palomino der Sonnenwache',
+        emoji: '☀️',
+        glb: '/assets/models/npcs/pewi_mount_horse.glb',
+        tex: ['/assets/models/npcs/pewi_mount_horse_col5.png'],
+        texFile: 'pewi_mount_horse_col5.png',
+        height: 1.94,
+        color: new THREE.Color(1.06, 1.04, 1.00),
+        emissive: new THREE.Color(0x000000),
+        emissiveIntensity: 0.0,
+        roughness: 0.48,
+        metalness: 0.07,
+      },
     };
     return configs[resolvedKey] || configs.horse_lvl1;
   }
 
-  setMountAppearance(skinKey = 'horse_lvl1', horseLevel = 1) {
+  setMountAppearance(skinKey = 'horse_lvl1', horseLevel = 1, fromServerSync = false) {
+    if (fromServerSync && performance.now() <= (this._optimisticMountSkinUntil || 0)) {
+      return;
+    }
     const cfg = this.getHorseSkinConfig(skinKey, horseLevel);
     const validSkin = cfg.key;
     this.customMountSkin = validSkin;
+    if (!fromServerSync) {
+      this._optimisticMountSkinUntil = performance.now() + 1600;
+    }
     try {
-      localStorage.setItem('aeryndor_mount_skin_v1', validSkin);
+      const storageSkin =
+        skinKey === 'none' || validSkin === 'horse_lvl1' || validSkin === 'horse_lvl35' || validSkin === 'horse_lvl50'
+          ? 'none'
+          : validSkin;
+      localStorage.setItem('aeryndor_mount_skin_v1', storageSkin);
     } catch (_) {}
 
     const mg = this.localPlayerActor?.mountGroup;
@@ -28739,7 +28777,8 @@ export class OpenWorld3DEngine {
       const guild = cfg.guild !== undefined ? cfg.guild : (this.customGuildName || '');
       const showGuild = this.showGuildNames !== false;
       const showPlayer = this.showPlayerNames !== false;
-      const labelKey = `${cfg.level}|${rankName}|${rankColor || ''}|${cfg.name}|${guild}|${showGuild}`;
+      const teamRank = cfg.teamRank || this.localTeamRank || null;
+      const labelKey = `${cfg.level}|${rankName}|${rankColor || ''}|${cfg.name}|${guild}|${showGuild}|${teamRank || ''}`;
       if (this.lastLocalLabelText !== labelKey) {
         this.lastLocalLabelText = labelKey;
         if (this.localPlayerLabel) {
@@ -28753,10 +28792,11 @@ export class OpenWorld3DEngine {
             name: cfg.name,
             guild,
             showGuild,
+            teamRank,
           },
-          0.42
+          0.34
         );
-        this.localPlayerLabel.position.set(0, 2.84, 0);
+        this.localPlayerLabel.position.set(0, 2.70, 0);
         this.localPlayerActor.root.add(this.localPlayerLabel);
       }
       if (this.localPlayerLabel) {
@@ -28764,7 +28804,6 @@ export class OpenWorld3DEngine {
       }
 
       // 3D-Team-Wappen (GameMaster & Team-Insignie)
-      const teamRank = cfg.teamRank || this.localTeamRank || null;
       if (teamRank && this.teamEmblemSystem) {
         if (!this.localTeamEmblemGroup || this._currentLocalTeamRank !== teamRank) {
           if (this.localTeamEmblemGroup) {
@@ -28778,7 +28817,7 @@ export class OpenWorld3DEngine {
         }
         if (this.localTeamEmblemGroup) {
           const isMounted = Boolean(this.localPlayerActor.mountGroup?.visible);
-          this.localTeamEmblemGroup.userData.baseY = isMounted ? 4.38 : 3.75;
+          this.localTeamEmblemGroup.userData.baseY = isMounted ? 3.86 : 3.22;
           this.localTeamEmblemGroup.visible = this.showTeamEmblems !== false;
         }
       } else if (this.localTeamEmblemGroup) {
@@ -31787,13 +31826,13 @@ export class OpenWorld3DEngine {
   getRankColorByName(rankName, fallbackColor = null) {
     const rankMap = {
       Unsterblich: '#e838c8',
-      Legendär: '#9333ea',
-      Göttlich: '#ff00ff',
+      Legendär: '#a855f7',
+      Göttlich: '#e879f9',
       Königlich: '#f59e0b',
       Held: '#6ee7b7',
       Ritterlich: '#38bdf8',
-      Edel: '#2563eb',
-      Gut: '#2b5c8f',
+      Edel: '#3b82f6',
+      Gut: '#3b82b6',
       Freundlich: '#93c5fd',
       Neutral: '#cbd5e1',
       '-NEUTRAL-': '#cbd5e1',
@@ -31809,7 +31848,7 @@ export class OpenWorld3DEngine {
     return rankMap[rankName] || fallbackColor || '#38bdf8';
   }
 
-  createPlayerNameplateSprite(opts = {}, scale = 0.42) {
+  createPlayerNameplateSprite(opts = {}, scale = 0.34) {
     const level = opts.level ?? 1;
     const rankName = opts.rankName !== undefined ? opts.rankName : 'Freundlich';
     const rankColor = this.getRankColorByName(rankName, opts.rankColor);
@@ -31817,52 +31856,83 @@ export class OpenWorld3DEngine {
     const guild = opts.guild !== undefined ? opts.guild : 'Drachenorden';
     const showGuild = opts.showGuild !== false && Boolean(guild && guild !== 'Keine Gilde');
 
+    // High-DPI Supersampled Canvas (1280x240, Aspect 5.3333 = 9.6 / 1.80) für gestochen scharfe Typografie
     const canvas = document.createElement('canvas');
-    canvas.width = 768;
-    canvas.height = 148;
+    canvas.width = 1280;
+    canvas.height = 240;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.miterLimit = 2;
 
-    // 1. Obere Zeile: Gildenname in Weiß über dem Kopf (Server 1 Stil)
+    // 1. Obere Zeile: Dezent proportionierter Gildenname mit feiner dunkler Kontur
     if (showGuild) {
-      ctx.font = 'bold 26px Inter, "Segoe UI", sans-serif';
+      ctx.font = '600 39px Inter, "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const guildY = 42;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.92)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 2;
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 6;
-      ctx.strokeText(guild, canvas.width / 2, guildY);
-      ctx.shadowBlur = 0;
+      const guildY = 78;
+
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.88)';
+      ctx.shadowBlur = 5;
       ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 2;
+      ctx.strokeStyle = 'rgba(6, 9, 15, 0.94)';
+      ctx.lineWidth = 4.5;
+      ctx.strokeText(guild, canvas.width / 2, guildY);
+
+      ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
-      ctx.fillStyle = '#ffffff';
+      if (guild === 'Serverleitung') {
+        const gGrad = ctx.createLinearGradient(0, guildY - 18, 0, guildY + 18);
+        gGrad.addColorStop(0, '#fffbeb');
+        gGrad.addColorStop(0.55, '#fef3c7');
+        gGrad.addColorStop(1, '#fde68a');
+        ctx.fillStyle = gGrad;
+      } else {
+        ctx.fillStyle = '#f1f5f9';
+      }
       ctx.fillText(guild, canvas.width / 2, guildY);
     }
 
-    // 2. Untere Hauptzeile: Lvl (Gold), Rang (Passend farblich), optional 🤖 [Bot] Symbol (Cyan), Name (Weiß bzw. Gold + 👑 bei SA)
-    const mainY = showGuild ? 92 : 76;
-    ctx.font = 'bold 30px Inter, "Segoe UI", sans-serif';
+    // 2. Untere Hauptzeile: Level (Edelgold), Rang (fein abgestimmt), Name (klar & scharf ohne klobiges Emoji)
+    const mainY = showGuild ? 140 : 120;
+    ctx.font = '700 48px Inter, "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
     const lvlText = `Lv. ${level}`;
     const rankText = showGuild && rankName ? String(rankName) : '';
     const rawName = String(name);
+    const upperName = rawName.toUpperCase();
     const isBotFlag = Boolean(opts.isBot) || rawName.startsWith('[Bot]') || rawName.endsWith('Bot');
-    const isSaFlag = !isBotFlag && (Boolean(opts.isSA) || opts.teamRank === 'SA' || rawName.toUpperCase().startsWith('[SA]'));
+    const normTeamRank = String(opts.teamRank || '').trim().toUpperCase();
+    const isSaFlag =
+      !isBotFlag &&
+      (Boolean(opts.isSA) ||
+        normTeamRank === 'SA' ||
+        normTeamRank === 'SGA' ||
+        normTeamRank === 'GA' ||
+        upperName.startsWith('[SA]') ||
+        upperName.startsWith('[SGA]') ||
+        upperName.startsWith('[GA]'));
+    const isGmFlag =
+      !isBotFlag &&
+      !isSaFlag &&
+      (normTeamRank === 'GM' ||
+        normTeamRank === 'SGM' ||
+        normTeamRank === 'TGM' ||
+        normTeamRank === 'JGM' ||
+        upperName.startsWith('[GM]') ||
+        upperName.startsWith('[SGM]') ||
+        upperName.startsWith('[TGM]'));
     const cleanCharName = rawName.startsWith('[Bot]')
       ? rawName.slice(5).trim()
       : (isBotFlag && rawName.endsWith('Bot') ? rawName.slice(0, -3).trim() : rawName);
-    const botPrefixText = isBotFlag ? '🤖 [Bot]' : '';
-    const nameText = isSaFlag ? `👑 ${cleanCharName}` : cleanCharName;
-    const gap = 14;
+    const botPrefixText = isBotFlag ? '[Bot] ' : '';
+    const nameText = cleanCharName;
+    const gap = 20;
 
     const wLvl = ctx.measureText(lvlText).width;
     const wRank = rankText ? ctx.measureText(rankText).width : 0;
@@ -31876,12 +31946,12 @@ export class OpenWorld3DEngine {
     const xBotPrefix = startX + wLvl + (wRank > 0 ? gap + wRank : 0) + gap;
     const xName = xBotPrefix + wBotPrefix;
 
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.92)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 1;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.90)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 2;
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 6.5;
+    ctx.strokeStyle = 'rgba(6, 9, 15, 0.95)';
+    ctx.lineWidth = 5.4;
 
     ctx.strokeText(lvlText, xLvl, mainY);
     if (wRank > 0) {
@@ -31893,16 +31963,27 @@ export class OpenWorld3DEngine {
     ctx.strokeText(nameText, xName, mainY);
 
     ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
-    ctx.fillStyle = '#ffd700';
+
+    const lvlGrad = ctx.createLinearGradient(xLvl, mainY - 20, xLvl, mainY + 20);
+    lvlGrad.addColorStop(0, '#fef08a');
+    lvlGrad.addColorStop(0.55, '#fde047');
+    lvlGrad.addColorStop(1, '#eab308');
+    ctx.fillStyle = lvlGrad;
     ctx.fillText(lvlText, xLvl, mainY);
+
     if (wRank > 0) {
       if (rankName === 'Unsterblich') {
         const grad = ctx.createLinearGradient(xRank, mainY, xRank + wRank, mainY);
-        grad.addColorStop(0, '#ff1a8c');
-        grad.addColorStop(0.5, '#e838c8');
-        grad.addColorStop(1, '#9333ea');
+        grad.addColorStop(0, '#f472b6');
+        grad.addColorStop(0.5, '#e879f9');
+        grad.addColorStop(1, '#a855f7');
+        ctx.fillStyle = grad;
+      } else if (rankName === 'Göttlich') {
+        const grad = ctx.createLinearGradient(xRank, mainY - 20, xRank, mainY + 20);
+        grad.addColorStop(0, '#f5d0fe');
+        grad.addColorStop(0.5, '#e879f9');
+        grad.addColorStop(1, '#c026d3');
         ctx.fillStyle = grad;
       } else {
         ctx.fillStyle = rankColor;
@@ -31914,22 +31995,33 @@ export class OpenWorld3DEngine {
       ctx.fillText(botPrefixText, xBotPrefix, mainY);
     }
     if (isSaFlag) {
-      const saGrad = ctx.createLinearGradient(xName, mainY - 14, xName, mainY + 14);
-      saGrad.addColorStop(0, '#fff7ad');
-      saGrad.addColorStop(0.5, '#ffd700');
-      saGrad.addColorStop(1, '#f59e0b');
+      const saGrad = ctx.createLinearGradient(xName, mainY - 22, xName, mainY + 22);
+      saGrad.addColorStop(0, '#fffbeb');
+      saGrad.addColorStop(0.48, '#fde047');
+      saGrad.addColorStop(1, '#d97706');
       ctx.fillStyle = saGrad;
+    } else if (isGmFlag) {
+      const gmGrad = ctx.createLinearGradient(xName, mainY - 22, xName, mainY + 22);
+      gmGrad.addColorStop(0, '#ecfeff');
+      gmGrad.addColorStop(0.5, '#67e8f9');
+      gmGrad.addColorStop(1, '#06b6d4');
+      ctx.fillStyle = gmGrad;
     } else {
       ctx.fillStyle = '#ffffff';
     }
     ctx.fillText(nameText, xName, mainY);
 
     const tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = Math.min(8, this.renderer?.capabilities?.getMaxAnisotropy?.() || 4);
+    if (THREE.SRGBColorSpace) {
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
     const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(scale * 9.6, scale * 1.85, 1);
+    sprite.scale.set(scale * 9.6, scale * 1.80, 1);
     sprite.layers.set(1);
     return sprite;
   }
@@ -32599,8 +32691,15 @@ export class OpenWorld3DEngine {
     this.localPlayerEmpire = p.empire || 'solaria';
     const rawLocalGuild = typeof p.guild === 'object' ? p.guild?.name : (p.guild ?? p.guildName);
     const resolvedLocalGuild = this.customGuildName || rawLocalGuild || (this.localTeamRank ? 'Serverleitung' : '');
-    if (comp.hasCostumeMountSkin && comp.mountVisualSkin && this.customMountSkin !== comp.mountVisualSkin) {
-      this.customMountSkin = comp.mountVisualSkin;
+    const serverHorseLv = Math.max(1, Number(p.mountData?.level || comp.horseLevel || 1));
+    const serverMountVisual = comp.mountVisualSkin || p.mountData?.visualSkin || null;
+    if (serverMountVisual && performance.now() > (this._optimisticMountSkinUntil || 0)) {
+      if (
+        this.customMountSkin !== serverMountVisual ||
+        (this.localPlayerActor?.mountGroup && this.localPlayerActor.mountGroup.userData?.mountSkin !== serverMountVisual)
+      ) {
+        this.setMountAppearance(serverMountVisual, serverHorseLv, true);
+      }
     }
     this.setLocalPlayerAppearance({
       classId: p.class_id || 'warrior',
@@ -32624,10 +32723,10 @@ export class OpenWorld3DEngine {
     this.localPlayerActor.mountGroup.visible = isNowMounted;
     this.localPlayerActor.bodyGroup.position.set(0, isNowMounted ? 0.72 : 0.0, isNowMounted ? -0.06 : 0.0);
     if (this.localPlayerLabel) {
-      this.localPlayerLabel.position.y = isNowMounted ? 3.48 : 2.84;
+      this.localPlayerLabel.position.y = isNowMounted ? 3.34 : 2.70;
     }
     if (this.localTeamEmblemGroup) {
-      this.localTeamEmblemGroup.userData.baseY = isNowMounted ? 4.38 : 3.75;
+      this.localTeamEmblemGroup.userData.baseY = isNowMounted ? 3.86 : 3.22;
       this.localTeamEmblemGroup.visible = this.showTeamEmblems !== false;
     }
     const hadPetVisible = Boolean(this.localPlayerActor.petGroup.visible);
@@ -32701,7 +32800,7 @@ export class OpenWorld3DEngine {
       const rawOpGuild = op.guild !== undefined ? op.guild : op.guildName;
       const opGuild = rawOpGuild || (opTeamRank ? 'Serverleitung' : '');
       const opShowGuild = this.showGuildNames !== false;
-      const opLabelKey = `${op.level}|${opRankName}|${opRankColor || ''}|${op.name}|${opGuild}|${opShowGuild}`;
+      const opLabelKey = `${op.level}|${opRankName}|${opRankColor || ''}|${op.name}|${opGuild}|${opShowGuild}|${opTeamRank || ''}`;
       const opWeaponPlus = Number(op.weaponPlus ?? 0);
       const opArmorPlus = Number(op.armorPlus ?? opWeaponPlus);
       const opGender = isFemaleGender(op.gender) ? 'female' : 'male';
@@ -32757,11 +32856,13 @@ export class OpenWorld3DEngine {
             name: op.name,
             guild: opGuild,
             showGuild: opShowGuild,
+            teamRank: opTeamRank,
+            isSA: Boolean(op.isSA),
             isBot: Boolean(op.isBot) || String(op.id || '').startsWith('bot_'),
           },
-          0.42
+          0.34
         );
-        lbl.position.set(0, 2.84, 0);
+        lbl.position.set(0, 2.70, 0);
         rig.root.add(lbl);
         rig.labelSprite = lbl;
         rig.lastLabelKey = opLabelKey;
@@ -32797,18 +32898,20 @@ export class OpenWorld3DEngine {
             name: op.name,
             guild: opGuild,
             showGuild: opShowGuild,
+            teamRank: opTeamRank,
+            isSA: Boolean(op.isSA),
             isBot: Boolean(op.isBot) || String(op.id || '').startsWith('bot_'),
           },
-          0.42
+          0.34
         );
-        lbl.position.set(0, 2.84, 0);
+        lbl.position.set(0, 2.70, 0);
         mesh.root.add(lbl);
         mesh.labelSprite = lbl;
       }
       if (mesh) mesh.playerName = op.name;
       if (mesh.labelSprite) {
         mesh.labelSprite.visible = this.showPlayerNames !== false;
-        mesh.labelSprite.position.y = op.activeMount ? 3.48 : 2.84;
+        mesh.labelSprite.position.y = op.activeMount ? 3.34 : 2.70;
       }
       // 3D-Team-Wappen für andere autorisierte Team-Mitglieder
       if (opTeamRank && this.teamEmblemSystem) {
@@ -32821,7 +32924,7 @@ export class OpenWorld3DEngine {
           mesh.teamRank = opTeamRank;
         }
         if (mesh.teamEmblemGroup) {
-          mesh.teamEmblemGroup.userData.baseY = op.activeMount ? 4.38 : 3.75;
+          mesh.teamEmblemGroup.userData.baseY = op.activeMount ? 3.86 : 3.22;
           mesh.teamEmblemGroup.visible = this.showTeamEmblems !== false && !mesh._isDistanceCulled;
         }
       } else if (mesh.teamEmblemGroup) {
@@ -37288,8 +37391,8 @@ export class OpenWorld3DEngine {
     }
     this.updateWorldChunkCulling(false);
     if (this.localPlayerLabel) {
-      const lblZoomScale = 0.42 * Math.min(1.0, Math.max(0.42, this.cameraDistance / 13.5));
-      this.localPlayerLabel.scale.set(lblZoomScale * 9.6, lblZoomScale * 1.85, 1);
+      const lblZoomScale = 0.34 * Math.min(1.0, Math.max(0.46, this.cameraDistance / 13.5));
+      this.localPlayerLabel.scale.set(lblZoomScale * 9.6, lblZoomScale * 1.80, 1);
     }
 
     // Kamera-Okklusions-Fade für Gebäude, Mauern und Türme vor der Kamera

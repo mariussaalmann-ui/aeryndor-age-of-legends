@@ -4,7 +4,7 @@
 // Schmied/Runenweberin, Auto-Jagd sowie Echtzeit-WebSocket-Sync & 3D-Engine.
 // ============================================================================
 
-import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v637';
+import { OpenWorld3DEngine, CharacterShowcase3D } from '../engine/openWorld3D.js?v=v20261101_v638';
 import { NpcRenderTargetStage } from '../engine/npcRenderTarget.js?v=v20261024_2018';
 import { renderIconHTML, getItemSlotSize, getItemTypeLabel } from './iconRenderer.js?v=v20261028_v531';
 import { audioSystem } from './audioSystem.js?v=20261029_v600';
@@ -5307,24 +5307,37 @@ class AeryndorMMOApp {
       this.renderFriendsWindow();
     }
     this.updateMessengerBadges();
-    if (this.selfState?.mountData && this.engine?.setMountAppearance) {
+    const syncMountData = this.selfState?.computed?.mountData || this.selfState?.mountData;
+    if (syncMountData && this.engine?.setMountAppearance) {
       this.engine.setMountAppearance(
-        this.selfState.mountData.equippedSkin || 'none',
-        Number(this.selfState.mountData.level || 1)
+        syncMountData.equippedSkin || 'none',
+        Number(syncMountData.level || 1),
+        true
       );
     }
     const petWin = document.getElementById('win-pet');
-    if (petWin && !petWin.classList.contains('hidden')) {
+    const stableModal = document.getElementById('npc-quest-dialog-modal');
+    const petWinOpen = Boolean(petWin && !petWin.classList.contains('hidden'));
+    const stableWinOpen = Boolean(
+      stableModal && !stableModal.classList.contains('hidden') && stableModal.querySelector('[data-stable-skin]')
+    );
+    if (petWinOpen || stableWinOpen) {
       const petChanged =
         !prevSelf ||
         prevSelf.active_pet !== this.selfState.active_pet ||
         prevSelf.active_mount !== this.selfState.active_mount ||
         this._fastObjSig(prevSelf.petData) !== this._fastObjSig(this.selfState.petData) ||
         this._fastObjSig(prevSelf.mountData) !== this._fastObjSig(this.selfState.mountData) ||
+        this._fastObjSig(prevSelf.computed?.mountData) !== this._fastObjSig(this.selfState.computed?.mountData) ||
         this._fastObjSig(prevSelf.equipment?.costume_pet_skin) !== this._fastObjSig(this.selfState.equipment?.costume_pet_skin) ||
         this._fastObjSig(prevSelf.equipment?.costume_mount_skin) !== this._fastObjSig(this.selfState.equipment?.costume_mount_skin);
       if (petChanged) {
-        this.renderPetWindow();
+        if (petWinOpen) {
+          this.renderPetWindow();
+        }
+        if (stableWinOpen) {
+          this.openStablemasterModal(this._activeStablemasterTitle || '🐎 Stallbursche Konrad');
+        }
       }
     }
 
@@ -13800,7 +13813,195 @@ class AeryndorMMOApp {
     });
   }
 
+  getUnifiedMountSkinsCatalog() {
+    const canonical = [
+      {
+        id: 'none',
+        mountId: 'mount_war_boar',
+        name: 'Standard-Pferd (Stufen-Aussehen)',
+        emoji: '🐎',
+        swatch: '#94a3b8',
+        badge: '🐎 STUFEN-RANG',
+        desc: 'Zeigt automatisch das Rang-Aussehen deines Pferdes passend zur Stufe: Pferd (Lv. 1), Kampfpferd (Lv. 35) oder Militärgaul (Lv. 50).',
+        bonusSummary: 'Automatisches Rang-Aussehen (Lv. 1 / Lv. 35 / Lv. 50)',
+      },
+      {
+        id: 'col1',
+        mountId: 'mount_war_boar',
+        name: 'Schwarzer Rappe',
+        emoji: '🖤',
+        swatch: '#1e293b',
+        badge: '🖤 SCHWARZER RAPPE',
+        desc: 'Edler tiefschwarzer Rappe mit dunklem Glanzfell, schwarzer Mähne und rotem Reichssattel – läuft links in der großen Pferdekoppel.',
+        bonusSummary: '+10% Stark gg. Monster • +5% Kritischer Treffer',
+      },
+      {
+        id: 'col2',
+        mountId: 'mount_war_boar',
+        name: 'Braun-Weißer Königs-Schecke',
+        emoji: '👑',
+        swatch: '#b45309',
+        badge: '👑 KÖNIGS-SCHECKE',
+        desc: 'Kräftiger braun-weiß gefleckter Schecke mit silberweißer Mähne und edlem Zaumzeug – läuft rechts vorne in der Koppel.',
+        bonusSummary: '+10% Stark gg. Rissmonolithen • +5% Durchbohrender Treffer',
+      },
+      {
+        id: 'col3',
+        mountId: 'mount_war_boar',
+        name: 'Edler Licht-Schimmel',
+        emoji: '✨',
+        swatch: '#f8fafc',
+        badge: '✨ LICHT-SCHIMMEL',
+        desc: 'Strahlend weißer Schimmel mit goldblonder Mähne und Prunksattel – läuft im Zentrum des Pferdestalls.',
+        bonusSummary: '+350 Max. TP • +15 Verteidigung im Sattel',
+      },
+      {
+        id: 'col4',
+        mountId: 'mount_war_boar',
+        name: 'Rotbraunes Kastanien-Streitross',
+        emoji: '🔥',
+        swatch: '#9a3412',
+        badge: '🔥 KASTANIEN-ROSS',
+        desc: 'Kräftiger Vollblut-Kastanienfuchs mit goldblonder Mähne und dunkler Satteldecke – läuft an der rechten Stallseite.',
+        bonusSummary: '+25 Angriffswert • +6% Durchschnittsschaden (DSS)',
+      },
+      {
+        id: 'col5',
+        mountId: 'mount_war_boar',
+        name: 'Gold-Palomino der Sonnenwache',
+        emoji: '☀️',
+        swatch: '#eab308',
+        badge: '☀️ GOLD-PALOMINO',
+        desc: 'Goldschimmerndes Palomino-Streitross mit platinweißer Mähne – läuft vorne am Koppelgatter neben Stallbursche Konrad.',
+        bonusSummary: '+10% Stark gg. Bosse • +250 Max. TP',
+      },
+      {
+        id: 'skin_rift_charger',
+        mountId: 'mount_war_boar',
+        name: 'Rissbrecher-Schlachtross',
+        emoji: '💠',
+        swatch: '#22d3ee',
+        badge: '💠 ÄTHER-AURA',
+        desc: 'Mystisches Äther-Schlachtross mit smaragd-türkisfarbener Riss-Aura für erfahrene Monolithen-Bezwinger.',
+        bonusSummary: '+15% Stark gg. Rissmonolithen • +8% Durchschnittsschaden (DSS)',
+      },
+      {
+        id: 'skin_shadow_steed',
+        mountId: 'mount_war_boar',
+        name: 'Nachtschatten-Streitross',
+        emoji: '🌑',
+        swatch: '#9333ea',
+        badge: '🌑 SCHATTEN-AURA',
+        desc: 'Dunkler Nachtschatten-Rappe mit violetter Amethyst-Aura für kompromisslose Monsterjagd.',
+        bonusSummary: '+15% Stark gg. Monster • +10% Kritischer Treffer',
+      },
+    ];
+
+    const serverMap = new Map();
+    if (Array.isArray(this.config?.mountSkins)) {
+      for (const sm of this.config.mountSkins) {
+        if (sm?.id && !serverMap.has(sm.id)) {
+          serverMap.set(sm.id, sm);
+        }
+      }
+    }
+
+    return canonical.map((item) => {
+      const srv = serverMap.get(item.id);
+      if (!srv) return item;
+      return {
+        ...item,
+        name: srv.name || item.name,
+        emoji: srv.emoji || item.emoji,
+        badge: srv.badge || item.badge,
+        desc: srv.desc || item.desc,
+        bonusSummary: srv.bonusSummary || item.bonusSummary,
+      };
+    });
+  }
+
+  getActiveEquippedMountSkinId() {
+    const catalog = this.getUnifiedMountSkinsCatalog();
+    const validIds = new Set(catalog.map((x) => x.id));
+    const md = this.selfState?.mountData || this.selfState?.computed?.mountData;
+    const rawEq = md?.equippedSkin;
+    if (typeof rawEq === 'string' && rawEq.length > 0) {
+      if (rawEq === 'horse_lvl1' || rawEq === 'horse_lvl35' || rawEq === 'horse_lvl50') {
+        return 'none';
+      }
+      if (validIds.has(rawEq)) {
+        return rawEq;
+      }
+    }
+    try {
+      const saved = localStorage.getItem('aeryndor_mount_skin_v1');
+      if (saved === 'horse_lvl1' || saved === 'horse_lvl35' || saved === 'horse_lvl50') {
+        return 'none';
+      }
+      if (saved && validIds.has(saved)) {
+        return saved;
+      }
+    } catch (_) {}
+    return 'none';
+  }
+
+  applyUnifiedMountSkinSelection(skinId, opts = {}) {
+    const catalog = this.getUnifiedMountSkinsCatalog();
+    const chosen = catalog.find((x) => x.id === skinId) || catalog[0];
+    const validId = chosen.id;
+    const md = this.selfState?.mountData || this.selfState?.computed?.mountData;
+    const horseLv = Math.max(1, Math.min(50, Number(md?.level || this.selfState?.computed?.horseLevel || 1)));
+    const defaultVisual = horseLv >= 50 ? 'horse_lvl50' : horseLv >= 35 ? 'horse_lvl35' : 'horse_lvl1';
+    const resolvedVisual = validId !== 'none' ? validId : defaultVisual;
+
+    if (this.selfState) {
+      if (!this.selfState.mountData) {
+        this.selfState.mountData = { level: horseLv };
+      }
+      this.selfState.mountData.equippedSkin = validId;
+      this.selfState.mountData.skinExplicit = true;
+      this.selfState.mountData.visualSkin = resolvedVisual;
+      this.selfState.mountData.skinName = chosen.name;
+      this.selfState.mountData.skinBonusSummary = chosen.bonusSummary;
+
+      if (this.selfState.computed) {
+        this.selfState.computed.mountVisualSkin = resolvedVisual;
+        if (!this.selfState.computed.mountData) {
+          this.selfState.computed.mountData = { ...this.selfState.mountData };
+        } else {
+          this.selfState.computed.mountData.equippedSkin = validId;
+          this.selfState.computed.mountData.skinExplicit = true;
+          this.selfState.computed.mountData.visualSkin = resolvedVisual;
+          this.selfState.computed.mountData.skinName = chosen.name;
+          this.selfState.computed.mountData.skinBonusSummary = chosen.bonusSummary;
+        }
+      }
+    }
+
+    try {
+      localStorage.setItem('aeryndor_mount_skin_v1', validId);
+    } catch (_) {}
+
+    this.engine?.setMountAppearance?.(validId, horseLv, false);
+    this.sendAction('set_mount_skin', { skinId: validId });
+
+    const petWin = document.getElementById('win-pet');
+    if (petWin && !petWin.classList.contains('hidden')) {
+      this.renderPetWindow();
+    }
+
+    if (!opts.skipStableRender) {
+      const stableModal = document.getElementById('npc-quest-dialog-modal');
+      if (stableModal && !stableModal.classList.contains('hidden') && stableModal.querySelector('[data-stable-skin]')) {
+        this.openStablemasterModal(this._activeStablemasterTitle || '🐎 Stallbursche Konrad');
+      }
+    }
+
+    return chosen;
+  }
+
   openStablemasterModal(npcName = '🐎 Stallbursche Konrad') {
+    this._activeStablemasterTitle = npcName || '🐎 Stallbursche Konrad';
     let modal = document.getElementById('npc-quest-dialog-modal');
     if (!modal) {
       modal = document.createElement('div');
@@ -13809,55 +14010,16 @@ class AeryndorMMOApp {
       document.body.appendChild(modal);
     }
 
+    const prevList = modal.querySelector('.nqm-quest-list');
+    const prevScrollTop = prevList && modal.querySelector('[data-stable-skin]') ? prevList.scrollTop : 0;
+
     const isMounted = Boolean(this.selfState?.active_mount);
-    const activeSkin = localStorage.getItem('aeryndor_mount_skin_v1') || 'col1';
-    const horses = [
-      {
-        id: 'mount_war_boar',
-        skin: 'col1',
-        name: 'Schwarzer Rappe (Nachtschatten-Hengst)',
-        tier: 'Textur-Variante 1 (col1)',
-        bonus: '+35% Bewegungstempo • Sofortiger Kampf vom Pferderücken',
-        desc: 'Edler tiefdunkler Rappe mit aufgehelltem Glanzfell und Reichssattel – läuft links in der großen Pferdekoppel.',
-        badge: '🖤 SCHWARZER RAPPE',
-      },
-      {
-        id: 'mount_war_boar',
-        skin: 'col2',
-        name: 'Braun-Weißer Königs-Schecke (Weißmähne)',
-        tier: 'Textur-Variante 2 (col2)',
-        bonus: '+35% Bewegungstempo • Sofortiger Kampf vom Pferderücken',
-        desc: 'Kräftiger braun-weiß gefleckter Schecke mit silberweißer Mähne und edlem Zaumzeug – läuft rechts vorne in der Koppel.',
-        badge: '👑 KÖNIGS-SCHECKE',
-      },
-      {
-        id: 'mount_war_boar',
-        skin: 'col3',
-        name: 'Edler Licht-Schimmel (Goldmähne)',
-        tier: 'Textur-Variante 3 (col3)',
-        bonus: '+35% Bewegungstempo • Sofortiger Kampf vom Pferderücken',
-        desc: 'Strahlend weißer Schimmel mit goldblonder Mähne und Prunksattel – läuft im Zentrum des Pferdestalls.',
-        badge: '✨ LICHT-SCHIMMEL',
-      },
-      {
-        id: 'mount_war_boar',
-        skin: 'col4',
-        name: 'Rotbraunes Kastanien-Streitross',
-        tier: 'Textur-Variante 4 (col4)',
-        bonus: '+35% Bewegungstempo • Sofortiger Kampf vom Pferderücken',
-        desc: 'Warmes mahagoni- und kastanienbraunes Schlachtross der Reichsreiterei – läuft an der rechten Stallseite.',
-        badge: '🔥 KASTANIEN-ROSS',
-      },
-      {
-        id: 'mount_war_boar',
-        skin: 'col5',
-        name: 'Gold-Palomino der Sonnenwache',
-        tier: 'Textur-Variante 5 (col5)',
-        bonus: '+35% Bewegungstempo • Sofortiger Kampf vom Pferderücken',
-        desc: 'Goldschimmerndes Palomino-Streitross mit heller Mähne – läuft vorne am Koppelgatter neben Stallbursche Konrad.',
-        badge: '☀️ GOLD-PALOMINO',
-      },
-    ];
+    const activeSkin = this.getActiveEquippedMountSkinId();
+    const horses = this.getUnifiedMountSkinsCatalog();
+    const horseLv = Math.max(
+      1,
+      Math.min(50, Number(this.selfState?.mountData?.level || this.selfState?.computed?.horseLevel || 1))
+    );
 
     modal.classList.remove('hidden');
     modal.innerHTML = `
@@ -13874,26 +14036,29 @@ class AeryndorMMOApp {
           <div class="nqm-header-title">
             <div>
               <div class="nqm-npc-name">${this.escapeHtml(npcName || 'Stallbursche Konrad')}</div>
-              <div class="nqm-npc-sub">Reichs-Gestüt • Alle 5 Pferde-Texturvarianten im Stall &amp; Aufsitzen [Strg+H / F3]</div>
+              <div class="nqm-npc-sub">Reichs-Gestüt (Pferde-Stufe ${horseLv}/50) • Synchron mit Reittier-Fenster [P] &amp; Aufsitzen [Strg+H]</div>
             </div>
           </div>
           <button type="button" class="nqm-close-btn nw-chamfer-close" id="btn-stable-close" data-ui-tip="Schließen [ESC]">✕</button>
         </div>
 
         <div class="nqm-greeting">
-          „Willkommen am vergrößerten Pferdestall! Alle <b>5 Pferde-Texturvarianten</b> laufen hier direkt neben mir in der Koppel herum. Wähle jederzeit dein Lieblingsross für <b>[Strg+H]</b>, <b>[F3]</b> und das Auto-Reittier!“
+          „Willkommen am vergrößerten Pferdestall! Wähle hier oder im <b>Reittier-Fenster [P]</b> aus allen <b>${horses.length} Pferde-Skins &amp; Fellfarben</b> (inkl. <b>Schwarzer Rappe</b>, Schecke, Schimmel, Kastanie, Gold-Palomino &amp; Aura-Streitrösser) – deine Auswahl ist überall 100% synchron!“
         </div>
 
         <div class="nqm-quest-list">
           ${horses
             .map((h) => {
-              const isSelected = activeSkin === h.skin;
+              const isSelected = activeSkin === h.id;
               return `
             <div class="nqm-quest-card ${isSelected ? 'status-ready' : 'status-available'}" style="border-color:${
                 isSelected ? 'rgba(74,222,128,0.65)' : 'rgba(245,158,11,0.45)'
               };">
               <div class="nqm-qcard-head">
-                <div class="nqm-qcard-title">🐎 ${this.escapeHtml(h.name)}</div>
+                <div class="nqm-qcard-title" style="display:flex;align-items:center;gap:7px;">
+                  <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${h.swatch};border:1px solid rgba(255,255,255,0.55);box-shadow:0 0 6px ${h.swatch};flex-shrink:0;"></span>
+                  <span>${h.emoji} ${this.escapeHtml(h.name)}</span>
+                </div>
                 <span class="nqm-badge ${isSelected ? 'ready' : 'available'}">${
                 isSelected ? '✓ AKTIVES AUSSEHEN' : h.badge
               }</span>
@@ -13901,13 +14066,13 @@ class AeryndorMMOApp {
               <div class="nqm-qcard-desc">${this.escapeHtml(h.desc)}</div>
               <div class="nqm-qcard-bottom" style="margin-top:6px;">
                 <div class="nqm-rew-list">
-                  <span class="nqm-rew-pill gold">⚡ ${this.escapeHtml(h.bonus)}</span>
+                  <span class="nqm-rew-pill gold">⚡ ${this.escapeHtml(h.bonusSummary)}</span>
                 </div>
                 <div class="nqm-qcard-actions" style="display:flex;gap:6px;">
-                  <button type="button" class="ornate-btn ${isSelected ? 'green' : ''} small" data-stable-skin="${h.skin}">
+                  <button type="button" class="ornate-btn ${isSelected ? 'green' : ''} small" data-stable-skin="${h.id}">
                     ${isSelected ? '✓ Aussehen aktiv' : '🎨 Aussehen wählen'}
                   </button>
-                  <button type="button" class="ornate-btn gold small" data-stable-mount="${h.id}" data-stable-mount-skin="${h.skin}">
+                  <button type="button" class="ornate-btn gold small" data-stable-mount="${h.mountId}" data-stable-mount-skin="${h.id}">
                     ${isMounted && isSelected ? '🐎 Absitzen' : '🐎 Wählen &amp; Aufsitzen'}
                   </button>
                 </div>
@@ -13921,11 +14086,17 @@ class AeryndorMMOApp {
           <button type="button" class="ornate-btn gold" id="btn-stable-toggle-now">
             ${isMounted ? '🐎 Vom Reittier absitzen [Strg+H]' : '🐎 Sofort aufsitzen [Strg+H]'}
           </button>
-          <button type="button" class="ornate-btn" id="btn-stable-open-inv">🎒 Reittier- &amp; Skin-Inventar [I]</button>
+          <button type="button" class="ornate-btn" id="btn-stable-open-mount-win">🐎 Reittier-Fenster [P]</button>
+          <button type="button" class="ornate-btn" id="btn-stable-open-inv">🎒 Kostüm-Inventar [I]</button>
           <button type="button" class="ornate-btn" id="btn-stable-close-bottom">Schließen</button>
         </div>
       </div>
     `;
+
+    const nextList = modal.querySelector('.nqm-quest-list');
+    if (nextList && prevScrollTop > 0) {
+      nextList.scrollTop = prevScrollTop;
+    }
 
     const closeModal = () => modal.classList.add('hidden');
     modal.querySelector('#btn-stable-close')?.addEventListener('click', closeModal);
@@ -13936,28 +14107,19 @@ class AeryndorMMOApp {
 
     modal.querySelectorAll('[data-stable-skin]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const skinKey = btn.getAttribute('data-stable-skin') || 'col1';
-        const chosen = horses.find((h) => h.skin === skinKey) || horses[0];
-        try {
-          localStorage.setItem('aeryndor_mount_skin_v1', skinKey);
-        } catch (_) {}
-        this.engine?.setMountAppearance?.(skinKey);
-        this.showToast(`🐎 Start-Mount Aussehen geändert: ${chosen.name}!`);
-        this.openStablemasterModal(npcName);
+        const skinKey = btn.getAttribute('data-stable-skin') || 'none';
+        const chosen = this.applyUnifiedMountSkinSelection(skinKey);
+        this.showToast(`🐎 Pferde-Aussehen gewählt: ${chosen.name}!`);
       });
     });
 
     modal.querySelectorAll('[data-stable-mount]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const mId = btn.getAttribute('data-stable-mount') || 'mount_war_boar';
-        const skinKey = btn.getAttribute('data-stable-mount-skin') || 'col1';
-        const chosen = horses.find((h) => h.skin === skinKey) || horses[0];
-        const prevSkin = localStorage.getItem('aeryndor_mount_skin_v1') || 'col1';
-        try {
-          localStorage.setItem('aeryndor_mount_skin_v1', skinKey);
-        } catch (_) {}
-        this.engine?.setMountAppearance?.(skinKey);
-        if (!this.selfState?.active_mount || prevSkin === skinKey) {
+        const skinKey = btn.getAttribute('data-stable-mount-skin') || 'none';
+        const prevSkin = this.getActiveEquippedMountSkinId();
+        const chosen = this.applyUnifiedMountSkinSelection(skinKey, { skipStableRender: true });
+        if (!this.selfState?.active_mount || prevSkin === chosen.id) {
           this.triggerMountToggle(mId, !this.selfState?.active_mount);
         }
         this.showToast(`🐎 ${chosen.name}: Gute Reise im Sattel!`);
@@ -13968,6 +14130,13 @@ class AeryndorMMOApp {
     modal.querySelector('#btn-stable-toggle-now')?.addEventListener('click', () => {
       this.triggerMountToggle('mount_war_boar');
       closeModal();
+    });
+
+    modal.querySelector('#btn-stable-open-mount-win')?.addEventListener('click', () => {
+      closeModal();
+      this.companionWindowPage = 'mount';
+      this.openWindow('pet');
+      this.renderPetWindow();
     });
 
     modal.querySelector('#btn-stable-open-inv')?.addEventListener('click', () => {
@@ -15401,14 +15570,8 @@ class AeryndorMMOApp {
       const mb = md.mountedBonuses || {};
       const sc = md.perPointScaling || { awPerDmgPt: 5, strPerDmgPt: 0.5, dmgPctPerDmgPt: 0.15, hpPerHpPt: 45, defPerHpPt: 3 };
 
-      const allowedHorseSkinIds = new Set(['none', 'skin_rift_charger', 'skin_shadow_steed']);
-      const rawMountSkins = this.config?.mountSkins || [
-        { id: 'none', name: 'Standard-Pferd (Stufen-Aussehen)', emoji: '🐎', bonusSummary: 'Zeigt automatisch dein Pferd (Lv. 1), Kampfpferd (Lv. 35) oder Militärgaul (Lv. 50)' },
-        { id: 'skin_rift_charger', name: 'Rissbrecher-Schlachtross', emoji: '💠', bonusSummary: '+15% Stark gg. Rissmonolithen • +8% Durchschnittsschaden (DSS)' },
-        { id: 'skin_shadow_steed', name: 'Nachtschatten-Streitross', emoji: '🌑', bonusSummary: '+15% Stark gg. Monster • +10% Kritischer Treffer' },
-      ];
-      const mountSkinsList = rawMountSkins.filter((ms) => allowedHorseSkinIds.has(ms.id));
-      const safeEqSkin = allowedHorseSkinIds.has(eqSkin) ? eqSkin : 'none';
+      const mountSkinsList = this.getUnifiedMountSkinsCatalog();
+      const safeEqSkin = this.getActiveEquippedMountSkinId();
 
       const horseSkillsList = s.computed?.horseSkills || this.config?.horseSkills || [
         { id: 'horse_stomp', slot: 101, name: 'Kampf vom Pferderücken (Pferde-Stampfen)', shortName: 'Pferde-Stampfen', icon: './assets/icons/skills/cropped/stump.png', cooldown: 9, description: '245% Flächenschaden im Umkreis & 3 Sek. Betäubung (Ohnmacht).' },
@@ -15534,20 +15697,23 @@ class AeryndorMMOApp {
             </div>
           </div>
 
-          <!-- 2. MITTE: MOUNT-SKINS (ÜBERDECKEN IMMER DAS STANDARD-PFERD & GEWÄHREN ZUSÄTZLICHE SATTEL-BONI) -->
+          <!-- 2. MITTE: MOUNT-SKINS (ÜBERDECKEN IMMER DAS STANDARD-PFERD & GEWÄHREN ZUSÄTZLICHE SATTEL-BONI • SYNCHRON MIT STALLBURSCHE KONRAD) -->
           <div class="cw-section-box" style="padding:8px 10px;">
             <div class="cw-sec-header" style="margin-bottom:6px;">
-              <span>🐎 Pferde-Skins &amp; Sattel-Boni (Überdeckt das Standard-Pferd!)</span>
+              <span>🐎 Pferde-Skins &amp; Fellfarben (Synchron mit Stallbursche Konrad)</span>
               <span style="color:#4ade80;font-size:10px;">Aktiv im Sattel: ${this.escapeHtml(activeSkinMeta.bonusSummary)}</span>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;">
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%;">
               ${mountSkinsList
                 .map((ms) => {
                   const isAct = safeEqSkin === ms.id;
                   return `
-                  <button type="button" data-mount-skin-select="${ms.id}" style="min-width:0;max-width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border-radius:6px;cursor:pointer;text-align:left;border:1px solid ${isAct ? '#fbbf24' : 'rgba(148,163,184,0.24)'};background:${isAct ? 'rgba(245,158,11,0.22)' : 'rgba(15,23,42,0.78)'};color:${isAct ? '#fef3c7' : '#e2e8f0'};">
-                    <div style="font-size:10.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;">${ms.emoji} ${this.escapeHtml(ms.name)}</div>
-                    <div style="font-size:8.8px;color:${isAct ? '#fde047' : '#94a3b8'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;" title="${this.escapeHtml(ms.bonusSummary)}">${this.escapeHtml(ms.bonusSummary)}</div>
+                  <button type="button" data-mount-skin-select="${ms.id}" title="${this.escapeHtml(ms.name + ' – ' + ms.bonusSummary)}" style="min-width:0;max-width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 7px;border-radius:6px;cursor:pointer;text-align:left;border:1px solid ${isAct ? '#fbbf24' : 'rgba(148,163,184,0.24)'};background:${isAct ? 'rgba(245,158,11,0.22)' : 'rgba(15,23,42,0.78)'};color:${isAct ? '#fef3c7' : '#e2e8f0'};">
+                    <div style="display:flex;align-items:center;gap:5px;width:100%;min-width:0;">
+                      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ms.swatch || '#94a3b8'};border:1px solid rgba(255,255,255,0.55);box-shadow:0 0 5px ${ms.swatch || '#94a3b8'};flex-shrink:0;"></span>
+                      <span style="font-size:10px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">${ms.emoji} ${this.escapeHtml(ms.name)}</span>
+                    </div>
+                    <div style="font-size:8.4px;color:${isAct ? '#fde047' : '#94a3b8'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;">${this.escapeHtml(ms.bonusSummary)}</div>
                   </button>`;
                 })
                 .join('')}
@@ -15669,8 +15835,7 @@ class AeryndorMMOApp {
         btn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           const skinId = btn.getAttribute('data-mount-skin-select') || 'none';
-          this.engine?.setMountAppearance?.(skinId, horseLv);
-          this.sendAction('set_mount_skin', { skinId });
+          this.applyUnifiedMountSkinSelection(skinId);
         });
       });
 
